@@ -1,0 +1,123 @@
+export interface ImportTemplateFormatDefinition {
+  key: string;
+  label: string;
+  fileName: string;
+  mimeType: string;
+  requiredFields: string[];
+  mappingNotes: string[];
+  sample: string;
+  downloadContent: string;
+}
+
+export interface ImportTemplateDefinition {
+  title: string;
+  description: string;
+  footerNote?: string;
+  formats: ImportTemplateFormatDefinition[];
+}
+
+const questionCsvTemplate = [
+  "subject_code,difficulty,question_type,question_text,tags,option_A,option_B,option_C,option_D,correct_option_keys,acceptable_answers,essay_rubric,sample_answer",
+  'SMOKE101,easy,multiple_choice,"2 + 2 = ?","math|arithmetic",3,4,5,6,B,,,',
+  'SMOKE101,medium,essay,"Explain why practice exams are useful.","essay|reflection",,,,,,"practice|timing","Score clarity, structure, and examples.","Practice exams reveal gaps and improve timing before the real test."',
+].join("\n");
+
+const questionJsonTemplate = JSON.stringify(
+  [
+    {
+      subject_code: "SMOKE101",
+      difficulty: "easy",
+      question_type: "multiple_choice",
+      question_text: "2 + 2 = ?",
+      tags: ["math", "arithmetic"],
+      options: [
+        { key: "A", text: "3" },
+        { key: "B", text: "4" },
+        { key: "C", text: "5" },
+      ],
+      correct_option_keys: ["B"],
+      acceptable_answers: [],
+      essay_rubric: "",
+      sample_answer: "",
+    },
+    {
+      subject_code: "SMOKE101",
+      difficulty: "medium",
+      question_type: "essay",
+      question_text: "Explain why practice exams are useful.",
+      tags: ["essay", "reflection"],
+      options: [],
+      correct_option_keys: [],
+      acceptable_answers: ["practice", "timing"],
+      essay_rubric: "Score clarity, structure, and examples.",
+      sample_answer: "Practice exams reveal gaps and improve timing before the real test.",
+    },
+  ],
+  null,
+  2,
+);
+
+const userCsvTemplate = [
+  "full_name,email,password,phone_number,status,is_active,is_staff,school_code,role_slugs",
+  'Candidate Demo,candidate@example.com,candidate123,+84900000001,active,true,false,SMOKE-SCHOOL,candidate',
+  'Exam Proctor,proctor@example.com,proctor123,+84900000002,pending,true,true,SMOKE-SCHOOL,proctor|examiner',
+].join("\n");
+
+export const questionImportTemplate: ImportTemplateDefinition = {
+  title: "Question Import Template",
+  description: "Use backend-compatible CSV or JSON rows so the question import endpoint can create revisioned questions directly.",
+  footerNote: "List-style fields such as tags, correct_option_keys, and acceptable_answers use the pipe character `|` in CSV files.",
+  formats: [
+    {
+      key: "csv",
+      label: "CSV",
+      fileName: "question-import-template.csv",
+      mimeType: "text/csv;charset=utf-8",
+      requiredFields: ["subject_code", "difficulty", "question_type", "question_text"],
+      mappingNotes: [
+        "Objective questions can provide either option_A, option_B, option_C, option_D columns or additional option_* columns.",
+        "correct_option_keys must reference option keys such as A|B or TRUE.",
+        "Essay rows can leave option_* columns empty and use acceptable_answers, essay_rubric, and sample_answer.",
+      ],
+      sample: questionCsvTemplate,
+      downloadContent: questionCsvTemplate,
+    },
+    {
+      key: "json",
+      label: "JSON",
+      fileName: "question-import-template.json",
+      mimeType: "application/json;charset=utf-8",
+      requiredFields: ["subject_code", "difficulty", "question_type", "question_text"],
+      mappingNotes: [
+        "JSON rows may send an options array with key/text pairs instead of option_* columns.",
+        "tags, correct_option_keys, and acceptable_answers should be arrays in JSON files.",
+        "Keep question_type aligned with backend values: multiple_choice, essay, or true_false.",
+      ],
+      sample: questionJsonTemplate,
+      downloadContent: `${questionJsonTemplate}\n`,
+    },
+  ],
+};
+
+export const userImportTemplate: ImportTemplateDefinition = {
+  title: "User Import Template",
+  description: "Prepare CSV files now using the fields planned for the future backend user import pipeline.",
+  footerNote: "This template is ready for the backend import phase that will resolve school_code and role_slugs into the current API payload.",
+  formats: [
+    {
+      key: "csv",
+      label: "CSV",
+      fileName: "user-import-template.csv",
+      mimeType: "text/csv;charset=utf-8",
+      requiredFields: ["full_name", "email", "password", "status", "is_active", "is_staff"],
+      mappingNotes: [
+        "school_code should match an existing school code; leave it blank when the user has no school.",
+        "role_slugs accepts one or more role slugs separated by `|`, for example candidate|student.",
+        "status should use active, pending, or locked, while boolean columns should use true or false.",
+      ],
+      sample: userCsvTemplate,
+      downloadContent: userCsvTemplate,
+    },
+  ],
+};
+

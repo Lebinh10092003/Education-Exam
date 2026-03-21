@@ -1,0 +1,183 @@
+import calendar
+from datetime import datetime
+from decimal import Decimal
+
+from django.conf import settings
+from django.db.models import Count, Q
+from django.utils import timezone
+from rest_framework import generics
+from rest_framework.permissions import IsAuthenticated
+from rest_framework.response import Response
+
+from apps.exam_authoring.models import Exam
+from apps.exam_authoring.services import build_exam_assignment_summary
+from apps.exam_delivery.models import ExamSession
+from apps.identity.models import User
+from apps.identity.permissions import HasAPIPermissionCode
+from apps.proctoring.models import ProctorEvent
+from apps.question_bank.models import Question
+
+from .serializers import (
+    DashboardOverviewSerializer,
+    LivenessSerializer,
+    ReadinessSerializer,
+)
+
+
+class LivenessView(generics.GenericAPIView):
+    authentication_classes = []
+    permission_classes = []
+    serializer_class = LivenessSerializer
+
+    def get(self, request):
+        serializer = self.get_serializer({"status": "ok"})
+        return Response(serializer.data)
+
+
+class ReadinessView(generics.GenericAPIView):
+    authentication_classes = []
+    permission_classes = []
+    serializer_class = ReadinessSerializer
+
+    def get(self, request):
+        components = {
+            "database": "configured" if settings.DATABASES.get("default") else "missing",
+            "redis": "configured" if getattr(settings, "REDIS_URL", None) else "missing",
+            "storage": "object-storage"
+            if getattr(settings, "AWS_STORAGE_BUCKET_NAME", "")
+            else "filesystem",
+        }
+        serializer = self.get_serializer({"status": "ok", "components": components})
+        return Response(serializer.data)
+
+
+def _month_starts(count=6):
+    current = timezone.localtime().date().replace(day=1)
+    months = []
+    year = current.year
+    month = current.month
+    for _ in range(count):
+        months.append(datetime(year, month, 1, tzinfo=timezone.get_current_timezone()))
+        month -= 1
+        if month == 0:
+            month = 12
+            year -= 1
+    return list(reversed(months))
+
+
+def _format_exam_time_left(exam):
+    now = timezone.now()
+    schedule_window = getattr(exam, "schedule_window", None)
+    if schedule_window is None:
+        return "-"
+
+    if schedule_window.opens_at and exam.status == Exam.Status.SCHEDULED and schedule_window.opens_at > now:
+        delta = schedule_window.opens_at - now
+        days = int(delta.total_seconds() // 86400)
+        hours = int((delta.total_seconds() % 86400) // 3600)
+        if days > 0:
+            return f"Starts in {days}d"
+        if hours > 0:
+            return f"Starts in {hours}h"
+        return "Starts soon"
+
+    if schedule_window.closes_at and schedule_window.closes_at > now:
+        delta = schedule_window.closes_at - now
+        hours = int(delta.total_seconds() // 3600)
+        minutes = int((delta.total_seconds() % 3600) // 60)
+        return f"{hours}h {minutes}m left"
+
+    if schedule_window.closes_at and schedule_window.closes_at <= now:
+        return "Ended"
+
+    return "-"
+
+
+class DashboardOverviewView(generics.GenericAPIView):
+    permission_classes = [IsAuthenticated, HasAPIPermissionCode]
+    permission_code = "exams.view"
+    serializer_class = DashboardOverviewSerializer
+
+    def get(self, request):
+        candidate_role_filter = Q(user_roles__role__slug="candidate") | Q(user_roles__role__slug="student")
+        total_candidates = User.objects.filter(candidate_role_filter, user_roles__is_active=True).distinct().count()
+        active_exams = Exam.objects.filter(
+            status__in=[Exam.Status.SCHEDULED, Exam.Status.OPEN, Exam.Status.PAUSED]
+        ).count()
+        question_bank_count = Question.objects.count()
+        total_sessions = ExamSession.objects.count()
+        submitted_sessions = ExamSession.objects.filter(status=ExamSession.Status.SUBMITTED).count()
+        completion_rate = Decimal("0.00")
+        if total_sessions:
+            completion_rate = (Decimal(submitted_sessions) / Decimal(total_sessions)) * Decimal("100")
+
+        activity = []
+        month_starts = _month_starts()
+        for index, start in enumerate(month_starts):
+            if index + 1 < len(month_starts):
+                end = month_starts[index + 1]
+            else:
+                next_month = start.month + 1
+                next_year = start.year
+                if next_month == 13:
+                    next_month = 1
+                    next_year += 1
+                end = datetime(next_year, next_month, 1, tzinfo=start.tzinfo)
+            activity.append(
+                {
+                    "month": calendar.month_abbr[start.month],
+                    "exams": Exam.objects.filter(created_at__gte=start, created_at__lt=end).count(),
+                    "candidates": ExamSession.objects.filter(
+                        started_at__gte=start,
+                        started_at__lt=end,
+                    ).values("candidate_id").distinct().count(),
+                }
+            )
+
+        recent_exam_records = (
+            Exam.objects.select_related("subject", "schedule_window", "current_version")
+            .annotate(completed_count=Count("sessions", filter=Q(sessions__status=ExamSession.Status.SUBMITTED)))
+            .order_by("-created_at")[:6]
+        )
+        recent_exams = []
+        for exam in recent_exam_records:
+            assignment_summary = build_exam_assignment_summary(exam)
+            recent_exams.append(
+                {
+                    "id": exam.id,
+                    "name": exam.name,
+                    "subject": exam.subject.name,
+                    "status": exam.status,
+                    "candidates": assignment_summary["total_candidates"],
+                    "completed": getattr(exam, "completed_count", 0),
+                    "time_left": _format_exam_time_left(exam),
+                }
+            )
+
+        recent_alerts = (
+            ProctorEvent.objects.select_related("session__exam")
+            .filter(severity__in=[ProctorEvent.Severity.WARNING, ProctorEvent.Severity.CRITICAL])
+            .order_by("-occurred_at")[:6]
+        )
+        alerts = [
+            {
+                "id": alert.id,
+                "type": "warning" if alert.severity == ProctorEvent.Severity.WARNING else "critical",
+                "message": alert.metadata.get("message") or alert.get_event_type_display(),
+                "time": timezone.localtime(alert.occurred_at).strftime("%Y-%m-%d %H:%M"),
+                "exam_id": alert.session.exam_id,
+            }
+            for alert in recent_alerts
+        ]
+
+        payload = {
+            "total_candidates": total_candidates,
+            "active_exams": active_exams,
+            "question_bank_count": question_bank_count,
+            "completion_rate": completion_rate.quantize(Decimal("0.01")),
+            "activity": activity,
+            "recent_exams": recent_exams,
+            "alerts": alerts,
+        }
+        serializer = self.get_serializer(payload)
+        return Response(serializer.data)
