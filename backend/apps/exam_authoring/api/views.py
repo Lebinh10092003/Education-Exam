@@ -1,6 +1,8 @@
 from django.db.models import Count, Exists, OuterRef, Q
+from drf_spectacular.utils import extend_schema
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
+from rest_framework.parsers import FormParser, MultiPartParser
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
@@ -8,11 +10,13 @@ from apps.identity.permissions import HasAPIPermissionCode
 from apps.institutions.models import CandidateGroup
 
 from ..models import Exam, ExamAssignment
-from ..services import build_exam_assignment_summary, clone_exam, sync_exam_assignments
+from ..services import build_exam_assignment_summary, clone_exam, import_students_to_exam, sync_exam_assignments
 from .serializers import (
     ExamGroupAssignmentSerializer,
     ExamGroupAssignmentSyncSerializer,
     ExamReadSerializer,
+    ExamStudentImportRequestSerializer,
+    ExamStudentImportSummarySerializer,
     ExamWriteSerializer,
 )
 
@@ -141,3 +145,24 @@ class ExamViewSet(viewsets.ModelViewSet):
             group_ids=serializer.validated_data["group_ids"],
         )
         return Response(build_exam_assignment_summary(exam))
+
+    @extend_schema(
+        request=ExamStudentImportRequestSerializer,
+        responses={200: ExamStudentImportSummarySerializer},
+    )
+    @action(
+        detail=True,
+        methods=["post"],
+        url_path="student-import",
+        parser_classes=[MultiPartParser, FormParser],
+    )
+    def student_import(self, request, pk=None):
+        exam = self.get_object()
+        serializer = ExamStudentImportRequestSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        summary = import_students_to_exam(
+            exam=exam,
+            assigned_by=request.user,
+            uploaded_file=serializer.validated_data["file"],
+        )
+        return Response(summary, status=status.HTTP_200_OK)

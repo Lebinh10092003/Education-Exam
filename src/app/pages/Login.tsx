@@ -16,7 +16,7 @@ export function Login() {
   const { login } = useAuth();
   const { isSubmitting, error, run } = useMutationState();
 
-  const [email, setEmail] = useState("admin@example.com");
+  const [identifier, setIdentifier] = useState("admin@example.com");
   const [password, setPassword] = useState("admin123456");
   const [rememberMe, setRememberMe] = useState(true);
 
@@ -24,7 +24,7 @@ export function Login() {
     event.preventDefault();
 
     try {
-      const profile = await run(() => login(email.trim(), password));
+      const profile = await run(() => login(identifier.trim(), password));
       toast.success("Signed in successfully.");
       navigate(getDefaultRouteForProfile(profile), { replace: true });
     } catch {
@@ -45,15 +45,15 @@ export function Login() {
         <CardContent>
           <form className="space-y-4" onSubmit={handleSubmit}>
             <div>
-              <Label htmlFor="email">Email Address</Label>
+              <Label htmlFor="identifier">Email or Username</Label>
               <Input
-                id="email"
-                type="email"
-                placeholder="you@example.com"
+                id="identifier"
+                type="text"
+                placeholder="you@example.com or your.username"
                 className="mt-2"
-                value={email}
-                onChange={(event) => setEmail(event.target.value)}
-                autoComplete="email"
+                value={identifier}
+                onChange={(event) => setIdentifier(event.target.value)}
+                autoComplete="username"
                 required
               />
             </div>

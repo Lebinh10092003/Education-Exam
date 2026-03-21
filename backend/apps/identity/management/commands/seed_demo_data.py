@@ -12,6 +12,7 @@ class Command(BaseCommand):
         user, created = user_model.objects.get_or_create(
             email="admin@example.com",
             defaults={
+                "username": "admin",
                 "full_name": "EduExam Administrator",
                 "is_staff": True,
                 "is_superuser": True,

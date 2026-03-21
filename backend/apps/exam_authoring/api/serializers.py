@@ -260,3 +260,23 @@ class ExamGroupAssignmentSerializer(serializers.Serializer):
 
 class ExamGroupAssignmentSyncSerializer(serializers.Serializer):
     group_ids = serializers.ListField(child=serializers.IntegerField(), required=True)
+
+
+class ExamStudentImportRequestSerializer(serializers.Serializer):
+    file = serializers.FileField(required=True)
+
+
+class ExamStudentImportErrorSerializer(serializers.Serializer):
+    row_number = serializers.IntegerField()
+    identifier = serializers.CharField()
+    message = serializers.CharField()
+
+
+class ExamStudentImportSummarySerializer(serializers.Serializer):
+    total_rows = serializers.IntegerField()
+    created_users = serializers.IntegerField()
+    updated_users = serializers.IntegerField()
+    assigned_users = serializers.IntegerField()
+    skipped_rows = serializers.IntegerField()
+    failed_rows = serializers.IntegerField()
+    errors = ExamStudentImportErrorSerializer(many=True)

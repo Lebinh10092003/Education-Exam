@@ -63,6 +63,12 @@ const userCsvTemplate = [
   'Exam Proctor,proctor@example.com,proctor123,+84900000002,pending,true,true,SMOKE-SCHOOL,proctor|examiner',
 ].join("\n");
 
+const examStudentCsvTemplate = [
+  "full_name,date_of_birth,student_class,cccd,email,phone_number,school_code",
+  "Le Van Binh,24/08/2003,12,012345678901,,0901234567,SMOKE-SCHOOL",
+  "Tran Thi Hoa,15/01/2004,12A1,012345678902,hoa@student.local,0901234568,SMOKE-SCHOOL",
+].join("\n");
+
 export const questionImportTemplate: ImportTemplateDefinition = {
   title: "Question Import Template",
   description: "Use backend-compatible CSV or JSON rows so the question import endpoint can create revisioned questions directly.",
@@ -117,6 +123,29 @@ export const userImportTemplate: ImportTemplateDefinition = {
       ],
       sample: userCsvTemplate,
       downloadContent: userCsvTemplate,
+    },
+  ],
+};
+
+export const examStudentImportTemplate: ImportTemplateDefinition = {
+  title: "Exam Student Import Template",
+  description: "Import students directly into a specific exam. The backend will create or update student accounts by CCCD and assign them straight to the exam.",
+  footerNote:
+    "If email is left blank, the backend will generate one from the student username. New student passwords default to the generated username.",
+  formats: [
+    {
+      key: "csv",
+      label: "CSV",
+      fileName: "exam-student-import-template.csv",
+      mimeType: "text/csv;charset=utf-8",
+      requiredFields: ["full_name", "date_of_birth", "student_class", "cccd"],
+      mappingNotes: [
+        "date_of_birth must use DD/MM/YYYY, for example 24/08/2003.",
+        "Generated usernames follow the pattern name.ddmmyyyy.class and remove Vietnamese accents automatically.",
+        "If CCCD already belongs to an existing student, the backend updates that profile and reuses the same account.",
+      ],
+      sample: examStudentCsvTemplate,
+      downloadContent: examStudentCsvTemplate,
     },
   ],
 };
