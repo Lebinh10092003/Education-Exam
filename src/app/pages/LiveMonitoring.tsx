@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useParams } from "react-router";
-import { toast } from "sonner";
+import { notify } from "../lib/notify";
 import {
   AlertTriangle,
   CheckCircle2,
@@ -178,11 +178,11 @@ export function LiveMonitoring() {
           body: { status: nextStatus },
         }),
       );
-      toast.success(`Exam moved to ${nextStatus}.`);
+      notify.success(`Exam moved to ${nextStatus}.`);
       await Promise.all([exam.reload(), snapshot.reload()]);
     } catch (error) {
       const message = error instanceof Error ? error.message : "Unable to update exam status.";
-      toast.error(message);
+      notify.error(message);
     }
   };
 
@@ -194,11 +194,11 @@ export function LiveMonitoring() {
           body: { decision, notes: "" },
         }),
       );
-      toast.success(`Case ${decision}.`);
+      notify.success(`Case ${decision}.`);
       await cases.reload();
     } catch (error) {
       const message = error instanceof Error ? error.message : "Unable to update case.";
-      toast.error(message);
+      notify.error(message);
     }
   };
 

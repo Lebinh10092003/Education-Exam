@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router";
 import { Check, ChevronLeft, ChevronRight, Search } from "lucide-react";
-import { toast } from "sonner";
+import { notify } from "../lib/notify";
 
 import { PageHeader } from "../components/PageHeader";
 import { Badge } from "../components/ui/badge";
@@ -297,7 +297,7 @@ export function ExamCreationWizard() {
   const validateStep = (step: number) => {
     if (step === 1) {
       if (!formState.name.trim() || !formState.subject_id) {
-        toast.error("Exam name and subject are required.");
+        notify.error("Exam name and subject are required.");
         return false;
       }
       return true;
@@ -308,7 +308,7 @@ export function ExamCreationWizard() {
         formState.manual_question_ids.length === 0 &&
         buildRandomRulesPayload().length === 0
       ) {
-        toast.error("Select at least one manual question or one random rule.");
+        notify.error("Select at least one manual question or one random rule.");
         return false;
       }
       return true;
@@ -365,7 +365,7 @@ export function ExamCreationWizard() {
         });
       }
 
-      toast.success(isEditing ? "Exam updated." : "Exam created.");
+      notify.success(isEditing ? "Exam updated." : "Exam created.");
       navigate("/exams");
     });
   };

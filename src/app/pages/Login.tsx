@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router";
-import { toast } from "sonner";
+import { notify } from "../lib/notify";
 
 import { getDefaultRouteForProfile } from "../auth/AuthContext";
 import { useAuth } from "../auth/useAuth";
@@ -25,10 +25,10 @@ export function Login() {
 
     try {
       const profile = await run(() => login(identifier.trim(), password));
-      toast.success("Signed in successfully.");
+      notify.success("Signed in successfully.");
       navigate(getDefaultRouteForProfile(profile), { replace: true });
     } catch {
-      toast.error("Unable to sign in with the provided credentials.");
+      notify.error("Unable to sign in with the provided credentials.");
     }
   };
 

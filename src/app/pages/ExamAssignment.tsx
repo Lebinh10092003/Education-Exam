@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router";
 import { Search, Upload, UserPlus } from "lucide-react";
-import { toast } from "sonner";
+import { notify } from "../lib/notify";
 
 import { ImportTemplateActions } from "../components/imports/ImportTemplateActions";
 import { PageHeader } from "../components/PageHeader";
@@ -128,7 +128,7 @@ export function ExamAssignment() {
         },
       });
       await Promise.all([examDetails.reload(), groupsList.reload()]);
-      toast.success("Assignments saved.");
+      notify.success("Assignments saved.");
       navigate("/exams");
     });
   };
@@ -139,7 +139,7 @@ export function ExamAssignment() {
     }
 
     if (!importFile) {
-      toast.error("Choose a CSV file to import.");
+      notify.error("Choose a CSV file to import.");
       return;
     }
 
@@ -154,9 +154,9 @@ export function ExamAssignment() {
       setImportSummary(summary);
       await Promise.all([examDetails.reload(), groupsList.reload()]);
       if (summary.failed_rows > 0) {
-        toast.info(`Imported with ${summary.failed_rows} row error(s).`);
+        notify.info(`Imported with ${summary.failed_rows} row error(s).`);
       } else {
-        toast.success("Students imported successfully.");
+        notify.success("Students imported successfully.");
       }
     });
   };

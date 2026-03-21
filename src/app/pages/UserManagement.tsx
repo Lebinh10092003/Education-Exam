@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Download, Edit, Lock, Plus, Search, Trash2, Unlock } from "lucide-react";
-import { toast } from "sonner";
+import { notify } from "../lib/notify";
 
 import { PageHeader } from "../components/PageHeader";
 import { StatusBadge } from "../components/StatusBadge";
@@ -215,12 +215,12 @@ export function UserManagement() {
 
   const saveUser = async () => {
     if (!formState.full_name.trim() || !formState.email.trim()) {
-      toast.error("Full name and email are required.");
+      notify.error("Full name and email are required.");
       return;
     }
 
     if (!editingUser && !formState.password.trim()) {
-      toast.error("Password is required when creating a user.");
+      notify.error("Password is required when creating a user.");
       return;
     }
 
@@ -255,12 +255,18 @@ export function UserManagement() {
       await usersList.reload();
       await schoolsList.reload();
       closeDialog(false);
-      toast.success(editingUser ? "User updated." : "User created.");
+      notify.success(editingUser ? "User updated." : "User created.");
     });
   };
 
   const deleteUser = async (user: UserRecord) => {
-    if (!window.confirm(`Delete user "${user.full_name}"?`)) {
+    const confirmed = await notify.confirm({
+      title: "Delete this user?",
+      text: `User "${user.full_name}" will be permanently removed.`,
+      confirmText: "Delete User",
+      confirmButtonColor: "#dc2626",
+    });
+    if (!confirmed) {
       return;
     }
 
@@ -269,12 +275,24 @@ export function UserManagement() {
         method: "DELETE",
       });
       await usersList.reload();
-      toast.success("User deleted.");
+      notify.success("User deleted.");
     });
   };
 
   const toggleLock = async (user: UserRecord) => {
     const action = user.status === "locked" ? "unlock" : "lock";
+    const confirmed = await notify.confirm({
+      title: action === "lock" ? "Lock this user?" : "Unlock this user?",
+      text:
+        action === "lock"
+          ? `${user.full_name} will no longer be able to sign in until unlocked.`
+          : `${user.full_name} will regain access to sign in.`,
+      confirmText: action === "lock" ? "Lock User" : "Unlock User",
+      confirmButtonColor: action === "lock" ? "#d97706" : "#16a34a",
+    });
+    if (!confirmed) {
+      return;
+    }
 
     await userMutation.run(async () => {
       await apiRequest(`/api/v1/users/${user.id}/${action}/`, {
@@ -282,7 +300,7 @@ export function UserManagement() {
         body: {},
       });
       await usersList.reload();
-      toast.success(action === "lock" ? "User locked." : "User unlocked.");
+      notify.success(action === "lock" ? "User locked." : "User unlocked.");
     });
   };
 
@@ -291,10 +309,29 @@ export function UserManagement() {
       return;
     }
 
-    if (
-      action === "delete" &&
-      !window.confirm(`Delete ${selectedUsers.length} selected user(s)?`)
-    ) {
+    const confirmed = await notify.confirm({
+      title:
+        action === "delete"
+          ? "Delete selected users?"
+          : action === "lock"
+            ? "Lock selected users?"
+            : "Unlock selected users?",
+      text:
+        action === "delete"
+          ? `${selectedUsers.length} selected user(s) will be permanently removed.`
+          : action === "lock"
+            ? `${selectedUsers.length} selected user(s) will be prevented from signing in.`
+            : `${selectedUsers.length} selected user(s) will regain access to sign in.`,
+      confirmText:
+        action === "delete"
+          ? "Delete Users"
+          : action === "lock"
+            ? "Lock Users"
+            : "Unlock Users",
+      confirmButtonColor:
+        action === "delete" ? "#dc2626" : action === "lock" ? "#d97706" : "#16a34a",
+    });
+    if (!confirmed) {
       return;
     }
 
@@ -314,17 +351,17 @@ export function UserManagement() {
       );
       setSelectedUsers([]);
       await usersList.reload();
-      toast.success(`Bulk ${action} completed.`);
+      notify.success(`Bulk ${action} completed.`);
     });
   };
 
   const handlePendingUserImport = () => {
     if (!importFile) {
-      toast.error("Choose a CSV file to prepare for import.");
+      notify.error("Choose a CSV file to prepare for import.");
       return;
     }
 
-    toast.info(
+    notify.info(
       "User import template is ready, but the backend CSV import endpoint is not exposed yet. The selected file remains local for now.",
     );
   };

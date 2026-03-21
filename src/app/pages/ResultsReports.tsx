@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { toast } from "sonner";
+import { notify } from "../lib/notify";
 import {
   Bar,
   BarChart,
@@ -173,17 +173,27 @@ export function ResultsReports() {
   );
 
   const publishResult = async (result: ResultRecord) => {
+    const confirmed = await notify.confirm({
+      title: "Publish this result?",
+      text: `${result.candidate.full_name} will be able to view the published result for ${result.exam.name}.`,
+      confirmText: "Publish Result",
+      confirmButtonColor: "#2563eb",
+    });
+    if (!confirmed) {
+      return;
+    }
+
     try {
       await mutation.run(() =>
         apiRequest(`/api/v1/results/${result.id}/publish/`, {
           method: "POST",
         }),
       );
-      toast.success("Result published.");
+      notify.success("Result published.");
       await Promise.all([resultsList.reload(), summary.reload()]);
     } catch (error) {
       const message = error instanceof Error ? error.message : "Unable to publish result.";
-      toast.error(message);
+      notify.error(message);
     }
   };
 

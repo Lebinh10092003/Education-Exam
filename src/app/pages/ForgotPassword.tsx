@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Link } from "react-router";
 import { ArrowLeft } from "lucide-react";
-import { toast } from "sonner";
+import { notify } from "../lib/notify";
 
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
 import { Button } from "../components/ui/button";
@@ -17,7 +17,7 @@ export function ForgotPassword() {
 
   const handleSubmit = async () => {
     if (!email.trim()) {
-      toast.error("Email is required.");
+      notify.error("Email is required.");
       return;
     }
 
@@ -30,10 +30,10 @@ export function ForgotPassword() {
         }),
       );
       setSuccessMessage(response.detail);
-      toast.success("Reset request accepted.");
+      notify.success("Reset request accepted.");
     } catch (error) {
       const message = error instanceof Error ? error.message : "Unable to request password reset.";
-      toast.error(message);
+      notify.error(message);
     }
   };
 

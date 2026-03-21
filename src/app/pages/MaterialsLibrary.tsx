@@ -1,5 +1,5 @@
 import { useMemo, useRef, useState, type ChangeEvent } from "react";
-import { toast } from "sonner";
+import { notify } from "../lib/notify";
 import { Download, Eye, FileText, Plus, Search, Trash2, Upload } from "lucide-react";
 
 import { PageHeader } from "../components/PageHeader";
@@ -142,13 +142,13 @@ export function MaterialsLibrary() {
       window.open(payload.file_url, "_blank", "noopener,noreferrer");
     } catch (error) {
       const message = error instanceof Error ? error.message : "Unable to open material.";
-      toast.error(message);
+      notify.error(message);
     }
   };
 
   const saveMaterial = async () => {
     if (!formState.title.trim() || !formState.subjectId || !formState.file) {
-      toast.error("Title, subject, and file are required.");
+      notify.error("Title, subject, and file are required.");
       return;
     }
 
@@ -165,18 +165,23 @@ export function MaterialsLibrary() {
           body: formData,
         }),
       );
-      toast.success("Material uploaded.");
+      notify.success("Material uploaded.");
       setIsCreateDialogOpen(false);
       resetForm();
       await materialsList.reload();
     } catch (error) {
       const message = error instanceof Error ? error.message : "Unable to upload material.";
-      toast.error(message);
+      notify.error(message);
     }
   };
 
   const deleteMaterial = async (material: MaterialRecord) => {
-    const confirmed = window.confirm(`Delete material "${material.title}"?`);
+    const confirmed = await notify.confirm({
+      title: "Delete this material?",
+      text: `Material "${material.title}" will be permanently removed.`,
+      confirmText: "Delete Material",
+      confirmButtonColor: "#dc2626",
+    });
     if (!confirmed) {
       return;
     }
@@ -186,14 +191,14 @@ export function MaterialsLibrary() {
           method: "DELETE",
         }),
       );
-      toast.success("Material deleted.");
+      notify.success("Material deleted.");
       if (selectedMaterial?.id === material.id) {
         setSelectedMaterial(null);
       }
       await materialsList.reload();
     } catch (error) {
       const message = error instanceof Error ? error.message : "Unable to delete material.";
-      toast.error(message);
+      notify.error(message);
     }
   };
 

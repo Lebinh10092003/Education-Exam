@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { toast } from "sonner";
+import { notify } from "../lib/notify";
 import { Bell, Lock, User } from "lucide-react";
 
 import { PageHeader } from "../components/PageHeader";
@@ -85,16 +85,16 @@ export function Profile() {
         }),
       );
       await refreshProfile();
-      toast.success("Profile updated.");
+      notify.success("Profile updated.");
     } catch (error) {
       const message = error instanceof Error ? error.message : "Unable to update profile.";
-      toast.error(message);
+      notify.error(message);
     }
   };
 
   const changePassword = async () => {
     if (!currentPassword || !newPassword) {
-      toast.error("Current and new password are required.");
+      notify.error("Current and new password are required.");
       return;
     }
     try {
@@ -109,10 +109,10 @@ export function Profile() {
       );
       setCurrentPassword("");
       setNewPassword("");
-      toast.success("Password updated.");
+      notify.success("Password updated.");
     } catch (error) {
       const message = error instanceof Error ? error.message : "Unable to change password.";
-      toast.error(message);
+      notify.error(message);
     }
   };
 
@@ -124,9 +124,9 @@ export function Profile() {
           JSON.stringify(notificationPreferences),
         );
       });
-      toast.success("Notification preferences saved locally.");
+      notify.success("Notification preferences saved locally.");
     } catch {
-      toast.error("Unable to save notification preferences.");
+      notify.error("Unable to save notification preferences.");
     }
   };
 

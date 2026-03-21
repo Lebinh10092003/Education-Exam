@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { BookOpen, Edit, Plus, Search, Trash2 } from "lucide-react";
-import { toast } from "sonner";
+import { notify } from "../lib/notify";
 
 import { PageHeader } from "../components/PageHeader";
 import { Badge } from "../components/ui/badge";
@@ -129,7 +129,7 @@ export function SubjectManagement() {
 
   const saveSubject = async () => {
     if (!formState.name.trim() || !formState.code.trim()) {
-      toast.error("Subject name and code are required.");
+      notify.error("Subject name and code are required.");
       return;
     }
 
@@ -156,12 +156,18 @@ export function SubjectManagement() {
 
       await subjectsList.reload();
       closeDialog(false);
-      toast.success(editingSubject ? "Subject updated." : "Subject created.");
+      notify.success(editingSubject ? "Subject updated." : "Subject created.");
     });
   };
 
   const deleteSubject = async (subject: SubjectRecord) => {
-    if (!window.confirm(`Delete subject "${subject.name}"?`)) {
+    const confirmed = await notify.confirm({
+      title: "Delete this subject?",
+      text: `Subject "${subject.name}" will be permanently removed.`,
+      confirmText: "Delete Subject",
+      confirmButtonColor: "#dc2626",
+    });
+    if (!confirmed) {
       return;
     }
 
@@ -170,7 +176,7 @@ export function SubjectManagement() {
         method: "DELETE",
       });
       await subjectsList.reload();
-      toast.success("Subject deleted.");
+      notify.success("Subject deleted.");
     });
   };
 

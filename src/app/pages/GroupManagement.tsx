@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Edit, Plus, Search, Trash2, UserPlus, Users } from "lucide-react";
-import { toast } from "sonner";
+import { notify } from "../lib/notify";
 
 import { PageHeader } from "../components/PageHeader";
 import { Badge } from "../components/ui/badge";
@@ -222,7 +222,7 @@ export function GroupManagement() {
 
   const saveGroup = async () => {
     if (!formState.name.trim()) {
-      toast.error("Group name is required.");
+      notify.error("Group name is required.");
       return;
     }
 
@@ -248,12 +248,18 @@ export function GroupManagement() {
 
       await groupsList.reload();
       closeGroupDialog(false);
-      toast.success(editingGroup ? "Group updated." : "Group created.");
+      notify.success(editingGroup ? "Group updated." : "Group created.");
     });
   };
 
   const deleteGroup = async (group: GroupRecord) => {
-    if (!window.confirm(`Delete group "${group.name}"?`)) {
+    const confirmed = await notify.confirm({
+      title: "Delete this group?",
+      text: `Group "${group.name}" will be permanently removed.`,
+      confirmText: "Delete Group",
+      confirmButtonColor: "#dc2626",
+    });
+    if (!confirmed) {
       return;
     }
 
@@ -262,7 +268,7 @@ export function GroupManagement() {
         method: "DELETE",
       });
       await groupsList.reload();
-      toast.success("Group deleted.");
+      notify.success("Group deleted.");
     });
   };
 
@@ -287,7 +293,7 @@ export function GroupManagement() {
       setSelectedCandidateIds([]);
       setMembershipRefreshKey((previous) => previous + 1);
       await groupsList.reload();
-      toast.success("Members added to the group.");
+      notify.success("Members added to the group.");
     });
   };
 

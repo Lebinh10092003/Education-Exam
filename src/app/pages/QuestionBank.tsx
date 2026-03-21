@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Download, Edit, Eye, Plus, Search, Trash2 } from "lucide-react";
-import { toast } from "sonner";
+import { notify } from "../lib/notify";
 
 import { PageHeader } from "../components/PageHeader";
 import { Badge } from "../components/ui/badge";
@@ -328,7 +328,7 @@ export function QuestionBank() {
 
   const saveQuestion = async () => {
     if (!formState.subject_id || !formState.question_text.trim()) {
-      toast.error("Subject and question text are required.");
+      notify.error("Subject and question text are required.");
       return;
     }
 
@@ -378,12 +378,18 @@ export function QuestionBank() {
 
       await questionsList.reload();
       closeQuestionDialog(false);
-      toast.success(editingQuestion ? "Question updated." : "Question created.");
+      notify.success(editingQuestion ? "Question updated." : "Question created.");
     });
   };
 
   const deleteQuestion = async (question: QuestionRecord) => {
-    if (!window.confirm("Delete this question and all of its revisions?")) {
+    const confirmed = await notify.confirm({
+      title: "Delete this question?",
+      text: "This will permanently remove the question and all of its revisions.",
+      confirmText: "Delete Question",
+      confirmButtonColor: "#dc2626",
+    });
+    if (!confirmed) {
       return;
     }
 
@@ -392,13 +398,13 @@ export function QuestionBank() {
         method: "DELETE",
       });
       await questionsList.reload();
-      toast.success("Question deleted.");
+      notify.success("Question deleted.");
     });
   };
 
   const uploadImportBatch = async () => {
     if (!importFile) {
-      toast.error("Choose a file to import.");
+      notify.error("Choose a file to import.");
       return;
     }
 
@@ -414,7 +420,7 @@ export function QuestionBank() {
       setImportFile(null);
       setIsImportDialogOpen(false);
       await Promise.all([questionsList.reload(), importBatches.reload()]);
-      toast.success("Question import completed.");
+      notify.success("Question import completed.");
     });
   };
 

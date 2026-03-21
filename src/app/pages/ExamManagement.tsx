@@ -1,7 +1,7 @@
 import { Link } from "react-router";
 import { useEffect, useState } from "react";
 import { Copy, Edit, Eye, Plus, Search, Trash2, Users } from "lucide-react";
-import { toast } from "sonner";
+import { notify } from "../lib/notify";
 
 import { PageHeader } from "../components/PageHeader";
 import { StatusBadge } from "../components/StatusBadge";
@@ -127,12 +127,18 @@ export function ExamManagement() {
         body: {},
       });
       await examsList.reload();
-      toast.success("Exam cloned.");
+      notify.success("Exam cloned.");
     });
   };
 
   const deleteExam = async (exam: ExamRecord) => {
-    if (!window.confirm(`Delete exam "${exam.name}"?`)) {
+    const confirmed = await notify.confirm({
+      title: "Delete this exam?",
+      text: `Exam "${exam.name}" will be permanently removed.`,
+      confirmText: "Delete Exam",
+      confirmButtonColor: "#dc2626",
+    });
+    if (!confirmed) {
       return;
     }
 
@@ -141,7 +147,7 @@ export function ExamManagement() {
         method: "DELETE",
       });
       await examsList.reload();
-      toast.success("Exam deleted.");
+      notify.success("Exam deleted.");
     });
   };
 

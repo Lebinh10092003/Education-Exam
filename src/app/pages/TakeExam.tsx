@@ -1,8 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router";
-import { toast } from "sonner";
+import { notify } from "../lib/notify";
 import {
-  AlertTriangle,
   CheckCircle2,
   ChevronLeft,
   ChevronRight,
@@ -17,14 +16,6 @@ import { RadioGroup, RadioGroupItem } from "../components/ui/radio-group";
 import { Label } from "../components/ui/label";
 import { Badge } from "../components/ui/badge";
 import { Textarea } from "../components/ui/textarea";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "../components/ui/dialog";
 import { apiRequest } from "../lib/http";
 
 interface SessionQuestion {
@@ -115,7 +106,6 @@ export function TakeExam() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
-  const [showSubmitDialog, setShowSubmitDialog] = useState(false);
   const [timeRemaining, setTimeRemaining] = useState(0);
   const [lastSavedAt, setLastSavedAt] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
@@ -192,11 +182,11 @@ export function TakeExam() {
       setLastSavedAt(response.updated_at);
       dirtyEssayQuestionIdsRef.current.delete(questionId);
       if (!options?.silent) {
-        toast.success("Answer saved.");
+        notify.success("Answer saved.");
       }
     } catch (saveError) {
       const message = saveError instanceof Error ? saveError.message : "Unable to save answer.";
-      toast.error(message);
+      notify.error(message);
       throw saveError;
     } finally {
       setIsSaving(false);
@@ -419,7 +409,7 @@ export function TakeExam() {
       await persistEssayAnswer();
       setCurrentQuestionIndex(nextIndex);
     } catch {
-      // Error already surfaced via toast.
+      // Error already surfaced via notify.
     }
   };
 
@@ -482,14 +472,43 @@ export function TakeExam() {
             }
           : current,
       );
-      setShowSubmitDialog(false);
-      toast.success("Exam submitted.");
+      notify.success("Exam submitted.");
     } catch (submitError) {
       const message = submitError instanceof Error ? submitError.message : "Unable to submit exam.";
-      toast.error(message);
+      notify.error(message);
     } finally {
       setIsSubmitting(false);
     }
+  };
+
+  const confirmSubmit = async () => {
+    if (!session) {
+      return;
+    }
+
+    const confirmed = await notify.confirm({
+      title: "Submit exam now?",
+      html: `
+        <div style="text-align:left">
+          <p style="margin:0 0 12px;">Review your progress before final submission. This action cannot be undone.</p>
+          <div style="display:grid;gap:8px;">
+            <div><strong>Total questions:</strong> ${session.questions.length}</div>
+            <div><strong>Answered:</strong> ${answeredCount}</div>
+            <div><strong>Unanswered:</strong> ${session.questions.length - answeredCount}</div>
+            ${markedCount > 0 ? `<div><strong>Marked for review:</strong> ${markedCount}</div>` : ""}
+          </div>
+        </div>
+      `,
+      confirmText: "Submit Exam",
+      cancelText: "Go Back",
+      confirmButtonColor: "#2563eb",
+    });
+
+    if (!confirmed) {
+      return;
+    }
+
+    await handleSubmit();
   };
 
   if (isLoading) {
@@ -604,7 +623,7 @@ export function TakeExam() {
               <span className="font-mono font-semibold text-blue-900">{formatTime(timeRemaining)}</span>
             </div>
 
-            <Button className="w-full sm:w-auto" onClick={() => setShowSubmitDialog(true)} disabled={isSubmitting}>
+            <Button className="w-full sm:w-auto" onClick={() => void confirmSubmit()} disabled={isSubmitting}>
               Submit Exam
             </Button>
           </div>
@@ -762,46 +781,6 @@ export function TakeExam() {
         </div>
       </div>
 
-      <Dialog open={showSubmitDialog} onOpenChange={setShowSubmitDialog}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Submit Exam?</DialogTitle>
-            <DialogDescription>
-              Review your progress before final submission. This action cannot be undone.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="py-4 space-y-3">
-            <div className="flex items-center justify-between rounded-lg bg-gray-50 p-3">
-              <span className="text-sm text-gray-700">Total Questions</span>
-              <span className="font-semibold">{session.questions.length}</span>
-            </div>
-            <div className="flex items-center justify-between rounded-lg bg-green-50 p-3">
-              <span className="text-sm text-gray-700">Answered</span>
-              <span className="font-semibold text-green-600">{answeredCount}</span>
-            </div>
-            <div className="flex items-center justify-between rounded-lg bg-red-50 p-3">
-              <span className="text-sm text-gray-700">Unanswered</span>
-              <span className="font-semibold text-red-600">{session.questions.length - answeredCount}</span>
-            </div>
-            {markedCount > 0 ? (
-              <div className="flex items-center gap-2 rounded-lg border border-orange-200 bg-orange-50 p-3">
-                <AlertTriangle className="w-4 h-4 text-orange-600" />
-                <span className="text-sm text-orange-900">
-                  You still have {markedCount} question(s) marked for review.
-                </span>
-              </div>
-            ) : null}
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowSubmitDialog(false)}>
-              Go Back
-            </Button>
-            <Button className="w-full sm:w-auto" onClick={() => void handleSubmit()} disabled={isSubmitting}>
-              {isSubmitting ? "Submitting..." : "Confirm Submit"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }
