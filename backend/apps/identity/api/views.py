@@ -118,6 +118,11 @@ class UserViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=["post"])
     def lock(self, request, pk=None):
         user = self.get_object()
+        if user.pk == request.user.pk:
+            return Response(
+                {"detail": "You cannot lock your own account."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
         user.status = User.Status.LOCKED
         user.is_active = False
         user.save(update_fields=["status", "is_active"])
@@ -130,6 +135,15 @@ class UserViewSet(viewsets.ModelViewSet):
         user.is_active = True
         user.save(update_fields=["status", "is_active"])
         return Response({"id": user.id, "status": user.status})
+
+    def destroy(self, request, *args, **kwargs):
+        user = self.get_object()
+        if user.pk == request.user.pk:
+            return Response(
+                {"detail": "You cannot delete your own account."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        return super().destroy(request, *args, **kwargs)
 
 
 class RoleViewSet(viewsets.ModelViewSet):

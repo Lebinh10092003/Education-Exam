@@ -1,6 +1,8 @@
 import { buildApiUrl } from "./env";
 import { clearStoredTokens, getStoredTokens, setStoredTokens, type AuthTokens } from "./storage";
 
+export const AUTH_ERROR_EVENT = "eduexam:auth-error";
+
 export interface PaginatedResponse<TItem> {
   count: number;
   next: string | null;
@@ -33,6 +35,7 @@ export class ApiError extends Error {
 }
 
 let refreshPromise: Promise<AuthTokens | null> | null = null;
+let lastAuthErrorEventAt = 0;
 
 const appendQueryParams = (
   url: URL,
@@ -74,10 +77,16 @@ const getErrorMessage = (payload: unknown, fallback: string) => {
 
     for (const [field, value] of Object.entries(payload as Record<string, unknown>)) {
       if (Array.isArray(value) && typeof value[0] === "string") {
+        if (field === "non_field_errors") {
+          return value[0];
+        }
         return `${field}: ${value[0]}`;
       }
 
       if (typeof value === "string" && value.trim()) {
+        if (field === "non_field_errors") {
+          return value;
+        }
         return `${field}: ${value}`;
       }
     }
@@ -213,8 +222,18 @@ export async function apiRequest<TResponse>(
   const payload = await parseResponseBody(response);
 
   if (!response.ok) {
+    const message = getErrorMessage(payload, `Request failed with status ${response.status}`);
+
+    if (response.status === 401 && options.auth !== false) {
+      clearStoredTokens();
+      if (typeof window !== "undefined" && Date.now() - lastAuthErrorEventAt > 1000) {
+        lastAuthErrorEventAt = Date.now();
+        window.dispatchEvent(new CustomEvent(AUTH_ERROR_EVENT, { detail: { message } }));
+      }
+    }
+
     throw new ApiError(
-      getErrorMessage(payload, `Request failed with status ${response.status}`),
+      message,
       response.status,
       payload,
     );

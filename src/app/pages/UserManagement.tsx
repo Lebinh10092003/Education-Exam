@@ -31,6 +31,7 @@ import { userImportTemplate } from "../lib/importTemplates";
 import { useAsyncList } from "../hooks/useAsyncList";
 import { useDebouncedValue } from "../hooks/useDebouncedValue";
 import { useMutationState } from "../hooks/useMutationState";
+import { useAuth } from "../auth/useAuth";
 
 interface SchoolOption {
   id: number;
@@ -114,6 +115,7 @@ const toUserFormState = (user: UserRecord): UserFormState => ({
 });
 
 export function UserManagement() {
+  const { profile } = useAuth();
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedUsers, setSelectedUsers] = useState<number[]>([]);
   const [roleFilter, setRoleFilter] = useState("all");
@@ -162,7 +164,9 @@ export function UserManagement() {
   const users = usersList.data?.results ?? [];
   const roles = rolesList.data?.results ?? [];
   const schools = schoolsList.data?.results ?? [];
-  const allSelected = users.length > 0 && selectedUsers.length === users.length;
+  const currentUserId = profile?.id ?? null;
+  const selectableUsers = users.filter((user) => user.id !== currentUserId);
+  const allSelected = selectableUsers.length > 0 && selectedUsers.length === selectableUsers.length;
 
   const openCreateDialog = () => {
     setEditingUser(null);
@@ -193,6 +197,9 @@ export function UserManagement() {
   };
 
   const toggleUserSelection = (userId: number) => {
+    if (userId === currentUserId) {
+      return;
+    }
     setSelectedUsers((previous) =>
       previous.includes(userId)
         ? previous.filter((id) => id !== userId)
@@ -201,7 +208,7 @@ export function UserManagement() {
   };
 
   const toggleAllUsers = () => {
-    setSelectedUsers(allSelected ? [] : users.map((user) => user.id));
+    setSelectedUsers(allSelected ? [] : selectableUsers.map((user) => user.id));
   };
 
   const toggleRoleSelection = (roleId: number) => {
@@ -260,6 +267,14 @@ export function UserManagement() {
   };
 
   const deleteUser = async (user: UserRecord) => {
+    if (user.id === currentUserId) {
+      await notify.error("You cannot delete your own account.", {
+        title: "Action blocked",
+        timer: 4000,
+      });
+      return;
+    }
+
     const confirmed = await notify.confirm({
       title: "Delete this user?",
       text: `User "${user.full_name}" will be permanently removed.`,
@@ -280,6 +295,14 @@ export function UserManagement() {
   };
 
   const toggleLock = async (user: UserRecord) => {
+    if (user.id === currentUserId) {
+      await notify.error("You cannot lock your own account.", {
+        title: "Action blocked",
+        timer: 4000,
+      });
+      return;
+    }
+
     const action = user.status === "locked" ? "unlock" : "lock";
     const confirmed = await notify.confirm({
       title: action === "lock" ? "Lock this user?" : "Unlock this user?",
@@ -309,6 +332,22 @@ export function UserManagement() {
       return;
     }
 
+    const targetUserIds = selectedUsers.filter((userId) => userId !== currentUserId);
+    if (targetUserIds.length === 0) {
+      await notify.error("Your own account cannot be changed by bulk actions.", {
+        title: "Action blocked",
+        timer: 4000,
+      });
+      return;
+    }
+
+    if (targetUserIds.length !== selectedUsers.length) {
+      await notify.warning("Your own account was excluded from the bulk action.", {
+        title: "Current account skipped",
+        timer: 4000,
+      });
+    }
+
     const confirmed = await notify.confirm({
       title:
         action === "delete"
@@ -318,10 +357,10 @@ export function UserManagement() {
             : "Unlock selected users?",
       text:
         action === "delete"
-          ? `${selectedUsers.length} selected user(s) will be permanently removed.`
+          ? `${targetUserIds.length} selected user(s) will be permanently removed.`
           : action === "lock"
-            ? `${selectedUsers.length} selected user(s) will be prevented from signing in.`
-            : `${selectedUsers.length} selected user(s) will regain access to sign in.`,
+            ? `${targetUserIds.length} selected user(s) will be prevented from signing in.`
+            : `${targetUserIds.length} selected user(s) will regain access to sign in.`,
       confirmText:
         action === "delete"
           ? "Delete Users"
@@ -337,7 +376,7 @@ export function UserManagement() {
 
     await userMutation.run(async () => {
       await Promise.all(
-        selectedUsers.map((userId) =>
+        targetUserIds.map((userId) =>
           apiRequest(
             action === "delete"
               ? `/api/v1/users/${userId}/`
@@ -485,6 +524,7 @@ export function UserManagement() {
                   <div className="flex items-start gap-3">
                     <Checkbox
                       checked={selectedUsers.includes(user.id)}
+                      disabled={user.id === currentUserId}
                       onCheckedChange={() => toggleUserSelection(user.id)}
                     />
                     <div className="min-w-0 flex-1">
@@ -528,7 +568,7 @@ export function UserManagement() {
                           size="sm"
                           variant="outline"
                           onClick={() => void toggleLock(user)}
-                          disabled={userMutation.isSubmitting}
+                          disabled={userMutation.isSubmitting || user.id === currentUserId}
                         >
                           {user.status === "locked" ? (
                             <>
@@ -546,7 +586,7 @@ export function UserManagement() {
                           size="sm"
                           variant="outline"
                           onClick={() => void deleteUser(user)}
-                          disabled={userMutation.isSubmitting}
+                          disabled={userMutation.isSubmitting || user.id === currentUserId}
                         >
                           <Trash2 className="mr-2 h-4 w-4 text-red-600" />
                           Delete
@@ -608,6 +648,7 @@ export function UserManagement() {
                       <td className="py-3 px-4">
                         <Checkbox
                           checked={selectedUsers.includes(user.id)}
+                          disabled={user.id === currentUserId}
                           onCheckedChange={() => toggleUserSelection(user.id)}
                         />
                       </td>
@@ -651,7 +692,7 @@ export function UserManagement() {
                             size="sm"
                             variant="ghost"
                             onClick={() => void toggleLock(user)}
-                            disabled={userMutation.isSubmitting}
+                            disabled={userMutation.isSubmitting || user.id === currentUserId}
                           >
                             {user.status === "locked" ? (
                               <Unlock className="w-4 h-4 text-green-600" />
@@ -663,7 +704,7 @@ export function UserManagement() {
                             size="sm"
                             variant="ghost"
                             onClick={() => void deleteUser(user)}
-                            disabled={userMutation.isSubmitting}
+                            disabled={userMutation.isSubmitting || user.id === currentUserId}
                           >
                             <Trash2 className="w-4 h-4 text-red-600" />
                           </Button>

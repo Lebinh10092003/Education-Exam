@@ -11,10 +11,15 @@ import { Input } from "../components/ui/input";
 import { Label } from "../components/ui/label";
 import { Checkbox } from "../components/ui/checkbox";
 
+const normalizeLoginErrorMessage = (message: string) =>
+  message.trim() === "User is inactive"
+    ? "Your account is inactive or locked. Please contact an administrator."
+    : message;
+
 export function Login() {
   const navigate = useNavigate();
   const { login } = useAuth();
-  const { isSubmitting, error, run } = useMutationState();
+  const { isSubmitting, run } = useMutationState();
 
   const [identifier, setIdentifier] = useState("admin@example.com");
   const [password, setPassword] = useState("admin123456");
@@ -27,8 +32,12 @@ export function Login() {
       const profile = await run(() => login(identifier.trim(), password));
       notify.success("Signed in successfully.");
       navigate(getDefaultRouteForProfile(profile), { replace: true });
-    } catch {
-      notify.error("Unable to sign in with the provided credentials.");
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unable to sign in with the provided credentials.";
+      notify.error(normalizeLoginErrorMessage(message), {
+        title: "Sign in failed",
+        timer: 4000,
+      });
     }
   };
 
@@ -85,11 +94,6 @@ export function Login() {
                 Forgot password?
               </Link>
             </div>
-            {error && (
-              <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
-                {error}
-              </div>
-            )}
             <Button className="w-full" size="lg" type="submit" disabled={isSubmitting}>
               {isSubmitting ? "Signing In..." : "Sign In"}
             </Button>

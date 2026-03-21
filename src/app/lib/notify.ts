@@ -18,6 +18,11 @@ interface ConfirmOptions {
   reverseButtons?: boolean;
 }
 
+const bindTimerControls = (element: HTMLElement) => {
+  element.addEventListener("mouseenter", Swal.stopTimer);
+  element.addEventListener("mouseleave", Swal.resumeTimer);
+};
+
 const toast = Swal.mixin({
   toast: true,
   position: "center",
@@ -26,10 +31,7 @@ const toast = Swal.mixin({
   timer: 2400,
   timerProgressBar: true,
   heightAuto: false,
-  didOpen: (element) => {
-    element.addEventListener("mouseenter", Swal.stopTimer);
-    element.addEventListener("mouseleave", Swal.resumeTimer);
-  },
+  didOpen: bindTimerControls,
 });
 
 const fireToast = (icon: Exclude<SweetAlertIcon, "question">, message: string, options?: NotifyOptions) =>
@@ -49,9 +51,13 @@ export const notify = {
       icon: "error",
       title: options?.title ?? "Error",
       text: message,
-      confirmButtonText: "Close",
+      confirmButtonText: options?.timer ? undefined : "Close",
+      showConfirmButton: !options?.timer,
       position: "center",
       heightAuto: false,
+      timer: options?.timer,
+      timerProgressBar: Boolean(options?.timer),
+      didOpen: options?.timer ? bindTimerControls : undefined,
     }),
   confirm: async (options: ConfirmOptions) => {
     const result = await Swal.fire({

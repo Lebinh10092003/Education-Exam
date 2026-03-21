@@ -97,7 +97,9 @@ python manage.py runserver 0.0.0.0:8000
 Frontend:
 
 ```bash
-npm run dev
+npm.cmd install
+npm.cmd run dev
+
 ```
 
 Sau do mo frontend tai URL duoc Vite in ra, thuong la `http://127.0.0.1:5173`.

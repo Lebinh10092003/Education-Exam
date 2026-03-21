@@ -55,11 +55,6 @@ export function ForgotPassword() {
               {successMessage}
             </div>
           ) : null}
-          {(mutation.error && !successMessage) ? (
-            <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-              {mutation.error}
-            </div>
-          ) : null}
           <form
             className="space-y-4"
             onSubmit={(event) => {

@@ -7,7 +7,8 @@ import {
   type ReactNode,
 } from "react";
 
-import { apiRequest } from "../lib/http";
+import { apiRequest, AUTH_ERROR_EVENT } from "../lib/http";
+import { notify } from "../lib/notify";
 import { clearStoredTokens, getStoredTokens, setStoredTokens, type AuthTokens } from "../lib/storage";
 
 export interface AuthProfile {
@@ -46,6 +47,12 @@ interface AuthContextValue {
 const AuthContext = createContext<AuthContextValue | null>(null);
 
 const ADMIN_ROLES = ["administrator", "examiner", "proctor"];
+const normalizeAuthErrorMessage = (message?: string) => {
+  if (message?.trim() === "User is inactive") {
+    return "Your account is inactive or locked. Please contact an administrator.";
+  }
+  return message?.trim() || "Your session has ended. Please sign in again.";
+};
 
 export const getDefaultRouteForProfile = (profile: AuthProfile | null) => {
   if (!profile) {
@@ -128,6 +135,20 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       cancelled = true;
     };
   }, [refreshProfile]);
+
+  useEffect(() => {
+    const handleAuthError = (event: Event) => {
+      const customEvent = event as CustomEvent<{ message?: string }>;
+      logout();
+      void notify.error(normalizeAuthErrorMessage(customEvent.detail?.message), {
+        title: "Session ended",
+        timer: 4000,
+      });
+    };
+
+    window.addEventListener(AUTH_ERROR_EVENT, handleAuthError as EventListener);
+    return () => window.removeEventListener(AUTH_ERROR_EVENT, handleAuthError as EventListener);
+  }, [logout]);
 
   const value = useMemo<AuthContextValue>(
     () => ({

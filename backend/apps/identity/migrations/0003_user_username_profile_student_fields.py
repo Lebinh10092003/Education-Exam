@@ -58,7 +58,7 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name="user",
             name="username",
-            field=models.CharField(blank=True, db_index=True, max_length=255, null=True),
+            field=models.CharField(blank=True, max_length=255, null=True),
         ),
         migrations.AddField(
             model_name="profile",
@@ -79,6 +79,6 @@ class Migration(migrations.Migration):
         migrations.AlterField(
             model_name="user",
             name="username",
-            field=models.CharField(db_index=True, max_length=255, unique=True),
+            field=models.CharField(max_length=255, unique=True),
         ),
     ]
