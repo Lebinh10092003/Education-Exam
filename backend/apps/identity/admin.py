@@ -7,10 +7,10 @@ from .models import Permission, Profile, Role, RolePermission, User, UserRole
 @admin.register(User)
 class UserAdmin(DjangoUserAdmin):
     ordering = ("email",)
-    list_display = ("email", "full_name", "status", "is_staff", "is_active")
-    search_fields = ("email", "full_name")
+    list_display = ("username", "email", "full_name", "status", "is_staff", "is_active")
+    search_fields = ("username", "email", "full_name")
     fieldsets = (
-        (None, {"fields": ("email", "password")}),
+        (None, {"fields": ("username", "email", "password")}),
         ("Personal info", {"fields": ("full_name", "status")}),
         (
             "Permissions",
@@ -31,7 +31,7 @@ class UserAdmin(DjangoUserAdmin):
             None,
             {
                 "classes": ("wide",),
-                "fields": ("email", "full_name", "password1", "password2"),
+                "fields": ("username", "email", "full_name", "password1", "password2"),
             },
         ),
     )
@@ -39,8 +39,8 @@ class UserAdmin(DjangoUserAdmin):
 
 @admin.register(Profile)
 class ProfileAdmin(admin.ModelAdmin):
-    list_display = ("user", "school", "phone_number", "created_at")
-    search_fields = ("user__email", "user__full_name", "phone_number", "school__name")
+    list_display = ("user", "cccd", "student_class", "school", "phone_number", "created_at")
+    search_fields = ("user__username", "user__email", "user__full_name", "cccd", "phone_number", "school__name")
 
 
 @admin.register(Permission)
@@ -66,5 +66,5 @@ class RoleAdmin(admin.ModelAdmin):
 @admin.register(UserRole)
 class UserRoleAdmin(admin.ModelAdmin):
     list_display = ("user", "role", "is_active", "created_at")
-    search_fields = ("user__email", "user__full_name", "role__name", "role__slug")
+    search_fields = ("user__username", "user__email", "user__full_name", "role__name", "role__slug")
     list_filter = ("role", "is_active")

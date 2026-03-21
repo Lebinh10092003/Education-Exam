@@ -1,3 +1,6 @@
+import csv
+from io import StringIO
+import re
 from datetime import datetime
 
 from django.contrib.auth import get_user_model
@@ -6,12 +9,16 @@ from django.db.models import Count, Max, Q
 from django.utils import timezone
 from django.utils.dateparse import parse_datetime
 
+from apps.identity.models import Profile, Role, UserRole
+from apps.identity.utils import build_student_username, ensure_unique_username
 from apps.institutions.models import CandidateGroup
+from apps.institutions.models import School
 from apps.question_bank.models import Question
 
 from .models import Exam, ExamAssignment, ExamItem, ExamRandomRule, ExamScheduleWindow, ExamVersion
 
 UNSET = object()
+CSV_REQUIRED_STUDENT_IMPORT_FIELDS = ("full_name", "date_of_birth", "student_class", "cccd")
 
 
 def _coerce_datetime(value):
@@ -26,6 +33,253 @@ def _coerce_datetime(value):
     if timezone.is_naive(parsed):
         parsed = timezone.make_aware(parsed, timezone.get_current_timezone())
     return parsed
+
+
+def _normalize_cccd(value):
+    if value is None:
+        return ""
+    return re.sub(r"\s+", "", str(value)).strip()
+
+
+def _parse_student_import_date(value):
+    raw_value = (value or "").strip()
+    if not raw_value:
+        raise ValueError("date_of_birth is required.")
+    try:
+        return datetime.strptime(raw_value, "%d/%m/%Y").date()
+    except ValueError as exc:
+        raise ValueError("date_of_birth must use DD/MM/YYYY format.") from exc
+
+
+def _decode_csv_upload(uploaded_file):
+    if not uploaded_file:
+        raise ValueError("A CSV file is required.")
+    file_name = getattr(uploaded_file, "name", "") or ""
+    if not file_name.lower().endswith(".csv"):
+        raise ValueError("Only CSV imports are supported.")
+
+    uploaded_file.seek(0)
+    decoded = uploaded_file.read().decode("utf-8-sig")
+    reader = csv.DictReader(StringIO(decoded))
+    headers = reader.fieldnames or []
+    missing_headers = [header for header in CSV_REQUIRED_STUDENT_IMPORT_FIELDS if header not in headers]
+    if missing_headers:
+        raise ValueError(f"Missing required columns: {', '.join(missing_headers)}")
+    return list(reader)
+
+
+def _get_student_role():
+    role, _ = Role.objects.get_or_create(
+        slug="student",
+        defaults={"name": "Student", "is_system": True},
+    )
+    return role
+
+
+def _resolve_school_by_code(school_code):
+    normalized_code = (school_code or "").strip()
+    if not normalized_code:
+        return None
+    school = School.objects.filter(code__iexact=normalized_code).first()
+    if school is None:
+        raise ValueError(f"Unknown school_code: {normalized_code}")
+    return school
+
+
+def _resolve_import_email(*, row_email, username, existing_user=None):
+    normalized_email = (row_email or "").strip().lower()
+    if existing_user is not None and not normalized_email:
+        return existing_user.email
+    if not normalized_email:
+        normalized_email = f"{username}@student.local"
+    return normalized_email
+
+
+def _is_email_available(*, email, current_user_id=None):
+    user_model = get_user_model()
+    queryset = user_model.objects.filter(email__iexact=email)
+    if current_user_id is not None:
+        queryset = queryset.exclude(id=current_user_id)
+    return not queryset.exists()
+
+
+def _ensure_student_role(*, user, role):
+    user_role, created = UserRole.objects.get_or_create(
+        user=user,
+        role=role,
+        defaults={"is_active": True},
+    )
+    if not created and not user_role.is_active:
+        user_role.is_active = True
+        user_role.save(update_fields=["is_active", "updated_at"])
+        return True
+    return created
+
+
+def _sync_profile(*, profile, cccd, date_of_birth, student_class, phone_number, school):
+    changed = False
+
+    if profile.cccd != cccd:
+        profile.cccd = cccd
+        changed = True
+    if profile.date_of_birth != date_of_birth:
+        profile.date_of_birth = date_of_birth
+        changed = True
+    if profile.student_class != student_class:
+        profile.student_class = student_class
+        changed = True
+    if (profile.phone_number or "") != phone_number:
+        profile.phone_number = phone_number
+        changed = True
+    if profile.school != school:
+        profile.school = school
+        changed = True
+
+    if changed:
+        profile.save()
+    return changed
+
+
+@transaction.atomic
+def _import_student_row(*, exam, assigned_by, row, row_number, student_role):
+    user_model = get_user_model()
+    full_name = (row.get("full_name") or "").strip()
+    if not full_name:
+        raise ValueError("full_name is required.")
+
+    cccd = _normalize_cccd(row.get("cccd"))
+    if not cccd:
+        raise ValueError("cccd is required.")
+
+    date_of_birth = _parse_student_import_date(row.get("date_of_birth"))
+    student_class = (row.get("student_class") or "").strip()
+    if not student_class:
+        raise ValueError("student_class is required.")
+
+    phone_number = (row.get("phone_number") or "").strip()
+    school = _resolve_school_by_code(row.get("school_code"))
+    existing_profile = Profile.objects.select_related("user").filter(cccd=cccd).first()
+
+    if existing_profile is not None:
+        user = existing_profile.user
+        email = _resolve_import_email(row_email=row.get("email"), username=user.username, existing_user=user)
+        if email != user.email and not _is_email_available(email=email, current_user_id=user.id):
+            raise ValueError(f"email already belongs to another user: {email}")
+
+        changed = False
+        if user.full_name != full_name:
+            user.full_name = full_name
+            changed = True
+        if email != user.email:
+            user.email = email
+            changed = True
+        if changed:
+            user.save(update_fields=["full_name", "email", "updated_at"])
+
+        changed = _sync_profile(
+            profile=existing_profile,
+            cccd=cccd,
+            date_of_birth=date_of_birth,
+            student_class=student_class,
+            phone_number=phone_number,
+            school=school,
+        ) or changed
+        changed = _ensure_student_role(user=user, role=student_role) or changed
+        _, assignment_created = ExamAssignment.objects.get_or_create(
+            exam=exam,
+            user=user,
+            defaults={"assigned_by": assigned_by},
+        )
+        return {
+            "created": False,
+            "updated": changed,
+            "assigned": assignment_created,
+            "skipped": not changed and not assignment_created,
+        }
+
+    generated_username = build_student_username(
+        full_name=full_name,
+        date_of_birth=date_of_birth,
+        student_class=student_class,
+    )
+    username = ensure_unique_username(generated_username)
+    email = _resolve_import_email(row_email=row.get("email"), username=username)
+    if not _is_email_available(email=email):
+        raise ValueError(f"email already belongs to another user: {email}")
+
+    user = user_model.objects.create_user(
+        username=username,
+        email=email,
+        password=username,
+        full_name=full_name,
+        status=user_model.Status.ACTIVE,
+    )
+    profile, _ = Profile.objects.get_or_create(user=user)
+    _sync_profile(
+        profile=profile,
+        cccd=cccd,
+        date_of_birth=date_of_birth,
+        student_class=student_class,
+        phone_number=phone_number,
+        school=school,
+    )
+    _ensure_student_role(user=user, role=student_role)
+    ExamAssignment.objects.get_or_create(
+        exam=exam,
+        user=user,
+        defaults={"assigned_by": assigned_by},
+    )
+    return {
+        "created": True,
+        "updated": False,
+        "assigned": True,
+        "skipped": False,
+    }
+
+
+def import_students_to_exam(*, exam, assigned_by, uploaded_file):
+    rows = _decode_csv_upload(uploaded_file)
+    student_role = _get_student_role()
+    summary = {
+        "total_rows": len(rows),
+        "created_users": 0,
+        "updated_users": 0,
+        "assigned_users": 0,
+        "skipped_rows": 0,
+        "failed_rows": 0,
+        "errors": [],
+    }
+
+    for index, row in enumerate(rows, start=2):
+        try:
+            result = _import_student_row(
+                exam=exam,
+                assigned_by=assigned_by,
+                row=row,
+                row_number=index,
+                student_role=student_role,
+            )
+        except ValueError as exc:
+            summary["failed_rows"] += 1
+            summary["errors"].append(
+                {
+                    "row_number": index,
+                    "identifier": _normalize_cccd(row.get("cccd")) or (row.get("full_name") or "").strip(),
+                    "message": str(exc),
+                }
+            )
+            continue
+
+        if result["created"]:
+            summary["created_users"] += 1
+        if result["updated"]:
+            summary["updated_users"] += 1
+        if result["assigned"]:
+            summary["assigned_users"] += 1
+        if result["skipped"]:
+            summary["skipped_rows"] += 1
+
+    return summary
 
 
 def _dedupe_preserve_order(values):

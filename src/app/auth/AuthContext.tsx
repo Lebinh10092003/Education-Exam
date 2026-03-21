@@ -12,6 +12,7 @@ import { clearStoredTokens, getStoredTokens, setStoredTokens, type AuthTokens } 
 
 export interface AuthProfile {
   id: number;
+  username: string;
   email: string;
   full_name: string;
   status: string;
@@ -36,7 +37,7 @@ interface AuthContextValue {
   profile: AuthProfile | null;
   isAuthenticated: boolean;
   isBootstrapping: boolean;
-  login: (email: string, password: string) => Promise<AuthProfile>;
+  login: (identifier: string, password: string) => Promise<AuthProfile>;
   logout: () => void;
   refreshProfile: () => Promise<AuthProfile | null>;
   hasAnyRole: (...roles: string[]) => boolean;
@@ -81,11 +82,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   }, [logout]);
 
   const login = useCallback(
-    async (email: string, password: string) => {
+    async (identifier: string, password: string) => {
       const loginResponse = await apiRequest<LoginResponse>("/api/v1/auth/login/", {
         method: "POST",
         auth: false,
-        body: { email, password },
+        body: { identifier, email: identifier, password },
       });
 
       const nextTokens = {

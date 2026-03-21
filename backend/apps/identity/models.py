@@ -3,6 +3,7 @@ from django.contrib.auth.models import AbstractBaseUser, PermissionsMixin
 from django.db import models
 
 from apps.platform_core.models import TimeStampedModel
+from .utils import build_email_username, ensure_unique_username
 
 
 class UserManager(BaseUserManager):
@@ -12,7 +13,12 @@ class UserManager(BaseUserManager):
         if not email:
             raise ValueError("The email field must be set.")
         email = self.normalize_email(email)
+        username = extra_fields.pop("username", "")
+        if not username:
+            username = build_email_username(email)
+        username = ensure_unique_username(username)
         user = self.model(email=email, **extra_fields)
+        user.username = username
         user.set_password(password)
         user.save(using=self._db)
         return user
@@ -39,6 +45,7 @@ class User(AbstractBaseUser, PermissionsMixin, TimeStampedModel):
         PENDING = "pending", "Pending"
         LOCKED = "locked", "Locked"
 
+    username = models.CharField(max_length=255, unique=True, db_index=True)
     email = models.EmailField(unique=True)
     full_name = models.CharField(max_length=255, blank=True)
     is_active = models.BooleanField(default=True)
@@ -59,7 +66,7 @@ class User(AbstractBaseUser, PermissionsMixin, TimeStampedModel):
         ordering = ("email",)
 
     def __str__(self):
-        return self.email
+        return self.username or self.email
 
     def has_platform_permission(self, code: str) -> bool:
         if self.is_superuser:
@@ -86,6 +93,9 @@ class Profile(TimeStampedModel):
     )
     phone_number = models.CharField(max_length=32, blank=True)
     avatar = models.FileField(upload_to="avatars/", blank=True)
+    cccd = models.CharField(max_length=32, null=True, blank=True, unique=True)
+    date_of_birth = models.DateField(null=True, blank=True)
+    student_class = models.CharField(max_length=64, blank=True)
     school = models.ForeignKey(
         "institutions.School",
         null=True,

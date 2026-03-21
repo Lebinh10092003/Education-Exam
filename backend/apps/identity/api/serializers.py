@@ -1,3 +1,4 @@
+from django.db.models import Q
 from rest_framework import serializers
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 from drf_spectacular.utils import extend_schema_field
@@ -8,12 +9,35 @@ from apps.institutions.models import School
 
 
 class EduExamTokenObtainPairSerializer(TokenObtainPairSerializer):
+    identifier = serializers.CharField(required=False, allow_blank=False, write_only=True)
+    email = serializers.CharField(required=False, allow_blank=False, write_only=True)
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["email"].required = False
+
     @classmethod
     def get_token(cls, user):
         token = super().get_token(user)
+        token["username"] = user.username
         token["email"] = user.email
         token["full_name"] = user.full_name
         return token
+
+    def validate(self, attrs):
+        identifier = (attrs.get("identifier") or attrs.get("email") or "").strip()
+        password = attrs.get("password")
+
+        if not identifier:
+            raise serializers.ValidationError({"identifier": "This field is required."})
+
+        user = User.objects.filter(Q(username__iexact=identifier) | Q(email__iexact=identifier)).first()
+        if user is None or not user.check_password(password) or not user.is_active:
+            raise serializers.ValidationError("No active account found with the given credentials.")
+
+        data = super().validate({"email": user.email, "password": password})
+        data["username"] = user.username
+        return data
 
 
 class SchoolSummarySerializer(serializers.Serializer):
@@ -23,6 +47,7 @@ class SchoolSummarySerializer(serializers.Serializer):
 
 
 class ProfileSerializer(serializers.ModelSerializer):
+    username = serializers.CharField(read_only=True)
     phone_number = serializers.SerializerMethodField()
     school = serializers.SerializerMethodField()
     roles = serializers.SerializerMethodField()
@@ -32,6 +57,7 @@ class ProfileSerializer(serializers.ModelSerializer):
         model = User
         fields = (
             "id",
+            "username",
             "email",
             "full_name",
             "status",
@@ -140,6 +166,7 @@ class RoleSerializer(serializers.ModelSerializer):
 
 
 class UserSerializer(serializers.ModelSerializer):
+    username = serializers.CharField(required=False)
     password = serializers.CharField(write_only=True, required=False, allow_blank=False)
     school_id = serializers.PrimaryKeyRelatedField(
         queryset=School.objects.all(),
@@ -162,6 +189,7 @@ class UserSerializer(serializers.ModelSerializer):
         model = User
         fields = (
             "id",
+            "username",
             "email",
             "full_name",
             "status",
@@ -192,11 +220,12 @@ class UserSerializer(serializers.ModelSerializer):
         return obj.last_login.isoformat()
 
     def create(self, validated_data):
+        username = validated_data.pop("username", "")
         password = validated_data.pop("password", None)
         school = validated_data.pop("school_id", None)
         phone_number = validated_data.pop("phone_number", "")
         roles = validated_data.pop("role_ids", [])
-        user = User.objects.create_user(password=password, **validated_data)
+        user = User.objects.create_user(password=password, username=username, **validated_data)
         profile, _ = Profile.objects.get_or_create(user=user)
         profile.phone_number = phone_number
         profile.school = school
@@ -208,12 +237,15 @@ class UserSerializer(serializers.ModelSerializer):
         return user
 
     def update(self, instance, validated_data):
+        username = validated_data.pop("username", None)
         password = validated_data.pop("password", None)
         school = validated_data.pop("school_id", None)
         phone_number = validated_data.pop("phone_number", None)
         roles = validated_data.pop("role_ids", None)
         for attr, value in validated_data.items():
             setattr(instance, attr, value)
+        if username is not None:
+            instance.username = username
         if password:
             instance.set_password(password)
         instance.save()
