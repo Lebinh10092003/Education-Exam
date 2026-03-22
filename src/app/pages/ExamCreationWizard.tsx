@@ -42,6 +42,20 @@ interface GroupOption {
   member_count: number;
 }
 
+interface ExamPeriodOption {
+  id: number;
+  name: string;
+  start_date: string;
+  end_date: string;
+}
+
+interface ExamRoomOption {
+  id: number;
+  name: string;
+  location: string;
+  capacity: number;
+}
+
 interface QuestionRecord {
   id: number;
   difficulty: "easy" | "medium" | "hard";
@@ -56,6 +70,8 @@ interface ExamRecord {
   id: number;
   name: string;
   subject: SubjectOption;
+  period: ExamPeriodOption | null;
+  room: ExamRoomOption | null;
   description: string;
   status: "draft" | "scheduled" | "open" | "paused" | "closed" | "archived";
   duration_minutes: number;
@@ -95,6 +111,8 @@ interface RandomRuleState {
 interface ExamFormState {
   name: string;
   subject_id: string;
+  period_id: string;
+  room_id: string;
   description: string;
   status: ExamRecord["status"];
   duration_minutes: string;
@@ -113,6 +131,8 @@ interface ExamFormState {
 const buildDefaultFormState = (): ExamFormState => ({
   name: "",
   subject_id: "",
+  period_id: "none",
+  room_id: "none",
   description: "",
   status: "draft",
   duration_minutes: "60",
@@ -163,6 +183,8 @@ const toFormState = (exam: ExamRecord): ExamFormState => {
   return {
     name: exam.name,
     subject_id: String(exam.subject.id),
+    period_id: exam.period ? String(exam.period.id) : "none",
+    room_id: exam.room ? String(exam.room.id) : "none",
     description: exam.description,
     status: exam.status,
     duration_minutes: String(exam.duration_minutes),
@@ -212,6 +234,22 @@ export function ExamCreationWizard() {
         },
       }),
     [debouncedGroupSearch],
+  );
+
+  const periodsList = useAsyncList(
+    async () =>
+      apiRequest<PaginatedResponse<ExamPeriodOption>>("/api/v1/exam-periods/", {
+        query: { page_size: 100 },
+      }),
+    [],
+  );
+
+  const roomsList = useAsyncList(
+    async () =>
+      apiRequest<PaginatedResponse<ExamRoomOption>>("/api/v1/exam-rooms/", {
+        query: { page_size: 100 },
+      }),
+    [],
   );
 
   const questionsList = useAsyncList(
@@ -337,6 +375,8 @@ export function ExamCreationWizard() {
     const payload = {
       name: formState.name.trim(),
       subject_id: Number(formState.subject_id),
+      period_id: formState.period_id === "none" ? null : Number(formState.period_id),
+      room_id: formState.room_id === "none" ? null : Number(formState.room_id),
       description: formState.description.trim(),
       status: formState.status,
       duration_minutes: Number(formState.duration_minutes),
@@ -372,6 +412,8 @@ export function ExamCreationWizard() {
 
   const subjects = subjectsList.data?.results ?? [];
   const groups = groupsList.data?.results ?? [];
+  const periods = periodsList.data?.results ?? [];
+  const rooms = roomsList.data?.results ?? [];
   const questions = questionsList.data?.results ?? [];
 
   return (
@@ -424,7 +466,13 @@ export function ExamCreationWizard() {
 
       {(subjectsList.error || groupsList.error || questionsList.error || examDetails.error || mutation.error) && (
         <div className="mb-6 max-w-4xl mx-auto rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-          {subjectsList.error || groupsList.error || questionsList.error || examDetails.error || mutation.error}
+          {subjectsList.error ||
+            groupsList.error ||
+            periodsList.error ||
+            roomsList.error ||
+            questionsList.error ||
+            examDetails.error ||
+            mutation.error}
         </div>
       )}
 
@@ -673,6 +721,48 @@ export function ExamCreationWizard() {
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                  <Label>Exam Period</Label>
+                  <Select
+                    value={formState.period_id}
+                    onValueChange={(value) =>
+                      setFormState((previous) => ({ ...previous, period_id: value }))
+                    }
+                  >
+                    <SelectTrigger className="mt-2">
+                      <SelectValue placeholder="Select period" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">No period</SelectItem>
+                      {periods.map((period) => (
+                        <SelectItem key={period.id} value={String(period.id)}>
+                          {period.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label>Exam Room</Label>
+                  <Select
+                    value={formState.room_id}
+                    onValueChange={(value) =>
+                      setFormState((previous) => ({ ...previous, room_id: value }))
+                    }
+                  >
+                    <SelectTrigger className="mt-2">
+                      <SelectValue placeholder="Select room" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">No room</SelectItem>
+                      {rooms.map((room) => (
+                        <SelectItem key={room.id} value={String(room.id)}>
+                          {room.name} ({room.capacity})
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
                 <div>
                   <Label htmlFor="openingDate">Opening Date & Time</Label>
                   <Input

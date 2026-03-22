@@ -31,4 +31,38 @@ export default defineConfig({
 
   // File types to support raw imports. Never add .css, .tsx, or .ts files to this.
   assetsInclude: ['**/*.svg', '**/*.csv'],
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          if (!id.includes('node_modules')) {
+            return undefined
+          }
+          if (id.includes('recharts')) {
+            return 'vendor-charts'
+          }
+          if (id.includes('sweetalert2')) {
+            return 'vendor-alerts'
+          }
+          if (id.includes('@radix-ui')) {
+            return 'vendor-radix'
+          }
+          if (id.includes('@mui') || id.includes('@emotion')) {
+            return 'vendor-mui'
+          }
+          if (id.includes('react-router')) {
+            return 'vendor-router'
+          }
+          if (id.includes('lucide-react')) {
+            return 'vendor-icons'
+          }
+          return 'vendor'
+        },
+      },
+    },
+  },
+  test: {
+    environment: 'jsdom',
+    setupFiles: ['./src/test/setup.ts'],
+  },
 })

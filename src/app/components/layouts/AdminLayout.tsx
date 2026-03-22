@@ -1,3 +1,4 @@
+import { Suspense, useEffect, useState } from "react";
 import { Outlet, Link, useLocation } from "react-router";
 import {
   LayoutDashboard,
@@ -7,15 +8,19 @@ import {
   MessageSquareText,
   FileCheck,
   Play,
+  GraduationCap,
   BookMarked,
   BarChart3,
   Bell,
+  Shield,
+  Activity,
+  Calendar,
+  MapPin,
   Search,
   ChevronDown,
   Menu,
   X,
 } from "lucide-react";
-import { useEffect, useState } from "react";
 import { Avatar, AvatarFallback } from "../ui/avatar";
 import {
   DropdownMenu,
@@ -26,6 +31,10 @@ import {
   DropdownMenuTrigger,
 } from "../ui/dropdown-menu";
 import { useAuth } from "../../auth/useAuth";
+import { useAsyncList } from "../../hooks/useAsyncList";
+import { apiRequest } from "../../lib/http";
+import { NOTIFICATION_STATE_CHANGED_EVENT } from "../../lib/notifications";
+import { RouteContentLoader } from "../RouteContentLoader";
 
 const navItems = [
   { icon: LayoutDashboard, label: "Dashboard", path: "/" },
@@ -34,9 +43,15 @@ const navItems = [
   { icon: BookOpen, label: "Subjects", path: "/subjects" },
   { icon: MessageSquareText, label: "Question Bank", path: "/question-bank" },
   { icon: FileCheck, label: "Exam Management", path: "/exams" },
+  { icon: Calendar, label: "Exam Periods", path: "/exam-periods" },
+  { icon: MapPin, label: "Exam Rooms", path: "/exam-rooms" },
   { icon: Play, label: "Live Monitoring", path: "/exams" },
+  { icon: GraduationCap, label: "Manual Grading", path: "/manual-grading" },
   { icon: BookMarked, label: "Materials Library", path: "/materials" },
   { icon: BarChart3, label: "Results & Reports", path: "/results" },
+  { icon: Shield, label: "Roles & Permissions", path: "/roles-permissions" },
+  { icon: Bell, label: "Notifications", path: "/notifications" },
+  { icon: Activity, label: "Audit & Security", path: "/audit" },
 ];
 
 export function AdminLayout() {
@@ -44,9 +59,14 @@ export function AdminLayout() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const { logout, profile } = useAuth();
+  const notificationCount = useAsyncList(
+    () => apiRequest<{ unread_count: number }>("/api/v1/notifications/unread-count/"),
+    [location.pathname],
+  );
   const displayName = profile?.full_name ?? "EduExam User";
   const primaryRole = profile?.roles?.[0] ?? "user";
   const email = profile?.email ?? "";
+  const unreadCount = notificationCount.data?.unread_count ?? 0;
   const initials = displayName
     .split(" ")
     .filter(Boolean)
@@ -65,6 +85,17 @@ export function AdminLayout() {
   useEffect(() => {
     setMobileSidebarOpen(false);
   }, [location.pathname]);
+
+  useEffect(() => {
+    const handleNotificationChange = () => {
+      void notificationCount.reload().catch(() => undefined);
+    };
+
+    window.addEventListener(NOTIFICATION_STATE_CHANGED_EVENT, handleNotificationChange);
+    return () => {
+      window.removeEventListener(NOTIFICATION_STATE_CHANGED_EVENT, handleNotificationChange);
+    };
+  }, [notificationCount.reload]);
 
   return (
     <div className="flex min-h-screen bg-gray-50">
@@ -212,10 +243,14 @@ export function AdminLayout() {
             </div>
 
             <div className="flex items-center justify-between gap-3 sm:justify-end">
-              <button className="relative rounded-lg p-2 transition-colors hover:bg-gray-100">
+              <Link to="/notifications" className="relative rounded-lg p-2 transition-colors hover:bg-gray-100">
                 <Bell className="h-5 w-5 text-gray-700" />
-                <span className="absolute right-1 top-1 h-2 w-2 rounded-full bg-red-500"></span>
-              </button>
+                {unreadCount > 0 ? (
+                  <span className="absolute -right-1 -top-1 min-w-[1.1rem] rounded-full bg-red-500 px-1 text-center text-[10px] font-semibold text-white">
+                    {unreadCount > 99 ? "99+" : unreadCount}
+                  </span>
+                ) : null}
+              </Link>
 
               <DropdownMenu>
                 <DropdownMenuTrigger className="flex min-w-0 items-center gap-3 rounded-lg px-2 py-2 transition-colors hover:bg-gray-50 sm:px-3">
@@ -259,7 +294,9 @@ export function AdminLayout() {
 
         {/* Page Content */}
         <main className="flex-1 overflow-y-auto p-4 sm:p-6">
-          <Outlet />
+          <Suspense fallback={<RouteContentLoader />}>
+            <Outlet />
+          </Suspense>
         </main>
       </div>
     </div>

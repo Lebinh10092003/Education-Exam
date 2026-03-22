@@ -1,4 +1,6 @@
-from django.db.models import Q
+from decimal import Decimal
+
+from django.db.models import Avg, Q
 from django.shortcuts import get_object_or_404
 from drf_spectacular.utils import extend_schema
 from rest_framework import mixins, status, viewsets
@@ -9,6 +11,8 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from apps.exam_authoring.models import Exam
+from apps.grading.models import Result
+from apps.materials.models import Material
 
 from ..models import ExamSession, SessionQuestion
 from ..services import (
@@ -23,6 +27,7 @@ from .serializers import (
     AutosaveSnapshotSerializer,
     AutosaveSnapshotWriteSerializer,
     CandidateAssignedExamSerializer,
+    CandidateDashboardOverviewSerializer,
     CandidateExamSessionSerializer,
     SessionAnswerResponseSerializer,
     SessionAnswerWriteSerializer,
@@ -30,24 +35,65 @@ from .serializers import (
 )
 
 
+def get_candidate_exam_queryset(*, user):
+    return (
+        Exam.objects.select_related("subject", "schedule_window", "current_version")
+        .filter(
+            Q(assignments__user=user)
+            | Q(
+                assignments__group__memberships__user=user,
+                assignments__group__memberships__is_active=True,
+            )
+        )
+        .exclude(status__in=[Exam.Status.DRAFT, Exam.Status.ARCHIVED])
+        .distinct()
+    )
+
+
 class CandidateAssignedExamListView(ListAPIView):
     serializer_class = CandidateAssignedExamSerializer
     permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
-        return (
-            Exam.objects.select_related("subject", "schedule_window", "current_version")
-            .filter(
-                Q(assignments__user=self.request.user)
-                | Q(
-                    assignments__group__memberships__user=self.request.user,
-                    assignments__group__memberships__is_active=True,
-                )
+        return get_candidate_exam_queryset(user=self.request.user).order_by("-created_at")
+
+
+class CandidateDashboardOverviewView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    @extend_schema(responses=CandidateDashboardOverviewSerializer)
+    def get(self, request):
+        exams = get_candidate_exam_queryset(user=request.user)
+        upcoming_exams = exams.order_by("schedule_window__opens_at", "name")
+        published_results = (
+            Result.objects.select_related(
+                "session",
+                "session__candidate",
+                "session__exam",
+                "session__exam__subject",
+                "published_by",
             )
-            .exclude(status__in=[Exam.Status.DRAFT, Exam.Status.ARCHIVED])
-            .distinct()
-            .order_by("-created_at")
+            .filter(
+                session__candidate=request.user,
+                publish_state=Result.PublishState.PUBLISHED,
+            )
+            .order_by("-published_at", "-created_at")
         )
+        active_materials = Material.objects.select_related("subject", "uploaded_by").filter(is_active=True)
+        payload = {
+            "stats": {
+                "assigned_exam_count": exams.count(),
+                "upcoming_exam_count": upcoming_exams.count(),
+                "published_result_count": published_results.count(),
+                "average_percentage": published_results.aggregate(avg=Avg("percentage"))["avg"] or Decimal("0.00"),
+                "active_material_count": active_materials.count(),
+            },
+            "upcoming_exams": list(upcoming_exams[:5]),
+            "recent_results": list(published_results[:5]),
+            "recent_materials": list(active_materials.order_by("-created_at", "title")[:6]),
+        }
+        serializer = CandidateDashboardOverviewSerializer(payload, context={"request": request})
+        return Response(serializer.data)
 
 
 class CandidateExamStartView(APIView):

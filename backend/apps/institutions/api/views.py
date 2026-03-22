@@ -1,15 +1,19 @@
 from django.db.models import Count, Q
+from drf_spectacular.utils import extend_schema
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
+from rest_framework.parsers import FormParser, MultiPartParser
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
 from apps.identity.permissions import HasAPIPermissionCode
 from apps.institutions.models import CandidateGroup, GroupMembership, School
+from apps.institutions.services import import_memberships_to_group
 
 from .serializers import (
     CandidateGroupSerializer,
     GroupMembershipSerializer,
+    GroupMembershipImportSummarySerializer,
     SchoolSerializer,
 )
 
@@ -80,3 +84,22 @@ class CandidateGroupViewSet(viewsets.ModelViewSet):
         serializer.is_valid(raise_exception=True)
         serializer.save(group=group)
         return Response(serializer.data, status=status.HTTP_201_CREATED)
+
+    @extend_schema(
+        request=None,
+        responses=GroupMembershipImportSummarySerializer,
+    )
+    @action(
+        detail=True,
+        methods=["post"],
+        url_path="memberships/import",
+        parser_classes=[MultiPartParser, FormParser],
+    )
+    def import_memberships(self, request, pk=None):
+        group = self.get_object()
+        summary = import_memberships_to_group(
+            group=group,
+            uploaded_file=request.FILES.get("file"),
+        )
+        serializer = GroupMembershipImportSummarySerializer(summary)
+        return Response(serializer.data, status=status.HTTP_200_OK)

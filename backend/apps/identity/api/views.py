@@ -9,6 +9,7 @@ from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 
 from apps.identity.models import Permission, Role, User, UserRole
 from apps.identity.permissions import HasAPIPermissionCode
+from apps.platform_core.audit import record_audit_event
 
 from .serializers import (
     ChangePasswordSerializer,
@@ -24,6 +25,18 @@ from .serializers import (
 
 class LoginView(TokenObtainPairView):
     serializer_class = EduExamTokenObtainPairSerializer
+
+    def post(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        record_audit_event(
+            actor=getattr(serializer, "user", None),
+            action="user.login",
+            category="authentication",
+            description="User logged in successfully.",
+            request=request,
+        )
+        return Response(serializer.validated_data, status=status.HTTP_200_OK)
 
 
 class RefreshView(TokenRefreshView):
@@ -126,6 +139,19 @@ class UserViewSet(viewsets.ModelViewSet):
         user.status = User.Status.LOCKED
         user.is_active = False
         user.save(update_fields=["status", "is_active"])
+        record_audit_event(
+            actor=request.user,
+            action="user.locked",
+            category="security",
+            severity="warning",
+            description=f'Locked user "{user.email}".',
+            metadata={
+                "target_user_id": user.id,
+                "target_email": user.email,
+                "target_full_name": user.full_name,
+            },
+            request=request,
+        )
         return Response({"id": user.id, "status": user.status})
 
     @action(detail=True, methods=["post"])
@@ -134,6 +160,18 @@ class UserViewSet(viewsets.ModelViewSet):
         user.status = User.Status.ACTIVE
         user.is_active = True
         user.save(update_fields=["status", "is_active"])
+        record_audit_event(
+            actor=request.user,
+            action="user.unlocked",
+            category="security",
+            description=f'Unlocked user "{user.email}".',
+            metadata={
+                "target_user_id": user.id,
+                "target_email": user.email,
+                "target_full_name": user.full_name,
+            },
+            request=request,
+        )
         return Response({"id": user.id, "status": user.status})
 
     def destroy(self, request, *args, **kwargs):
@@ -157,6 +195,55 @@ class RoleViewSet(viewsets.ModelViewSet):
         "DELETE": "roles.manage",
     }
     queryset = Role.objects.prefetch_related("permissions").order_by("name")
+
+    def perform_create(self, serializer):
+        role = serializer.save()
+        record_audit_event(
+            actor=self.request.user,
+            action="role.created",
+            category="security",
+            description=f'Created role "{role.name}".',
+            metadata={
+                "role_id": role.id,
+                "role_slug": role.slug,
+                "permission_codes": list(role.permissions.values_list("code", flat=True)),
+            },
+            request=self.request,
+        )
+
+    def perform_update(self, serializer):
+        role = serializer.instance
+        previous_permission_codes = list(role.permissions.values_list("code", flat=True))
+        role = serializer.save()
+        record_audit_event(
+            actor=self.request.user,
+            action="role.updated",
+            category="security",
+            description=f'Updated role "{role.name}".',
+            metadata={
+                "role_id": role.id,
+                "role_slug": role.slug,
+                "previous_permission_codes": previous_permission_codes,
+                "permission_codes": list(role.permissions.values_list("code", flat=True)),
+            },
+            request=self.request,
+        )
+
+    def perform_destroy(self, instance):
+        record_audit_event(
+            actor=self.request.user,
+            action="role.deleted",
+            category="security",
+            severity="warning",
+            description=f'Deleted role "{instance.name}".',
+            metadata={
+                "role_id": instance.id,
+                "role_slug": instance.slug,
+                "permission_codes": list(instance.permissions.values_list("code", flat=True)),
+            },
+            request=self.request,
+        )
+        super().perform_destroy(instance)
 
 
 class PermissionViewSet(viewsets.ReadOnlyModelViewSet):

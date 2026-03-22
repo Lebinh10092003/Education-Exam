@@ -65,6 +65,20 @@ interface CandidateOption {
   roles: Array<{ id: number; slug: string; name: string }>;
 }
 
+interface GroupMembershipImportSummary {
+  total_rows: number;
+  created_users: number;
+  updated_users: number;
+  assigned_users: number;
+  skipped_rows: number;
+  failed_rows: number;
+  errors: Array<{
+    row_number: number;
+    identifier: string;
+    message: string;
+  }>;
+}
+
 interface GroupFormState {
   name: string;
   description: string;
@@ -111,6 +125,9 @@ export function GroupManagement() {
   const [membershipRefreshKey, setMembershipRefreshKey] = useState(0);
   const [candidateSearchQuery, setCandidateSearchQuery] = useState("");
   const [selectedCandidateIds, setSelectedCandidateIds] = useState<number[]>([]);
+  const [importFile, setImportFile] = useState<File | null>(null);
+  const [importInputKey, setImportInputKey] = useState(0);
+  const [importSummary, setImportSummary] = useState<GroupMembershipImportSummary | null>(null);
 
   const debouncedSearch = useDebouncedValue(searchQuery, 350);
   const debouncedCandidateSearch = useDebouncedValue(candidateSearchQuery, 300);
@@ -210,6 +227,9 @@ export function GroupManagement() {
     setMembersDialogGroup(group);
     setCandidateSearchQuery("");
     setSelectedCandidateIds([]);
+    setImportFile(null);
+    setImportSummary(null);
+    setImportInputKey((previous) => previous + 1);
   };
 
   const closeMembersDialog = (nextOpen: boolean) => {
@@ -217,6 +237,9 @@ export function GroupManagement() {
       setMembersDialogGroup(null);
       setCandidateSearchQuery("");
       setSelectedCandidateIds([]);
+      setImportFile(null);
+      setImportSummary(null);
+      setImportInputKey((previous) => previous + 1);
     }
   };
 
@@ -294,6 +317,37 @@ export function GroupManagement() {
       setMembershipRefreshKey((previous) => previous + 1);
       await groupsList.reload();
       notify.success("Members added to the group.");
+    });
+  };
+
+  const importMembers = async () => {
+    if (!membersDialogGroup || !importFile) {
+      notify.error("Select a CSV file before importing.");
+      return;
+    }
+
+    await mutation.run(async () => {
+      const formData = new FormData();
+      formData.append("file", importFile);
+      const summary = await apiRequest<GroupMembershipImportSummary>(
+        `/api/v1/groups/${membersDialogGroup.id}/memberships/import/`,
+        {
+          method: "POST",
+          body: formData,
+        },
+      );
+
+      setImportSummary(summary);
+      setImportFile(null);
+      setImportInputKey((previous) => previous + 1);
+      setMembershipRefreshKey((previous) => previous + 1);
+      await groupsList.reload();
+
+      notify.success(
+        summary.failed_rows
+          ? `Imported ${summary.assigned_users} members with ${summary.failed_rows} row error(s).`
+          : `Imported ${summary.assigned_users} members.`,
+      );
     });
   };
 
@@ -554,11 +608,69 @@ export function GroupManagement() {
               Add Members to {membersDialogGroup?.name ?? "Group"}
             </DialogTitle>
             <DialogDescription>
-              Search candidate or student accounts and add them to this group.
+              Search candidate or student accounts, or import them from CSV, then add them to this group.
             </DialogDescription>
           </DialogHeader>
           <div className="grid gap-6 py-4 lg:grid-cols-[1.2fr,0.8fr]">
             <div className="space-y-4">
+              <div className="rounded-lg border border-dashed border-blue-200 bg-blue-50/60 p-4">
+                <div className="flex flex-col gap-3">
+                  <div>
+                    <h3 className="text-sm font-semibold text-gray-900">Import Members from CSV</h3>
+                    <p className="mt-1 text-xs text-gray-600">
+                      Supported columns: <code>full_name,email,phone_number,student_class,cccd,date_of_birth,school_code</code>
+                    </p>
+                  </div>
+                  <Input
+                    key={importInputKey}
+                    type="file"
+                    accept=".csv,text/csv"
+                    onChange={(event) => setImportFile(event.target.files?.[0] ?? null)}
+                  />
+                  <div className="flex items-center justify-between gap-3">
+                    <p className="text-xs text-gray-500">
+                      {importFile ? importFile.name : "No CSV file selected."}
+                    </p>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => void importMembers()}
+                      disabled={mutation.isSubmitting || !importFile}
+                    >
+                      {mutation.isSubmitting && importFile ? "Importing..." : "Import CSV"}
+                    </Button>
+                  </div>
+                </div>
+              </div>
+
+              {importSummary ? (
+                <div className="rounded-lg border border-gray-200 bg-gray-50 p-4">
+                  <div className="flex items-center justify-between gap-3">
+                    <h3 className="text-sm font-semibold text-gray-900">Last Import Summary</h3>
+                    <Badge variant={importSummary.failed_rows ? "secondary" : "outline"}>
+                      {importSummary.failed_rows ? `${importSummary.failed_rows} row errors` : "All rows processed"}
+                    </Badge>
+                  </div>
+                  <div className="mt-3 grid grid-cols-2 gap-3 text-sm text-gray-600">
+                    <div>Total rows: <strong>{importSummary.total_rows}</strong></div>
+                    <div>Created users: <strong>{importSummary.created_users}</strong></div>
+                    <div>Updated users: <strong>{importSummary.updated_users}</strong></div>
+                    <div>Assigned users: <strong>{importSummary.assigned_users}</strong></div>
+                    <div>Skipped rows: <strong>{importSummary.skipped_rows}</strong></div>
+                    <div>Failed rows: <strong>{importSummary.failed_rows}</strong></div>
+                  </div>
+                  {importSummary.errors.length ? (
+                    <div className="mt-4 space-y-2">
+                      {importSummary.errors.map((error) => (
+                        <div key={`${error.row_number}:${error.identifier}`} className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
+                          Row {error.row_number} {error.identifier ? `(${error.identifier})` : ""}: {error.message}
+                        </div>
+                      ))}
+                    </div>
+                  ) : null}
+                </div>
+              ) : null}
+
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
                 <Input

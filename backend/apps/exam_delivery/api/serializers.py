@@ -3,6 +3,8 @@ from drf_spectacular.utils import extend_schema_field
 from rest_framework import serializers
 
 from apps.exam_authoring.models import Exam
+from apps.grading.api.serializers import ResultSerializer
+from apps.materials.api.serializers import MaterialSerializer
 from apps.question_bank.models import QuestionOption
 
 from ..models import AutosaveSnapshot, ExamSession, SessionAnswer, SessionQuestion
@@ -232,3 +234,18 @@ class SessionSubmissionSummarySerializer(serializers.ModelSerializer):
             "max_score",
             "manual_grading_required",
         )
+
+
+class CandidateDashboardStatsSerializer(serializers.Serializer):
+    assigned_exam_count = serializers.IntegerField()
+    upcoming_exam_count = serializers.IntegerField()
+    published_result_count = serializers.IntegerField()
+    average_percentage = serializers.DecimalField(max_digits=8, decimal_places=2)
+    active_material_count = serializers.IntegerField()
+
+
+class CandidateDashboardOverviewSerializer(serializers.Serializer):
+    stats = CandidateDashboardStatsSerializer()
+    upcoming_exams = CandidateAssignedExamSerializer(many=True)
+    recent_results = ResultSerializer(many=True)
+    recent_materials = MaterialSerializer(many=True)

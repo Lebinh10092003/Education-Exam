@@ -196,6 +196,7 @@ class ViolationCaseViewSet(
             reviewer=request.user,
             decision=serializer.validated_data["decision"],
             notes=serializer.validated_data.get("notes", ""),
+            request=request,
         )
         output = ViolationCaseSerializer(case)
         return Response(output.data)

@@ -1,10 +1,13 @@
+from django.urls import path
 from rest_framework.routers import SimpleRouter
 
-from .views import ManualGradingTaskViewSet, ResultViewSet
+from .views import CandidateResultListView, ManualGradingTaskViewSet, ResultViewSet
 
 
 router = SimpleRouter()
 router.register("grading/tasks", ManualGradingTaskViewSet, basename="grading-tasks")
 router.register("results", ResultViewSet, basename="results")
 
-urlpatterns = router.urls
+urlpatterns = [
+    path("my-results/", CandidateResultListView.as_view(), name="my-results"),
+] + router.urls

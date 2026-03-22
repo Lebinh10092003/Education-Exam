@@ -1,4 +1,5 @@
 import calendar
+from datetime import date
 from datetime import datetime
 from decimal import Decimal
 
@@ -14,10 +15,13 @@ from apps.exam_authoring.services import build_exam_assignment_summary
 from apps.exam_delivery.models import ExamSession
 from apps.identity.models import User
 from apps.identity.permissions import HasAPIPermissionCode
+from apps.platform_core.models import AuditEvent
 from apps.proctoring.models import ProctorEvent
 from apps.question_bank.models import Question
 
 from .serializers import (
+    AuditEventSerializer,
+    AuditEventSummarySerializer,
     DashboardOverviewSerializer,
     LivenessSerializer,
     ReadinessSerializer,
@@ -44,10 +48,81 @@ class ReadinessView(generics.GenericAPIView):
             "database": "configured" if settings.DATABASES.get("default") else "missing",
             "redis": "configured" if getattr(settings, "REDIS_URL", None) else "missing",
             "storage": "object-storage"
-            if getattr(settings, "AWS_STORAGE_BUCKET_NAME", "")
+            if getattr(settings, "USE_S3_STORAGE", False)
             else "filesystem",
         }
         serializer = self.get_serializer({"status": "ok", "components": components})
+        return Response(serializer.data)
+
+
+class AuditEventFilterMixin:
+    def get_base_queryset(self):
+        return AuditEvent.objects.select_related("actor").order_by("-occurred_at", "-id")
+
+    def filter_audit_queryset(self, queryset):
+        search = self.request.query_params.get("search")
+        if search:
+            queryset = queryset.filter(
+                Q(action__icontains=search)
+                | Q(category__icontains=search)
+                | Q(description__icontains=search)
+                | Q(actor_email__icontains=search)
+                | Q(actor_name__icontains=search)
+                | Q(request_id__icontains=search)
+            )
+
+        category = self.request.query_params.get("category")
+        if category:
+            queryset = queryset.filter(category=category)
+
+        severity = self.request.query_params.get("severity")
+        if severity:
+            queryset = queryset.filter(severity=severity)
+
+        action = self.request.query_params.get("action")
+        if action:
+            queryset = queryset.filter(action=action)
+
+        date_from = self.request.query_params.get("date_from")
+        if date_from:
+            try:
+                queryset = queryset.filter(occurred_at__date__gte=date.fromisoformat(date_from))
+            except ValueError:
+                pass
+
+        date_to = self.request.query_params.get("date_to")
+        if date_to:
+            try:
+                queryset = queryset.filter(occurred_at__date__lte=date.fromisoformat(date_to))
+            except ValueError:
+                pass
+
+        return queryset
+
+
+class AuditEventListView(AuditEventFilterMixin, generics.ListAPIView):
+    serializer_class = AuditEventSerializer
+    permission_classes = [IsAuthenticated, HasAPIPermissionCode]
+    permission_code = "audit.view"
+
+    def get_queryset(self):
+        return self.filter_audit_queryset(self.get_base_queryset())
+
+
+class AuditEventSummaryView(AuditEventFilterMixin, generics.GenericAPIView):
+    serializer_class = AuditEventSummarySerializer
+    permission_classes = [IsAuthenticated, HasAPIPermissionCode]
+    permission_code = "audit.view"
+
+    def get(self, request):
+        queryset = self.filter_audit_queryset(self.get_base_queryset())
+        payload = {
+            "total_events": queryset.count(),
+            "warning_events": queryset.filter(severity=AuditEvent.Severity.WARNING).count(),
+            "error_events": queryset.filter(severity=AuditEvent.Severity.ERROR).count(),
+            "today_events": queryset.filter(occurred_at__date=timezone.localdate()).count(),
+        }
+        serializer = self.get_serializer(payload)
         return Response(serializer.data)
 
 

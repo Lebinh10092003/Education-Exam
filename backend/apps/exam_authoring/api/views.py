@@ -9,12 +9,14 @@ from rest_framework.response import Response
 from apps.identity.permissions import HasAPIPermissionCode
 from apps.institutions.models import CandidateGroup
 
-from ..models import Exam, ExamAssignment
+from ..models import Exam, ExamAssignment, ExamPeriod, ExamRoom
 from ..services import build_exam_assignment_summary, clone_exam, import_students_to_exam, sync_exam_assignments
 from .serializers import (
+    ExamPeriodSerializer,
     ExamGroupAssignmentSerializer,
     ExamGroupAssignmentSyncSerializer,
     ExamReadSerializer,
+    ExamRoomSerializer,
     ExamStudentImportRequestSerializer,
     ExamStudentImportSummarySerializer,
     ExamWriteSerializer,
@@ -143,6 +145,7 @@ class ExamViewSet(viewsets.ModelViewSet):
             exam=exam,
             assigned_by=request.user,
             group_ids=serializer.validated_data["group_ids"],
+            request=request,
         )
         return Response(build_exam_assignment_summary(exam))
 
@@ -166,3 +169,52 @@ class ExamViewSet(viewsets.ModelViewSet):
             uploaded_file=serializer.validated_data["file"],
         )
         return Response(summary, status=status.HTTP_200_OK)
+
+
+class ExamPeriodViewSet(viewsets.ModelViewSet):
+    serializer_class = ExamPeriodSerializer
+    permission_classes = [IsAuthenticated, HasAPIPermissionCode]
+    permission_codes = {
+        "GET": "exam_periods.view",
+        "POST": "exam_periods.manage",
+        "PUT": "exam_periods.manage",
+        "PATCH": "exam_periods.manage",
+        "DELETE": "exam_periods.manage",
+    }
+
+    def get_queryset(self):
+        queryset = ExamPeriod.objects.annotate(exams_count=Count("exams", distinct=True)).order_by("start_date", "name")
+        search = self.request.query_params.get("search")
+        if search:
+            queryset = queryset.filter(Q(name__icontains=search) | Q(description__icontains=search))
+        status_filter = self.request.query_params.get("status")
+        if status_filter:
+            from django.utils import timezone
+
+            today = timezone.localdate()
+            if status_filter == "upcoming":
+                queryset = queryset.filter(start_date__gt=today)
+            elif status_filter == "open":
+                queryset = queryset.filter(start_date__lte=today, end_date__gte=today)
+            elif status_filter == "closed":
+                queryset = queryset.filter(end_date__lt=today)
+        return queryset
+
+
+class ExamRoomViewSet(viewsets.ModelViewSet):
+    serializer_class = ExamRoomSerializer
+    permission_classes = [IsAuthenticated, HasAPIPermissionCode]
+    permission_codes = {
+        "GET": "exam_rooms.view",
+        "POST": "exam_rooms.manage",
+        "PUT": "exam_rooms.manage",
+        "PATCH": "exam_rooms.manage",
+        "DELETE": "exam_rooms.manage",
+    }
+
+    def get_queryset(self):
+        queryset = ExamRoom.objects.annotate(exams_count=Count("exams", distinct=True)).order_by("name")
+        search = self.request.query_params.get("search")
+        if search:
+            queryset = queryset.filter(Q(name__icontains=search) | Q(location__icontains=search))
+        return queryset

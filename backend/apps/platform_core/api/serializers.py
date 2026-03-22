@@ -1,4 +1,7 @@
+from drf_spectacular.utils import extend_schema_field
 from rest_framework import serializers
+
+from ..models import AuditEvent
 
 
 class LivenessSerializer(serializers.Serializer):
@@ -42,3 +45,54 @@ class DashboardOverviewSerializer(serializers.Serializer):
     activity = DashboardActivityPointSerializer(many=True)
     recent_exams = DashboardRecentExamSerializer(many=True)
     alerts = DashboardAlertSerializer(many=True)
+
+
+class AuditActorSerializer(serializers.Serializer):
+    id = serializers.IntegerField(allow_null=True)
+    email = serializers.CharField(allow_blank=True)
+    full_name = serializers.CharField(allow_blank=True)
+
+
+class AuditEventSerializer(serializers.ModelSerializer):
+    actor = serializers.SerializerMethodField()
+
+    class Meta:
+        model = AuditEvent
+        fields = (
+            "id",
+            "actor",
+            "actor_email",
+            "actor_name",
+            "action",
+            "category",
+            "severity",
+            "description",
+            "metadata",
+            "request_id",
+            "ip_address",
+            "occurred_at",
+            "created_at",
+            "updated_at",
+        )
+        read_only_fields = fields
+
+    @extend_schema_field(AuditActorSerializer)
+    def get_actor(self, obj):
+        if obj.actor_id is None:
+            return {
+                "id": None,
+                "email": obj.actor_email,
+                "full_name": obj.actor_name,
+            }
+        return {
+            "id": obj.actor_id,
+            "email": obj.actor.email,
+            "full_name": obj.actor.full_name,
+        }
+
+
+class AuditEventSummarySerializer(serializers.Serializer):
+    total_events = serializers.IntegerField()
+    warning_events = serializers.IntegerField()
+    error_events = serializers.IntegerField()
+    today_events = serializers.IntegerField()

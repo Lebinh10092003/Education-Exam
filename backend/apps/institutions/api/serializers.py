@@ -40,6 +40,22 @@ class GroupMembershipSerializer(serializers.ModelSerializer):
         read_only_fields = ("id", "created_at", "user_email", "user_name")
 
 
+class GroupMembershipImportErrorSerializer(serializers.Serializer):
+    row_number = serializers.IntegerField()
+    identifier = serializers.CharField(allow_blank=True)
+    message = serializers.CharField()
+
+
+class GroupMembershipImportSummarySerializer(serializers.Serializer):
+    total_rows = serializers.IntegerField()
+    created_users = serializers.IntegerField()
+    updated_users = serializers.IntegerField()
+    assigned_users = serializers.IntegerField()
+    skipped_rows = serializers.IntegerField()
+    failed_rows = serializers.IntegerField()
+    errors = GroupMembershipImportErrorSerializer(many=True)
+
+
 class CandidateGroupSerializer(serializers.ModelSerializer):
     school_id = serializers.PrimaryKeyRelatedField(
         queryset=School.objects.all(),

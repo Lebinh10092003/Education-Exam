@@ -149,6 +149,41 @@ paths:
                 type: object
                 additionalProperties: {}
           description: ''
+  /api/v1/audit/events/:
+    get:
+      operationId: api_v1_audit_events_list
+      parameters:
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedAuditEventList'
+          description: ''
+  /api/v1/audit/events/summary/:
+    get:
+      operationId: api_v1_audit_events_summary_retrieve
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuditEventSummary'
+          description: ''
   /api/v1/auth/forgot-password/:
     post:
       operationId: api_v1_auth_forgot_password_create
@@ -239,6 +274,298 @@ paths:
               schema:
                 $ref: '#/components/schemas/DashboardOverview'
           description: ''
+  /api/v1/exam-periods/:
+    get:
+      operationId: api_v1_exam_periods_list
+      parameters:
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedExamPeriodList'
+          description: ''
+    post:
+      operationId: api_v1_exam_periods_create
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ExamPeriod'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/ExamPeriod'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/ExamPeriod'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExamPeriod'
+          description: ''
+  /api/v1/exam-periods/{id}/:
+    get:
+      operationId: api_v1_exam_periods_retrieve
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this exam period.
+        required: true
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExamPeriod'
+          description: ''
+    put:
+      operationId: api_v1_exam_periods_update
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this exam period.
+        required: true
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ExamPeriod'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/ExamPeriod'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/ExamPeriod'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExamPeriod'
+          description: ''
+    patch:
+      operationId: api_v1_exam_periods_partial_update
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this exam period.
+        required: true
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedExamPeriod'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedExamPeriod'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedExamPeriod'
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExamPeriod'
+          description: ''
+    delete:
+      operationId: api_v1_exam_periods_destroy
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this exam period.
+        required: true
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '204':
+          description: No response body
+  /api/v1/exam-rooms/:
+    get:
+      operationId: api_v1_exam_rooms_list
+      parameters:
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedExamRoomList'
+          description: ''
+    post:
+      operationId: api_v1_exam_rooms_create
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ExamRoom'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/ExamRoom'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/ExamRoom'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExamRoom'
+          description: ''
+  /api/v1/exam-rooms/{id}/:
+    get:
+      operationId: api_v1_exam_rooms_retrieve
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this exam room.
+        required: true
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExamRoom'
+          description: ''
+    put:
+      operationId: api_v1_exam_rooms_update
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this exam room.
+        required: true
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ExamRoom'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/ExamRoom'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/ExamRoom'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExamRoom'
+          description: ''
+    patch:
+      operationId: api_v1_exam_rooms_partial_update
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this exam room.
+        required: true
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedExamRoom'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedExamRoom'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedExamRoom'
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExamRoom'
+          description: ''
+    delete:
+      operationId: api_v1_exam_rooms_destroy
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this exam room.
+        required: true
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '204':
+          description: No response body
   /api/v1/exam-sessions/{id}/:
     get:
       operationId: api_v1_exam_sessions_retrieve
@@ -612,6 +939,36 @@ paths:
               schema:
                 $ref: '#/components/schemas/CandidateExamSession'
           description: ''
+  /api/v1/exams/{id}/student-import/:
+    post:
+      operationId: api_v1_exams_student_import_create
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this exam.
+        required: true
+      tags:
+      - api
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/ExamStudentImportRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/ExamStudentImportRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExamStudentImportSummary'
+          description: ''
   /api/v1/grading/tasks/:
     get:
       operationId: api_v1_grading_tasks_list
@@ -885,6 +1242,27 @@ paths:
               schema:
                 $ref: '#/components/schemas/CandidateGroup'
           description: ''
+  /api/v1/groups/{id}/memberships/import/:
+    post:
+      operationId: api_v1_groups_memberships_import_create
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this candidate group.
+        required: true
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GroupMembershipImportSummary'
+          description: ''
   /api/v1/health/live/:
     get:
       operationId: api_v1_health_live_retrieve
@@ -1067,6 +1445,20 @@ paths:
               schema:
                 $ref: '#/components/schemas/Material'
           description: ''
+  /api/v1/my-dashboard/overview/:
+    get:
+      operationId: api_v1_my_dashboard_overview_retrieve
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CandidateDashboardOverview'
+          description: ''
   /api/v1/my-exams/:
     get:
       operationId: api_v1_my_exams_list
@@ -1087,6 +1479,161 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/PaginatedCandidateAssignedExamList'
+          description: ''
+  /api/v1/my-materials/:
+    get:
+      operationId: api_v1_my_materials_list
+      parameters:
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedMaterialList'
+          description: ''
+  /api/v1/my-results/:
+    get:
+      operationId: api_v1_my_results_list
+      parameters:
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedResultList'
+          description: ''
+  /api/v1/notifications/:
+    get:
+      operationId: api_v1_notifications_list
+      parameters:
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedNotificationList'
+          description: ''
+  /api/v1/notifications/{id}/:
+    get:
+      operationId: api_v1_notifications_retrieve
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this notification.
+        required: true
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Notification'
+          description: ''
+  /api/v1/notifications/{id}/mark-read/:
+    post:
+      operationId: api_v1_notifications_mark_read_create
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this notification.
+        required: true
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Notification'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/Notification'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/Notification'
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Notification'
+          description: ''
+  /api/v1/notifications/mark-all-read/:
+    post:
+      operationId: api_v1_notifications_mark_all_read_create
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Notification'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/Notification'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/Notification'
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Notification'
+          description: ''
+  /api/v1/notifications/unread-count/:
+    get:
+      operationId: api_v1_notifications_unread_count_retrieve
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Notification'
           description: ''
   /api/v1/permissions/:
     get:
@@ -2434,6 +2981,112 @@ paths:
           description: ''
 components:
   schemas:
+    AuditActor:
+      type: object
+      properties:
+        id:
+          type: integer
+          nullable: true
+        email:
+          type: string
+        full_name:
+          type: string
+      required:
+      - email
+      - full_name
+      - id
+    AuditEvent:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        actor:
+          allOf:
+          - $ref: '#/components/schemas/AuditActor'
+          readOnly: true
+        actor_email:
+          type: string
+          format: email
+          readOnly: true
+        actor_name:
+          type: string
+          readOnly: true
+        action:
+          type: string
+          readOnly: true
+        category:
+          type: string
+          readOnly: true
+        severity:
+          allOf:
+          - $ref: '#/components/schemas/AuditEventSeverityEnum'
+          readOnly: true
+        description:
+          type: string
+          readOnly: true
+        metadata:
+          readOnly: true
+        request_id:
+          type: string
+          readOnly: true
+        ip_address:
+          type: string
+          readOnly: true
+          nullable: true
+        occurred_at:
+          type: string
+          format: date-time
+          readOnly: true
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - action
+      - actor
+      - actor_email
+      - actor_name
+      - category
+      - created_at
+      - description
+      - id
+      - ip_address
+      - metadata
+      - occurred_at
+      - request_id
+      - severity
+      - updated_at
+    AuditEventSeverityEnum:
+      enum:
+      - info
+      - warning
+      - error
+      type: string
+      description: |-
+        * `info` - Info
+        * `warning` - Warning
+        * `error` - Error
+    AuditEventSummary:
+      type: object
+      properties:
+        total_events:
+          type: integer
+        warning_events:
+          type: integer
+        error_events:
+          type: integer
+        today_events:
+          type: integer
+      required:
+      - error_events
+      - today_events
+      - total_events
+      - warning_events
     BlankEnum:
       enum:
       - ''
@@ -2452,19 +3105,16 @@ components:
           $ref: '#/components/schemas/ExamStatusEnum'
         duration_minutes:
           type: integer
-          maximum: 9223372036854775807
+          maximum: 2147483647
           minimum: 0
-          format: int64
         passing_score:
           type: integer
-          maximum: 9223372036854775807
+          maximum: 2147483647
           minimum: 0
-          format: int64
         max_attempts:
           type: integer
-          maximum: 9223372036854775807
+          maximum: 2147483647
           minimum: 0
-          format: int64
         subject:
           allOf:
           - $ref: '#/components/schemas/CandidateExamSubject'
@@ -2498,6 +3148,49 @@ components:
       - question_count
       - schedule
       - subject
+    CandidateDashboardOverview:
+      type: object
+      properties:
+        stats:
+          $ref: '#/components/schemas/CandidateDashboardStats'
+        upcoming_exams:
+          type: array
+          items:
+            $ref: '#/components/schemas/CandidateAssignedExam'
+        recent_results:
+          type: array
+          items:
+            $ref: '#/components/schemas/Result'
+        recent_materials:
+          type: array
+          items:
+            $ref: '#/components/schemas/Material'
+      required:
+      - recent_materials
+      - recent_results
+      - stats
+      - upcoming_exams
+    CandidateDashboardStats:
+      type: object
+      properties:
+        assigned_exam_count:
+          type: integer
+        upcoming_exam_count:
+          type: integer
+        published_result_count:
+          type: integer
+        average_percentage:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,6}(?:\.\d{0,2})?$
+        active_material_count:
+          type: integer
+      required:
+      - active_material_count
+      - assigned_exam_count
+      - average_percentage
+      - published_result_count
+      - upcoming_exam_count
     CandidateExamSchedule:
       type: object
       properties:
@@ -2532,9 +3225,8 @@ components:
           $ref: '#/components/schemas/ExamSessionStatusEnum'
         attempt_number:
           type: integer
-          maximum: 9223372036854775807
+          maximum: 2147483647
           minimum: 0
-          format: int64
         started_at:
           type: string
           format: date-time
@@ -2663,6 +3355,24 @@ components:
       - email
       - full_name
       - id
+    CategoryEnum:
+      enum:
+      - exam
+      - submission
+      - grading
+      - user
+      - system
+      - alert
+      - result
+      type: string
+      description: |-
+        * `exam` - Exam
+        * `submission` - Submission
+        * `grading` - Grading
+        * `user` - User
+        * `system` - System
+        * `alert` - Alert
+        * `result` - Result
     ChangePassword:
       type: object
       properties:
@@ -2824,6 +3534,9 @@ components:
     EduExamTokenObtainPair:
       type: object
       properties:
+        identifier:
+          type: string
+          writeOnly: true
         email:
           type: string
           writeOnly: true
@@ -2831,7 +3544,6 @@ components:
           type: string
           writeOnly: true
       required:
-      - email
       - password
     ExamAssignedGroup:
       type: object
@@ -2897,9 +3609,8 @@ components:
           $ref: '#/components/schemas/ExamItemSourceEnum'
         sort_order:
           type: integer
-          maximum: 9223372036854775807
+          maximum: 2147483647
           minimum: 0
-          format: int64
         points:
           type: string
           format: decimal
@@ -2951,6 +3662,66 @@ components:
       - in_progress
       - not_started
       - total_candidates
+    ExamPeriod:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        name:
+          type: string
+          maxLength: 255
+        description:
+          type: string
+        start_date:
+          type: string
+          format: date
+        end_date:
+          type: string
+          format: date
+        status:
+          type: string
+          readOnly: true
+        exams_count:
+          type: integer
+          readOnly: true
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - created_at
+      - end_date
+      - exams_count
+      - id
+      - name
+      - start_date
+      - status
+      - updated_at
+    ExamPeriodSummary:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        name:
+          type: string
+          maxLength: 255
+        start_date:
+          type: string
+          format: date
+        end_date:
+          type: string
+          format: date
+      required:
+      - end_date
+      - id
+      - name
+      - start_date
     ExamQuestionRevisionSummary:
       type: object
       properties:
@@ -2981,9 +3752,8 @@ components:
           readOnly: true
         sort_order:
           type: integer
-          maximum: 9223372036854775807
+          maximum: 2147483647
           minimum: 0
-          format: int64
         difficulty:
           oneOf:
           - $ref: '#/components/schemas/DifficultyEnum'
@@ -2995,9 +3765,8 @@ components:
         tag_ids: {}
         count:
           type: integer
-          maximum: 9223372036854775807
+          maximum: 2147483647
           minimum: 0
-          format: int64
       required:
       - id
     ExamRandomRuleInput:
@@ -3033,25 +3802,30 @@ components:
           allOf:
           - $ref: '#/components/schemas/ExamSubject'
           readOnly: true
+        period:
+          allOf:
+          - $ref: '#/components/schemas/ExamPeriodSummary'
+          readOnly: true
+        room:
+          allOf:
+          - $ref: '#/components/schemas/ExamRoomSummary'
+          readOnly: true
         description:
           type: string
         status:
           $ref: '#/components/schemas/ExamStatusEnum'
         duration_minutes:
           type: integer
-          maximum: 9223372036854775807
+          maximum: 2147483647
           minimum: 0
-          format: int64
         passing_score:
           type: integer
-          maximum: 9223372036854775807
+          maximum: 2147483647
           minimum: 0
-          format: int64
         max_attempts:
           type: integer
-          maximum: 9223372036854775807
+          maximum: 2147483647
           minimum: 0
-          format: int64
         shuffle_questions:
           type: boolean
         show_results_immediately:
@@ -3089,9 +3863,65 @@ components:
       - delivery_summary
       - id
       - name
+      - period
+      - room
       - schedule_window
       - subject
       - updated_at
+    ExamRoom:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        name:
+          type: string
+          maxLength: 255
+        location:
+          type: string
+          maxLength: 255
+        capacity:
+          type: integer
+          maximum: 2147483647
+          minimum: 0
+        features: {}
+        exams_count:
+          type: integer
+          readOnly: true
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - created_at
+      - exams_count
+      - id
+      - name
+      - updated_at
+    ExamRoomSummary:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        name:
+          type: string
+          maxLength: 255
+        location:
+          type: string
+          maxLength: 255
+        capacity:
+          type: integer
+          maximum: 2147483647
+          minimum: 0
+        features: {}
+      required:
+      - id
+      - name
     ExamScheduleWindow:
       type: object
       properties:
@@ -3131,6 +3961,54 @@ components:
         * `paused` - Paused
         * `closed` - Closed
         * `archived` - Archived
+    ExamStudentImportError:
+      type: object
+      properties:
+        row_number:
+          type: integer
+        identifier:
+          type: string
+        message:
+          type: string
+      required:
+      - identifier
+      - message
+      - row_number
+    ExamStudentImportRequest:
+      type: object
+      properties:
+        file:
+          type: string
+          format: uri
+      required:
+      - file
+    ExamStudentImportSummary:
+      type: object
+      properties:
+        total_rows:
+          type: integer
+        created_users:
+          type: integer
+        updated_users:
+          type: integer
+        assigned_users:
+          type: integer
+        skipped_rows:
+          type: integer
+        failed_rows:
+          type: integer
+        errors:
+          type: array
+          items:
+            $ref: '#/components/schemas/ExamStudentImportError'
+      required:
+      - assigned_users
+      - created_users
+      - errors
+      - failed_rows
+      - skipped_rows
+      - total_rows
+      - updated_users
     ExamSubject:
       type: object
       properties:
@@ -3158,9 +4036,8 @@ components:
           readOnly: true
         version_number:
           type: integer
-          maximum: 9223372036854775807
+          maximum: 2147483647
           minimum: 0
-          format: int64
         item_count:
           type: integer
           readOnly: true
@@ -3192,6 +4069,12 @@ components:
           type: string
         subject_id:
           type: integer
+        period_id:
+          type: integer
+          nullable: true
+        room_id:
+          type: integer
+          nullable: true
         description:
           type: string
         status:
@@ -3244,6 +4127,46 @@ components:
           format: email
       required:
       - email
+    GroupMembershipImportError:
+      type: object
+      properties:
+        row_number:
+          type: integer
+        identifier:
+          type: string
+        message:
+          type: string
+      required:
+      - identifier
+      - message
+      - row_number
+    GroupMembershipImportSummary:
+      type: object
+      properties:
+        total_rows:
+          type: integer
+        created_users:
+          type: integer
+        updated_users:
+          type: integer
+        assigned_users:
+          type: integer
+        skipped_rows:
+          type: integer
+        failed_rows:
+          type: integer
+        errors:
+          type: array
+          items:
+            $ref: '#/components/schemas/GroupMembershipImportError'
+      required:
+      - assigned_users
+      - created_users
+      - errors
+      - failed_rows
+      - skipped_rows
+      - total_rows
+      - updated_users
     Liveness:
       type: object
       properties:
@@ -3486,6 +4409,82 @@ components:
       - id
       - name
       - subject_name
+    Notification:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        title:
+          type: string
+          readOnly: true
+        message:
+          type: string
+          readOnly: true
+        category:
+          allOf:
+          - $ref: '#/components/schemas/CategoryEnum'
+          readOnly: true
+        priority:
+          allOf:
+          - $ref: '#/components/schemas/PriorityEnum'
+          readOnly: true
+        action_url:
+          type: string
+          readOnly: true
+        metadata:
+          readOnly: true
+        is_read:
+          type: boolean
+          readOnly: true
+        read_at:
+          type: string
+          format: date-time
+          readOnly: true
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - action_url
+      - category
+      - created_at
+      - id
+      - is_read
+      - message
+      - metadata
+      - priority
+      - read_at
+      - title
+      - updated_at
+    PaginatedAuditEventList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/AuditEvent'
     PaginatedCandidateAssignedExamList:
       type: object
       required:
@@ -3532,6 +4531,29 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/CandidateGroup'
+    PaginatedExamPeriodList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/ExamPeriod'
     PaginatedExamReadList:
       type: object
       required:
@@ -3555,6 +4577,29 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/ExamRead'
+    PaginatedExamRoomList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/ExamRoom'
     PaginatedManualGradingTaskList:
       type: object
       required:
@@ -3601,6 +4646,29 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/Material'
+    PaginatedNotificationList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/Notification'
     PaginatedPermissionList:
       type: object
       required:
@@ -3864,6 +4932,65 @@ components:
           type: string
           format: date-time
           readOnly: true
+    PatchedExamPeriod:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        name:
+          type: string
+          maxLength: 255
+        description:
+          type: string
+        start_date:
+          type: string
+          format: date
+        end_date:
+          type: string
+          format: date
+        status:
+          type: string
+          readOnly: true
+        exams_count:
+          type: integer
+          readOnly: true
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
+    PatchedExamRoom:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        name:
+          type: string
+          maxLength: 255
+        location:
+          type: string
+          maxLength: 255
+        capacity:
+          type: integer
+          maximum: 2147483647
+          minimum: 0
+        features: {}
+        exams_count:
+          type: integer
+          readOnly: true
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
     PatchedExamWrite:
       type: object
       properties:
@@ -3871,6 +4998,12 @@ components:
           type: string
         subject_id:
           type: integer
+        period_id:
+          type: integer
+          nullable: true
+        room_id:
+          type: integer
+          nullable: true
         description:
           type: string
         status:
@@ -4099,6 +5232,8 @@ components:
         id:
           type: integer
           readOnly: true
+        username:
+          type: string
         email:
           type: string
           format: email
@@ -4170,6 +5305,16 @@ components:
       - id
       - is_system
       - module
+    PriorityEnum:
+      enum:
+      - low
+      - medium
+      - high
+      type: string
+      description: |-
+        * `low` - Low
+        * `medium` - Medium
+        * `high` - High
     ProctorEvent:
       type: object
       properties:
@@ -4284,6 +5429,9 @@ components:
         id:
           type: integer
           readOnly: true
+        username:
+          type: string
+          readOnly: true
         email:
           type: string
           format: email
@@ -4318,6 +5466,7 @@ components:
       - phone_number
       - roles
       - school
+      - username
     ProfileUpdate:
       type: object
       properties:
@@ -4351,19 +5500,16 @@ components:
           $ref: '#/components/schemas/QuestionImportBatchStatusEnum'
         total_records:
           type: integer
-          maximum: 9223372036854775807
+          maximum: 2147483647
           minimum: 0
-          format: int64
         success_count:
           type: integer
-          maximum: 9223372036854775807
+          maximum: 2147483647
           minimum: 0
-          format: int64
         error_count:
           type: integer
-          maximum: 9223372036854775807
+          maximum: 2147483647
           minimum: 0
-          format: int64
         errors:
           type: array
           items:
@@ -4408,9 +5554,8 @@ components:
           readOnly: true
         row_number:
           type: integer
-          maximum: 9223372036854775807
+          maximum: 2147483647
           minimum: 0
-          format: int64
         field_name:
           type: string
           maxLength: 64
@@ -4439,9 +5584,8 @@ components:
           type: string
         sort_order:
           type: integer
-          maximum: 9223372036854775807
+          maximum: 2147483647
           minimum: 0
-          format: int64
       required:
       - key
       - text
@@ -4504,9 +5648,8 @@ components:
           readOnly: true
         revision_number:
           type: integer
-          maximum: 9223372036854775807
+          maximum: 2147483647
           minimum: 0
-          format: int64
         question_text:
           type: string
         options:
@@ -4839,9 +5982,8 @@ components:
           $ref: '#/components/schemas/SessionHeartbeatConnectionStatusEnum'
         latency_ms:
           type: integer
-          maximum: 9223372036854775807
+          maximum: 2147483647
           minimum: 0
-          format: int64
           nullable: true
         payload: {}
         recorded_at:
@@ -4880,9 +6022,8 @@ components:
           readOnly: true
         sort_order:
           type: integer
-          maximum: 9223372036854775807
+          maximum: 2147483647
           minimum: 0
-          format: int64
         points:
           type: string
           format: decimal
@@ -4934,9 +6075,8 @@ components:
           type: string
         sort_order:
           type: integer
-          maximum: 9223372036854775807
+          maximum: 2147483647
           minimum: 0
-          format: int64
       required:
       - key
       - text
@@ -4998,6 +6138,8 @@ components:
         id:
           type: integer
           readOnly: true
+        username:
+          type: string
         email:
           type: string
           format: email

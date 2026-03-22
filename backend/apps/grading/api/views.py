@@ -1,7 +1,7 @@
 from decimal import Decimal
 
 from django.db.models import Avg, Q
-from rest_framework import mixins, status, viewsets
+from rest_framework import generics, mixins, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
@@ -69,6 +69,7 @@ class ManualGradingTaskViewSet(
             grader=request.user,
             score_awarded=serializer.validated_data["score_awarded"],
             feedback=serializer.validated_data.get("feedback", ""),
+            request=request,
         )
         output = ManualGradingTaskSerializer(task)
         return Response(output.data)
@@ -143,7 +144,39 @@ class ResultViewSet(
     @action(detail=True, methods=["post"])
     def publish(self, request, pk=None):
         result = self.get_object()
-        result = publish_result(result=result, published_by=request.user)
+        result = publish_result(result=result, published_by=request.user, request=request)
         output = ResultSerializer(result)
         return Response(output.data, status=status.HTTP_200_OK)
+
+
+class CandidateResultListView(generics.ListAPIView):
+    serializer_class = ResultSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        queryset = (
+            Result.objects.select_related(
+                "session",
+                "session__candidate",
+                "session__exam",
+                "session__exam__subject",
+                "published_by",
+            )
+            .filter(
+                session__candidate=self.request.user,
+                publish_state=Result.PublishState.PUBLISHED,
+            )
+            .order_by("-published_at", "-created_at")
+        )
+        exam_id = self.request.query_params.get("exam")
+        if exam_id:
+            queryset = queryset.filter(session__exam_id=exam_id)
+        search = self.request.query_params.get("search")
+        if search:
+            queryset = queryset.filter(
+                Q(session__exam__name__icontains=search)
+                | Q(session__exam__subject__name__icontains=search)
+                | Q(session__exam__subject__code__icontains=search)
+            )
+        return queryset
 

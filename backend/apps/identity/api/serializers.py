@@ -35,6 +35,7 @@ class EduExamTokenObtainPairSerializer(TokenObtainPairSerializer):
         if user is None or not user.check_password(password) or not user.is_active:
             raise serializers.ValidationError("No active account found with the given credentials.")
 
+        self.user = user
         data = super().validate({"email": user.email, "password": password})
         data["username"] = user.username
         return data

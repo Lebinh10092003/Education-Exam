@@ -49,6 +49,36 @@ def test_record_proctor_event_creates_violation_case_for_warning_events(subject,
 
 
 @pytest.mark.django_db
+def test_record_proctor_event_creates_admin_notification(subject, admin_user, candidate_user):
+    from apps.notifications.models import Notification
+    from apps.proctoring.services import record_proctor_event
+
+    exam, session = build_active_session(
+        subject=subject,
+        admin_user=admin_user,
+        candidate_user=candidate_user,
+    )
+
+    event = record_proctor_event(
+        session=session,
+        event_type="fullscreen_exit",
+        severity="critical",
+        metadata={"count": 1, "message": "Candidate left fullscreen."},
+        reported_by=candidate_user,
+    )
+
+    notification = Notification.objects.filter(
+        recipient=admin_user,
+        category=Notification.Category.ALERT,
+        metadata__event_id=event.id,
+    ).first()
+
+    assert notification is not None
+    assert notification.priority == Notification.Priority.HIGH
+    assert notification.action_url == f"/exams/{exam.id}/monitor"
+
+
+@pytest.mark.django_db
 def test_build_exam_monitoring_snapshot_returns_candidate_statuses_and_alerts(subject, admin_user, candidate_user):
     from apps.proctoring.services import build_exam_monitoring_snapshot, record_heartbeat, record_proctor_event
 
@@ -112,6 +142,7 @@ def test_resolve_violation_case_marks_case_resolved(subject, admin_user, candida
 
 @pytest.mark.django_db
 def test_register_client_capability_tolerates_broadcast_failures(
+    caplog,
     monkeypatch,
     subject,
     admin_user,
@@ -129,6 +160,8 @@ def test_register_client_capability_tolerates_broadcast_failures(
         candidate_user=candidate_user,
     )
     monkeypatch.setattr(services, "get_channel_layer", lambda: FailingChannelLayer())
+    caplog.set_level("WARNING")
+    monkeypatch.setattr(services, "_broadcast_warning_logged", False)
 
     capability = services.register_client_capability(
         session=session,
@@ -140,3 +173,40 @@ def test_register_client_capability_tolerates_broadcast_failures(
     )
 
     assert capability.client_type == "web"
+    assert "Unable to broadcast monitoring update" in caplog.text
+    assert "Traceback" not in caplog.text
+
+
+@pytest.mark.django_db
+def test_broadcast_failures_only_log_once(monkeypatch, caplog, subject, admin_user, candidate_user):
+    from apps.proctoring import services
+
+    class FailingChannelLayer:
+        async def group_send(self, *args, **kwargs):
+            raise RuntimeError("Redis unavailable")
+
+    _, session = build_active_session(
+        subject=subject,
+        admin_user=admin_user,
+        candidate_user=candidate_user,
+    )
+    monkeypatch.setattr(services, "get_channel_layer", lambda: FailingChannelLayer())
+    monkeypatch.setattr(services, "_broadcast_warning_logged", False)
+    caplog.set_level("WARNING")
+
+    services.record_heartbeat(
+        session=session,
+        connection_status="stable",
+        latency_ms=10,
+        payload={"source": "test"},
+        reported_by=candidate_user,
+    )
+    services.record_heartbeat(
+        session=session,
+        connection_status="stable",
+        latency_ms=11,
+        payload={"source": "test"},
+        reported_by=candidate_user,
+    )
+
+    assert caplog.text.count("Unable to broadcast monitoring update") == 1

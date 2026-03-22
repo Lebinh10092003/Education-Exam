@@ -9,6 +9,9 @@ from django.utils import timezone
 from rest_framework.exceptions import PermissionDenied, ValidationError
 
 from apps.exam_authoring.models import Exam, ExamAssignment
+from apps.notifications.models import Notification
+from apps.notifications.services import create_notifications_for_permission
+from apps.platform_core.audit import record_audit_event
 
 from .models import (
     ClientCapability,
@@ -20,6 +23,7 @@ from .models import (
 )
 
 logger = logging.getLogger(__name__)
+_broadcast_warning_logged = False
 
 
 def monitoring_group_name(exam_id):
@@ -27,6 +31,8 @@ def monitoring_group_name(exam_id):
 
 
 def _broadcast_exam_monitoring_update(*, exam_id, message_type, payload):
+    global _broadcast_warning_logged
+
     channel_layer = get_channel_layer()
     if channel_layer is None:
         return
@@ -40,11 +46,12 @@ def _broadcast_exam_monitoring_update(*, exam_id, message_type, payload):
             },
         )
     except Exception:
-        logger.warning(
-            "Unable to broadcast monitoring update.",
-            exc_info=True,
-            extra={"exam_id": exam_id, "message_type": message_type},
-        )
+        if not _broadcast_warning_logged:
+            logger.warning(
+                "Unable to broadcast monitoring update: channel layer is unavailable.",
+                extra={"exam_id": exam_id, "message_type": message_type},
+            )
+            _broadcast_warning_logged = True
 
 
 def _event_message(event):
@@ -188,6 +195,25 @@ def record_proctor_event(*, session, event_type, severity="info", metadata=None,
             summary=(metadata or {}).get("message", ""),
         )
         case.events.add(event)
+        create_notifications_for_permission(
+            permission_code="proctoring.view",
+            title=f"Proctoring {severity} detected",
+            message=(
+                f'{session.candidate.full_name or session.candidate.email} triggered '
+                f'{event.get_event_type_display()} in "{session.exam.name}".'
+            ),
+            category=Notification.Category.ALERT,
+            priority=Notification.Priority.HIGH if severity == ProctorEvent.Severity.CRITICAL else Notification.Priority.MEDIUM,
+            action_url=f"/exams/{session.exam_id}/monitor",
+            metadata={
+                "session_id": session.id,
+                "exam_id": session.exam_id,
+                "candidate_id": session.candidate_id,
+                "event_id": event.id,
+                "event_type": event.event_type,
+                "severity": severity,
+            },
+        )
     _broadcast_exam_monitoring_update(
         exam_id=session.exam_id,
         message_type="proctor_event",
@@ -307,7 +333,7 @@ def build_exam_monitoring_snapshot(*, exam):
 
 
 @transaction.atomic
-def resolve_violation_case(*, case, reviewer, decision, notes=""):
+def resolve_violation_case(*, case, reviewer, decision, notes="", request=None):
     if decision not in {ViolationReview.Decision.RESOLVED, ViolationReview.Decision.DISMISSED}:
         raise ValidationError("Invalid decision.")
 
@@ -326,6 +352,21 @@ def resolve_violation_case(*, case, reviewer, decision, notes=""):
     case.resolved_by = reviewer
     case.resolution_notes = notes
     case.save(update_fields=["status", "resolved_at", "resolved_by", "resolution_notes", "updated_at"])
+    record_audit_event(
+        actor=reviewer,
+        action="proctoring.case_reviewed",
+        category="proctoring",
+        severity="warning" if decision == ViolationReview.Decision.RESOLVED else "info",
+        description=f'Reviewed violation case #{case.id} for "{case.session.candidate.email}".',
+        metadata={
+            "case_id": case.id,
+            "session_id": case.session_id,
+            "exam_id": case.session.exam_id,
+            "candidate_id": case.session.candidate_id,
+            "decision": decision,
+        },
+        request=request,
+    )
     _broadcast_exam_monitoring_update(
         exam_id=case.session.exam_id,
         message_type="violation_case",

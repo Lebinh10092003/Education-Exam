@@ -274,6 +274,12 @@ export function ExamManagement() {
                     </div>
 
                     <div className="mt-4 flex flex-wrap gap-2">
+                      <Link to={`/exams/${exam.id}`}>
+                        <Button size="sm" variant="outline">
+                          <Eye className="mr-2 h-4 w-4" />
+                          View
+                        </Button>
+                      </Link>
                       {(exam.status === "open" || exam.delivery_summary.in_progress_sessions > 0) && (
                         <Link to={`/exams/${exam.id}/monitor`}>
                           <Button size="sm" variant="outline">
@@ -427,6 +433,11 @@ export function ExamManagement() {
                         </td>
                         <td className="py-4 px-4">
                           <div className="flex gap-1">
+                            <Link to={`/exams/${exam.id}`}>
+                              <Button size="sm" variant="ghost" title="View">
+                                <Eye className="w-4 h-4" />
+                              </Button>
+                            </Link>
                             {(exam.status === "open" || exam.delivery_summary.in_progress_sessions > 0) && (
                               <Link to={`/exams/${exam.id}/monitor`}>
                                 <Button size="sm" variant="ghost" title="Monitor">

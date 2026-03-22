@@ -3,6 +3,7 @@ from pathlib import Path
 
 import environ
 
+from .storage import build_storages
 
 BASE_DIR = Path(__file__).resolve().parents[2]
 
@@ -14,6 +15,7 @@ env = environ.Env(
     REDIS_URL=(str, "redis://localhost:6379/0"),
     CELERY_BROKER_URL=(str, "redis://localhost:6379/0"),
     CELERY_RESULT_BACKEND=(str, "redis://localhost:6379/1"),
+    USE_S3_STORAGE=(bool, False),
     AWS_ACCESS_KEY_ID=(str, ""),
     AWS_SECRET_ACCESS_KEY=(str, ""),
     AWS_STORAGE_BUCKET_NAME=(str, ""),
@@ -49,6 +51,7 @@ INSTALLED_APPS = [
     "apps.grading",
     "apps.proctoring",
     "apps.materials",
+    "apps.notifications",
 ]
 
 MIDDLEWARE = [
@@ -165,25 +168,16 @@ CHANNEL_LAYERS = {
     }
 }
 
-if env("AWS_STORAGE_BUCKET_NAME"):
+USE_S3_STORAGE = env("USE_S3_STORAGE")
+if USE_S3_STORAGE:
     AWS_ACCESS_KEY_ID = env("AWS_ACCESS_KEY_ID")
     AWS_SECRET_ACCESS_KEY = env("AWS_SECRET_ACCESS_KEY")
     AWS_STORAGE_BUCKET_NAME = env("AWS_STORAGE_BUCKET_NAME")
     AWS_S3_ENDPOINT_URL = env("AWS_S3_ENDPOINT_URL")
     AWS_S3_REGION_NAME = env("AWS_S3_REGION_NAME")
     AWS_QUERYSTRING_AUTH = True
-    STORAGES = {
-        "default": {"BACKEND": "storages.backends.s3.S3Storage"},
-        "staticfiles": {
-            "BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage"
-        },
-    }
-else:
-    STORAGES = {
-        "default": {
-            "BACKEND": "django.core.files.storage.FileSystemStorage",
-        },
-        "staticfiles": {
-            "BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage"
-        },
-    }
+
+STORAGES = build_storages(
+    use_s3_storage=USE_S3_STORAGE,
+    bucket_name=env("AWS_STORAGE_BUCKET_NAME"),
+)

@@ -13,6 +13,7 @@ from apps.identity.models import Profile, Role, UserRole
 from apps.identity.utils import build_student_username, ensure_unique_username
 from apps.institutions.models import CandidateGroup
 from apps.institutions.models import School
+from apps.platform_core.audit import record_audit_event
 from apps.question_bank.models import Question
 
 from .models import Exam, ExamAssignment, ExamItem, ExamRandomRule, ExamScheduleWindow, ExamVersion
@@ -448,8 +449,14 @@ def _validate_assignments(*, group_ids=None, user_ids=None):
 
 
 @transaction.atomic
-def sync_exam_assignments(*, exam, assigned_by, group_ids=UNSET, user_ids=UNSET):
+def sync_exam_assignments(*, exam, assigned_by, group_ids=UNSET, user_ids=UNSET, request=None):
     resolved_group_ids, resolved_user_ids = _validate_assignments(group_ids=group_ids, user_ids=user_ids)
+    previous_group_ids = set(
+        ExamAssignment.objects.filter(exam=exam, group__isnull=False).values_list("group_id", flat=True)
+    )
+    previous_user_ids = set(
+        ExamAssignment.objects.filter(exam=exam, user__isnull=False).values_list("user_id", flat=True)
+    )
 
     if resolved_group_ids is not UNSET:
         ExamAssignment.objects.filter(exam=exam, group__isnull=False).exclude(group_id__in=resolved_group_ids).delete()
@@ -475,6 +482,34 @@ def sync_exam_assignments(*, exam, assigned_by, group_ids=UNSET, user_ids=UNSET)
                 for user_id in resolved_user_ids
                 if user_id not in existing_user_ids
             ]
+        )
+
+    current_group_ids = set(
+        ExamAssignment.objects.filter(exam=exam, group__isnull=False).values_list("group_id", flat=True)
+    )
+    current_user_ids = set(
+        ExamAssignment.objects.filter(exam=exam, user__isnull=False).values_list("user_id", flat=True)
+    )
+    added_group_ids = sorted(current_group_ids - previous_group_ids)
+    removed_group_ids = sorted(previous_group_ids - current_group_ids)
+    added_user_ids = sorted(current_user_ids - previous_user_ids)
+    removed_user_ids = sorted(previous_user_ids - current_user_ids)
+    if added_group_ids or removed_group_ids or added_user_ids or removed_user_ids:
+        record_audit_event(
+            actor=assigned_by,
+            action="exam.assignments.synced",
+            category="exam",
+            description=f'Synchronized assignments for exam "{exam.name}".',
+            metadata={
+                "exam_id": exam.id,
+                "added_group_ids": added_group_ids,
+                "removed_group_ids": removed_group_ids,
+                "added_user_ids": added_user_ids,
+                "removed_user_ids": removed_user_ids,
+                "group_count": len(current_group_ids),
+                "user_count": len(current_user_ids),
+            },
+            request=request,
         )
 
     return exam
@@ -516,12 +551,15 @@ def create_exam(
     shuffle_questions=False,
     show_results_immediately=False,
     enable_proctoring=False,
+    period=None,
+    room=None,
     opening_at=None,
     closing_at=None,
     manual_question_ids=None,
     random_rules=None,
     group_ids=None,
     user_ids=None,
+    request=None,
 ):
     exam = Exam.objects.create(
         name=name,
@@ -534,6 +572,8 @@ def create_exam(
         shuffle_questions=shuffle_questions,
         show_results_immediately=show_results_immediately,
         enable_proctoring=enable_proctoring,
+        period=period,
+        room=room,
         created_by=created_by,
         updated_by=created_by,
     )
@@ -562,6 +602,7 @@ def create_exam(
         assigned_by=created_by,
         group_ids=group_ids or [],
         user_ids=user_ids or [],
+        request=request,
     )
     return exam
 
@@ -581,12 +622,15 @@ def revise_exam(
     shuffle_questions=UNSET,
     show_results_immediately=UNSET,
     enable_proctoring=UNSET,
+    period=UNSET,
+    room=UNSET,
     opening_at=UNSET,
     closing_at=UNSET,
     manual_question_ids=UNSET,
     random_rules=UNSET,
     group_ids=UNSET,
     user_ids=UNSET,
+    request=None,
 ):
     updated_fields = ["updated_by"]
     exam.updated_by = updated_by
@@ -602,6 +646,8 @@ def revise_exam(
         ("shuffle_questions", shuffle_questions),
         ("show_results_immediately", show_results_immediately),
         ("enable_proctoring", enable_proctoring),
+        ("period", period),
+        ("room", room),
     ):
         if value is not UNSET:
             setattr(exam, field_name, value)
@@ -641,6 +687,7 @@ def revise_exam(
             assigned_by=updated_by,
             group_ids=group_ids,
             user_ids=user_ids,
+            request=request,
         )
 
     return exam
@@ -659,6 +706,8 @@ def clone_exam(*, exam, created_by):
         shuffle_questions=exam.shuffle_questions,
         show_results_immediately=exam.show_results_immediately,
         enable_proctoring=exam.enable_proctoring,
+        period=exam.period,
+        room=exam.room,
         created_by=created_by,
         updated_by=created_by,
     )

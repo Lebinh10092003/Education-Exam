@@ -1,5 +1,5 @@
 from django.db.models import Q
-from rest_framework import status, viewsets
+from rest_framework import generics, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.parsers import FormParser, MultiPartParser
 from rest_framework.permissions import IsAuthenticated
@@ -52,4 +52,24 @@ class MaterialViewSet(viewsets.ModelViewSet):
         }
         output = MaterialDownloadSerializer(payload)
         return Response(output.data, status=status.HTTP_200_OK)
+
+
+class CandidateMaterialListView(generics.ListAPIView):
+    serializer_class = MaterialSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        queryset = Material.objects.select_related("subject", "uploaded_by").filter(is_active=True).order_by("-created_at", "title")
+        search = self.request.query_params.get("search")
+        if search:
+            queryset = queryset.filter(
+                Q(title__icontains=search)
+                | Q(description__icontains=search)
+                | Q(subject__name__icontains=search)
+                | Q(subject__code__icontains=search)
+            )
+        subject_id = self.request.query_params.get("subject")
+        if subject_id:
+            queryset = queryset.filter(subject_id=subject_id)
+        return queryset
 

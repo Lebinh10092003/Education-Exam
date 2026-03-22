@@ -87,3 +87,20 @@ def test_grading_task_list_supports_status_and_exam_filters(api_client, admin_to
     payload = response.json()
     assert payload["count"] == 1
     assert payload["results"][0]["status"] == "pending"
+
+
+@pytest.mark.django_db
+def test_submission_creates_notification_for_manual_grading_queue(subject, admin_user, candidate_user):
+    from apps.notifications.models import Notification
+
+    task = _build_manual_grading_task(subject=subject, admin_user=admin_user, candidate_user=candidate_user)
+
+    notification = Notification.objects.filter(
+        recipient=admin_user,
+        category=Notification.Category.GRADING,
+        metadata__session_id=task.session_id,
+    ).first()
+
+    assert notification is not None
+    assert notification.action_url == "/manual-grading"
+    assert "manual grading" in notification.title.lower()
