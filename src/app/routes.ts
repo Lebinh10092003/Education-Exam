@@ -3,6 +3,7 @@ import { createBrowserRouter } from "react-router";
 import { TakeExam } from "./pages/TakeExam";
 import { PracticeExam } from "./pages/PracticeExam";
 import { ForgotPassword } from "./pages/ForgotPassword";
+import { ResetPassword } from "./pages/ResetPassword";
 import {
   ProtectedAdminLayout,
   ProtectedCandidateLayout,
@@ -57,6 +58,10 @@ export const routeConfig = [
   {
     path: "/forgot-password",
     Component: ForgotPassword,
+  },
+  {
+    path: "/reset-password",
+    Component: ResetPassword,
   },
   {
     path: "/",

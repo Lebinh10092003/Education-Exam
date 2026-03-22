@@ -8,6 +8,7 @@ from django.utils import timezone
 from rest_framework.exceptions import PermissionDenied, ValidationError
 
 from apps.exam_authoring.models import Exam, ExamAssignment
+from apps.platform_core.i18n import t
 
 from .models import AutosaveSnapshot, ExamSession, SessionAnswer, SessionQuestion, Submission
 
@@ -27,17 +28,17 @@ def _candidate_has_access(*, exam, candidate):
 
 def _assert_candidate_can_start(*, exam, candidate, now):
     if not _candidate_has_access(exam=exam, candidate=candidate):
-        raise PermissionDenied("You are not assigned to this exam.")
+        raise PermissionDenied(t(vi="Bạn chưa được phân vào bài thi này.", en="You are not assigned to this exam."))
     if exam.current_version_id is None:
-        raise ValidationError("This exam does not have a deliverable version.")
+        raise ValidationError(t(vi="Bài thi này chưa có phiên bản có thể phân phối.", en="This exam does not have a deliverable version."))
     if exam.status not in {Exam.Status.SCHEDULED, Exam.Status.OPEN}:
-        raise ValidationError("This exam is not available for delivery.")
+        raise ValidationError(t(vi="Bài thi này hiện không thể mở cho thí sinh.", en="This exam is not available for delivery."))
 
     schedule_window = getattr(exam, "schedule_window", None)
     if schedule_window and schedule_window.opens_at and schedule_window.opens_at > now:
-        raise ValidationError("This exam is not open yet.")
+        raise ValidationError(t(vi="Bài thi này chưa mở.", en="This exam is not open yet."))
     if schedule_window and schedule_window.closes_at and schedule_window.closes_at <= now:
-        raise ValidationError("This exam is already closed.")
+        raise ValidationError(t(vi="Bài thi này đã đóng.", en="This exam is already closed."))
 
 
 def _expire_if_needed(session, *, now):
@@ -92,7 +93,7 @@ def start_or_resume_session(*, exam, candidate):
 
     attempts_used = ExamSession.objects.filter(exam=exam, candidate=candidate).count()
     if attempts_used >= exam.max_attempts:
-        raise ValidationError("No attempts remaining for this exam.")
+        raise ValidationError(t(vi="Bạn không còn lượt làm bài cho bài thi này.", en="No attempts remaining for this exam."))
 
     exam_items = list(
         exam.current_version.items.select_related("question_revision", "question_revision__question").order_by("sort_order")
@@ -103,7 +104,7 @@ def start_or_resume_session(*, exam, candidate):
     if schedule_window and schedule_window.closes_at and schedule_window.closes_at < expires_at:
         expires_at = schedule_window.closes_at
     if expires_at <= now:
-        raise ValidationError("This exam can no longer be started.")
+        raise ValidationError(t(vi="Bài thi này không thể bắt đầu nữa.", en="This exam can no longer be started."))
 
     session = ExamSession.objects.create(
         exam=exam,
@@ -123,9 +124,9 @@ def start_or_resume_session(*, exam, candidate):
 def _assert_session_is_active(session):
     now = timezone.now()
     if _expire_if_needed(session, now=now):
-        raise ValidationError("This session has expired.")
+        raise ValidationError(t(vi="Phiên thi này đã hết hạn.", en="This session has expired."))
     if session.status != ExamSession.Status.IN_PROGRESS:
-        raise ValidationError("This session is not accepting answers.")
+        raise ValidationError(t(vi="Phiên thi này hiện không nhận câu trả lời.", en="This session is not accepting answers."))
     return now
 
 
@@ -139,7 +140,7 @@ def save_session_answer(
     is_marked_for_review=UNSET,
 ):
     if session_question.session_id != session.id:
-        raise ValidationError("Question does not belong to this session.")
+        raise ValidationError(t(vi="Câu hỏi không thuộc phiên thi này.", en="Question does not belong to this session."))
 
     now = _assert_session_is_active(session)
     answer, _ = SessionAnswer.objects.get_or_create(session_question=session_question)

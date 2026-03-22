@@ -1,21 +1,24 @@
 import { Suspense } from "react";
 import { Link, Outlet, useLocation } from "react-router";
+import { useTranslation } from "react-i18next";
 import { Award, BookOpen, LayoutDashboard, LogOut, PlayCircle } from "lucide-react";
 
 import { useAuth } from "../../auth/useAuth";
+import { LanguageSwitcher } from "../LanguageSwitcher";
 import { RouteContentLoader } from "../RouteContentLoader";
 import { Avatar, AvatarFallback } from "../ui/avatar";
 import { Badge } from "../ui/badge";
 import { Button } from "../ui/button";
 
 const navItems = [
-  { label: "Dashboard", path: "/candidate/dashboard", icon: LayoutDashboard },
-  { label: "Practice", path: "/candidate/practice", icon: PlayCircle },
-  { label: "Results", path: "/candidate/results", icon: Award },
-  { label: "Materials", path: "/candidate/materials", icon: BookOpen },
+  { labelKey: "candidate.dashboard", path: "/candidate/dashboard", icon: LayoutDashboard },
+  { labelKey: "candidate.practice", path: "/candidate/practice", icon: PlayCircle },
+  { labelKey: "candidate.results", path: "/candidate/results", icon: Award },
+  { labelKey: "candidate.materials", path: "/candidate/materials", icon: BookOpen },
 ];
 
 export function CandidateLayout() {
+  const { t } = useTranslation(["navigation", "common"]);
   const location = useLocation();
   const { logout, profile } = useAuth();
 
@@ -27,7 +30,7 @@ export function CandidateLayout() {
     );
   }
 
-  const displayName = profile?.full_name ?? "Candidate";
+  const displayName = profile?.full_name ?? t("common:fallback.candidateUser");
   const initials =
     displayName
       .split(" ")
@@ -54,8 +57,8 @@ export function CandidateLayout() {
                 <span className="text-lg font-bold text-white">E</span>
               </div>
               <div>
-                <p className="text-lg font-semibold text-gray-900">EduExam</p>
-                <p className="text-xs uppercase tracking-[0.2em] text-gray-500">Student Portal</p>
+                <p className="text-lg font-semibold text-gray-900">{t("common:app.name")}</p>
+                <p className="text-xs uppercase tracking-[0.2em] text-gray-500">{t("navigation:candidate.portal")}</p>
               </div>
             </Link>
             {schoolName ? <Badge variant="outline">{schoolName}</Badge> : null}
@@ -75,13 +78,14 @@ export function CandidateLayout() {
                   }`}
                 >
                   <item.icon className="h-4 w-4" />
-                  {item.label}
+                  {t(item.labelKey, { ns: "navigation" })}
                 </Link>
               );
             })}
           </nav>
 
           <div className="flex items-center justify-between gap-3">
+            <LanguageSwitcher />
             <div className="flex min-w-0 items-center gap-3">
               <Avatar className="h-10 w-10">
                 <AvatarFallback>{initials}</AvatarFallback>
@@ -93,7 +97,7 @@ export function CandidateLayout() {
             </div>
             <Button variant="outline" size="sm" onClick={logout}>
               <LogOut className="h-4 w-4" />
-              Logout
+              {t("common:actions.logout")}
             </Button>
           </div>
         </div>

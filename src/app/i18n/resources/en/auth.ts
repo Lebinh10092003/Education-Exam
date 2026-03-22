@@ -1,0 +1,53 @@
+const auth = {
+  login: {
+    title: "Sign in to your account",
+    identifierLabel: "Email or Username",
+    identifierPlaceholder: "you@example.com or your.username",
+    passwordLabel: "Password",
+    rememberMe: "Remember me",
+    forgotPassword: "Forgot password?",
+    submit: "Sign In",
+    submitting: "Signing In...",
+    demoCredentials: "Local demo credentials",
+    noAccount: "Don't have an account?",
+    contactAdmin: "Contact Administrator",
+    success: "Signed in successfully.",
+    failedTitle: "Sign in failed",
+  },
+  forgotPassword: {
+    title: "Reset Password",
+    description: "Submit your email to receive password reset instructions.",
+    emailLabel: "Email Address",
+    emailPlaceholder: "you@example.com",
+    submit: "Send Reset Link",
+    submitting: "Sending...",
+    success: "Reset request accepted.",
+    backToLogin: "Back to Login",
+  },
+  resetPassword: {
+    title: "Create a new password",
+    description: "Enter your new password to complete the reset flow.",
+    newPasswordLabel: "New Password",
+    confirmPasswordLabel: "Confirm New Password",
+    submit: "Update Password",
+    submitting: "Updating...",
+    success: "Password updated. You can sign in again.",
+    goToLogin: "Go to Login",
+  },
+  errors: {
+    inactiveAccount: "Your account is inactive or locked. Please contact an administrator.",
+    invalidCredentials: "Unable to sign in with the provided credentials.",
+    emailRequired: "Email is required.",
+    resetRequestFailed: "Unable to request password reset.",
+    passwordMismatch: "Password confirmation does not match.",
+    sessionEnded: "Your session has ended. Please sign in again.",
+    sessionEndedTitle: "Session ended",
+  },
+  protected: {
+    loadingWorkspace: "Loading workspace...",
+    loadingExamSession: "Loading exam session...",
+    checkingSession: "Checking session...",
+  },
+};
+
+export default auth;

@@ -5,6 +5,8 @@ from drf_spectacular.types import OpenApiTypes
 from drf_spectacular.utils import extend_schema_field
 from rest_framework import serializers
 
+from apps.platform_core.i18n import t
+
 from ..models import (
     ClientCapability,
     ProctorEvidence,
@@ -26,7 +28,9 @@ class FlexibleJSONField(serializers.JSONField):
                 try:
                     data = ast.literal_eval(data)
                 except (ValueError, SyntaxError) as exc:
-                    raise serializers.ValidationError("Must be valid JSON.") from exc
+                    raise serializers.ValidationError(
+                        t(vi="Du lieu phai la JSON hop le.", en="Must be valid JSON.")
+                    ) from exc
         return super().to_internal_value(data)
 
 

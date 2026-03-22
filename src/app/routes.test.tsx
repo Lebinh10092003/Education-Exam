@@ -54,6 +54,7 @@ describe("route configuration", () => {
 
   it("registers the expanded admin routes", () => {
     expect(matchRoutes(routeConfig, "/")).toBeTruthy();
+    expect(matchRoutes(routeConfig, "/reset-password")).toBeTruthy();
     expect(matchRoutes(routeConfig, "/users")).toBeTruthy();
     expect(matchRoutes(routeConfig, "/materials")).toBeTruthy();
     expect(matchRoutes(routeConfig, "/manual-grading")).toBeTruthy();
@@ -92,7 +93,7 @@ describe("protected layouts", () => {
       </AuthContext.Provider>,
     );
 
-    expect(await screen.findAllByText("Dashboard")).not.toHaveLength(0);
+    expect(await screen.findAllByText("Tổng quan")).not.toHaveLength(0);
   });
 
   it("renders the shared candidate shell for authenticated candidates", async () => {
@@ -110,7 +111,7 @@ describe("protected layouts", () => {
       </AuthContext.Provider>,
     );
 
-    expect(await screen.findByText("Student Portal")).toBeInTheDocument();
-    expect(screen.getByText("Practice")).toBeInTheDocument();
+    expect(await screen.findByText("Cổng thí sinh")).toBeInTheDocument();
+    expect(screen.getByText("Luyện tập")).toBeInTheDocument();
   });
 });

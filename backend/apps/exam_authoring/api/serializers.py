@@ -4,6 +4,7 @@ from drf_spectacular.utils import extend_schema_field
 from rest_framework import serializers
 
 from apps.academics.models import Subject
+from apps.platform_core.i18n import t
 from apps.question_bank.models import Question, QuestionTag
 
 from ..models import Exam, ExamItem, ExamPeriod, ExamRandomRule, ExamRoom, ExamScheduleWindow, ExamVersion
@@ -237,10 +238,14 @@ class ExamWriteSerializer(serializers.Serializer):
                 if effective[field] in (None, "")
             ]
             if missing:
-                raise serializers.ValidationError({field: "This field is required." for field in missing})
+                raise serializers.ValidationError(
+                    {field: t(vi="Truong nay la bat buoc.", en="This field is required.") for field in missing}
+                )
 
         if effective["opening_at"] and effective["closing_at"] and effective["closing_at"] <= effective["opening_at"]:
-            raise serializers.ValidationError({"closing_at": "Closing time must be after opening time."})
+            raise serializers.ValidationError(
+                {"closing_at": t(vi="Thoi gian dong phai sau thoi gian mo.", en="Closing time must be after opening time.")}
+            )
 
         if (
             exam is not None
@@ -252,7 +257,12 @@ class ExamWriteSerializer(serializers.Serializer):
             and exam.current_version.items.exists()
         ):
             raise serializers.ValidationError(
-                {"subject_id": "Changing subject requires a new question composition for the next exam version."}
+                {
+                    "subject_id": t(
+                        vi="Doi mon hoc can cau hinh lai bo cau hoi cho phien ban de thi tiep theo.",
+                        en="Changing subject requires a new question composition for the next exam version.",
+                    )
+                }
             )
 
         tag_ids = {
@@ -265,7 +275,12 @@ class ExamWriteSerializer(serializers.Serializer):
             missing_tag_ids = sorted(tag_ids - found_tag_ids)
             if missing_tag_ids:
                 raise serializers.ValidationError(
-                    {"random_rules": f"Unknown tag ids: {', '.join(map(str, missing_tag_ids))}"}
+                    {
+                        "random_rules": t(
+                            vi=f"Khong tim thay tag id: {', '.join(map(str, missing_tag_ids))}",
+                            en=f"Unknown tag ids: {', '.join(map(str, missing_tag_ids))}",
+                        )
+                    }
                 )
 
         return attrs

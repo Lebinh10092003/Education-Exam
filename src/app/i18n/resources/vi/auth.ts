@@ -1,0 +1,53 @@
+const auth = {
+  login: {
+    title: "Đăng nhập vào tài khoản",
+    identifierLabel: "Email hoặc tên đăng nhập",
+    identifierPlaceholder: "you@example.com hoặc ten.dang.nhap",
+    passwordLabel: "Mật khẩu",
+    rememberMe: "Ghi nhớ đăng nhập",
+    forgotPassword: "Quên mật khẩu?",
+    submit: "Đăng nhập",
+    submitting: "Đang đăng nhập...",
+    demoCredentials: "Tài khoản demo local",
+    noAccount: "Chưa có tài khoản?",
+    contactAdmin: "Liên hệ quản trị viên",
+    success: "Đăng nhập thành công.",
+    failedTitle: "Đăng nhập thất bại",
+  },
+  forgotPassword: {
+    title: "Đặt lại mật khẩu",
+    description: "Nhập email của bạn để nhận hướng dẫn đặt lại mật khẩu.",
+    emailLabel: "Địa chỉ email",
+    emailPlaceholder: "you@example.com",
+    submit: "Gửi liên kết đặt lại",
+    submitting: "Đang gửi...",
+    success: "Yêu cầu đặt lại mật khẩu đã được tiếp nhận.",
+    backToLogin: "Quay lại đăng nhập",
+  },
+  resetPassword: {
+    title: "Tạo mật khẩu mới",
+    description: "Nhập mật khẩu mới để hoàn tất việc đặt lại mật khẩu.",
+    newPasswordLabel: "Mật khẩu mới",
+    confirmPasswordLabel: "Xác nhận mật khẩu mới",
+    submit: "Cập nhật mật khẩu",
+    submitting: "Đang cập nhật...",
+    success: "Mật khẩu đã được cập nhật. Bạn có thể đăng nhập lại.",
+    goToLogin: "Đi đến đăng nhập",
+  },
+  errors: {
+    inactiveAccount: "Tài khoản của bạn đang bị khóa hoặc chưa hoạt động. Vui lòng liên hệ quản trị viên.",
+    invalidCredentials: "Không thể đăng nhập với thông tin đã cung cấp.",
+    emailRequired: "Email là bắt buộc.",
+    resetRequestFailed: "Không thể gửi yêu cầu đặt lại mật khẩu.",
+    passwordMismatch: "Mật khẩu xác nhận không khớp.",
+    sessionEnded: "Phiên đăng nhập đã kết thúc. Vui lòng đăng nhập lại.",
+    sessionEndedTitle: "Phiên đã kết thúc",
+  },
+  protected: {
+    loadingWorkspace: "Đang tải không gian làm việc...",
+    loadingExamSession: "Đang tải phiên thi...",
+    checkingSession: "Đang kiểm tra phiên đăng nhập...",
+  },
+};
+
+export default auth;

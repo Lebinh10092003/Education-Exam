@@ -1,6 +1,7 @@
 from rest_framework import serializers
 
 from apps.academics.models import Subject
+from apps.platform_core.i18n import t
 from apps.question_bank.models import (
     Question,
     QuestionAnswerKey,
@@ -124,21 +125,37 @@ class QuestionWriteSerializer(serializers.Serializer):
 
         missing = [field for field in ("subject", "difficulty", "question_type", "question_text") if not effective[field]]
         if missing:
-            raise serializers.ValidationError({field: "This field is required." for field in missing})
+            raise serializers.ValidationError(
+                {field: t(vi="Truong nay la bat buoc.", en="This field is required.") for field in missing}
+            )
 
         if effective["question_type"] in {
             Question.Type.MULTIPLE_CHOICE,
             Question.Type.TRUE_FALSE,
         }:
             if not effective["options"]:
-                raise serializers.ValidationError({"options": "Objective questions require options."})
+                raise serializers.ValidationError(
+                    {"options": t(vi="Cau hoi trac nghiem bat buoc phai co dap an lua chon.", en="Objective questions require options.")}
+                )
             if not effective["correct_option_keys"]:
-                raise serializers.ValidationError({"correct_option_keys": "Objective questions require correct option keys."})
+                raise serializers.ValidationError(
+                    {
+                        "correct_option_keys": t(
+                            vi="Cau hoi trac nghiem bat buoc phai co dap an dung.",
+                            en="Objective questions require correct option keys.",
+                        )
+                    }
+                )
             option_keys = {option["key"] for option in effective["options"]}
             invalid_keys = [key for key in effective["correct_option_keys"] if key not in option_keys]
             if invalid_keys:
                 raise serializers.ValidationError(
-                    {"correct_option_keys": f"Unknown option keys: {', '.join(invalid_keys)}"}
+                    {
+                        "correct_option_keys": t(
+                            vi=f"Khong tim thay key dap an: {', '.join(invalid_keys)}",
+                            en=f"Unknown option keys: {', '.join(invalid_keys)}",
+                        )
+                    }
                 )
 
         return attrs

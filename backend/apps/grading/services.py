@@ -8,6 +8,7 @@ from apps.exam_delivery.models import SessionAnswer
 from apps.notifications.models import Notification
 from apps.notifications.services import create_notifications_for_permission
 from apps.platform_core.audit import record_audit_event
+from apps.platform_core.i18n import t
 
 from .models import ManualGrade, ManualGradingTask, Result
 
@@ -16,7 +17,7 @@ def _as_decimal(value):
     try:
         return Decimal(str(value))
     except (InvalidOperation, TypeError, ValueError) as exc:
-        raise ValidationError("Invalid decimal value.") from exc
+        raise ValidationError(t(vi="Gia tri so thap phan khong hop le.", en="Invalid decimal value.")) from exc
 
 
 def _calculate_percentage(*, total_score, max_score):
@@ -138,7 +139,12 @@ def initialize_grading_for_submission(*, session):
 def grade_manual_task(*, task, grader, score_awarded, feedback="", request=None):
     awarded_score = _as_decimal(score_awarded)
     if awarded_score < Decimal("0.00") or awarded_score > task.max_points:
-        raise ValidationError(f"Score must be between 0 and {task.max_points}.")
+        raise ValidationError(
+            t(
+                vi=f"Diem phai nam trong khoang tu 0 den {task.max_points}.",
+                en=f"Score must be between 0 and {task.max_points}.",
+            )
+        )
 
     graded_at = timezone.now()
     ManualGrade.objects.update_or_create(
@@ -189,7 +195,7 @@ def grade_manual_task(*, task, grader, score_awarded, feedback="", request=None)
 @transaction.atomic
 def publish_result(*, result, published_by, request=None):
     if result.workflow_status != Result.WorkflowStatus.FINALIZED:
-        raise ValidationError("Only finalized results can be published.")
+        raise ValidationError(t(vi="Chi co ket qua da hoan tat moi co the cong bo.", en="Only finalized results can be published."))
 
     result.publish_state = Result.PublishState.PUBLISHED
     result.published_at = timezone.now()

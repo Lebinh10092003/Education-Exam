@@ -4,6 +4,12 @@ export interface AuthTokens {
 }
 
 const AUTH_TOKENS_STORAGE_KEY = "eduexam.auth.tokens";
+export const LOCALE_STORAGE_KEY = "eduexam.locale";
+export const DEFAULT_LOCALE = "vi";
+
+export type AppLocale = "vi" | "en";
+
+const isSupportedLocale = (value: unknown): value is AppLocale => value === "vi" || value === "en";
 
 export const getStoredTokens = (): AuthTokens | null => {
   if (typeof window === "undefined") {
@@ -40,4 +46,25 @@ export const clearStoredTokens = () => {
   }
 
   window.localStorage.removeItem(AUTH_TOKENS_STORAGE_KEY);
+};
+
+export const getStoredLocale = (): AppLocale => {
+  if (typeof window === "undefined") {
+    return DEFAULT_LOCALE;
+  }
+
+  const rawValue = window.localStorage.getItem(LOCALE_STORAGE_KEY);
+  if (!rawValue || !isSupportedLocale(rawValue)) {
+    return DEFAULT_LOCALE;
+  }
+
+  return rawValue;
+};
+
+export const setStoredLocale = (locale: AppLocale) => {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  window.localStorage.setItem(LOCALE_STORAGE_KEY, locale);
 };

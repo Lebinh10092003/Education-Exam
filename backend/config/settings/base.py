@@ -21,6 +21,9 @@ env = environ.Env(
     AWS_STORAGE_BUCKET_NAME=(str, ""),
     AWS_S3_ENDPOINT_URL=(str, ""),
     AWS_S3_REGION_NAME=(str, "us-east-1"),
+    EMAIL_BACKEND=(str, "django.core.mail.backends.console.EmailBackend"),
+    DEFAULT_FROM_EMAIL=(str, "no-reply@eduexam.local"),
+    FRONTEND_BASE_URL=(str, "http://127.0.0.1:5173"),
 )
 
 environ.Env.read_env(BASE_DIR / ".env")
@@ -58,6 +61,7 @@ MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
     "apps.platform_core.middleware.RequestIdMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
+    "django.middleware.locale.LocaleMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
@@ -98,7 +102,12 @@ AUTH_PASSWORD_VALIDATORS = [
     },
 ]
 
-LANGUAGE_CODE = "en-us"
+LANGUAGE_CODE = "vi"
+LANGUAGES = [
+    ("vi", "Vietnamese"),
+    ("en", "English"),
+]
+LOCALE_PATHS = [BASE_DIR / "locale"]
 TIME_ZONE = "Asia/Ho_Chi_Minh"
 USE_I18N = True
 USE_TZ = True
@@ -107,6 +116,9 @@ STATIC_URL = "/static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
 MEDIA_URL = "/media/"
 MEDIA_ROOT = BASE_DIR / "media"
+EMAIL_BACKEND = env("EMAIL_BACKEND")
+DEFAULT_FROM_EMAIL = env("DEFAULT_FROM_EMAIL")
+FRONTEND_BASE_URL = env("FRONTEND_BASE_URL")
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 AUTH_USER_MODEL = "identity.User"

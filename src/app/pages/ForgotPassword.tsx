@@ -1,8 +1,10 @@
 import { useState } from "react";
 import { Link } from "react-router";
 import { ArrowLeft } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import { notify } from "../lib/notify";
 
+import { LanguageSwitcher } from "../components/LanguageSwitcher";
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
@@ -14,10 +16,11 @@ export function ForgotPassword() {
   const [email, setEmail] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
   const mutation = useMutationState();
+  const { t } = useTranslation(["auth", "common"]);
 
   const handleSubmit = async () => {
     if (!email.trim()) {
-      notify.error("Email is required.");
+      notify.error(t("auth:errors.emailRequired"));
       return;
     }
 
@@ -30,23 +33,27 @@ export function ForgotPassword() {
         }),
       );
       setSuccessMessage(response.detail);
-      notify.success("Reset request accepted.");
+      notify.success(t("auth:forgotPassword.success"));
     } catch (error) {
-      const message = error instanceof Error ? error.message : "Unable to request password reset.";
+      const message = error instanceof Error ? error.message : t("auth:errors.resetRequestFailed");
       notify.error(message);
     }
   };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-6">
-      <Card className="w-full max-w-md">
+      <div className="relative w-full max-w-md">
+        <div className="absolute right-0 top-0 z-10">
+          <LanguageSwitcher />
+        </div>
+        <Card className="w-full">
         <CardHeader className="text-center pb-8">
           <div className="w-16 h-16 bg-blue-600 rounded-2xl flex items-center justify-center mx-auto mb-4">
             <span className="text-white font-bold text-3xl">E</span>
           </div>
-          <CardTitle className="text-2xl font-bold">Reset Password</CardTitle>
+          <CardTitle className="text-2xl font-bold">{t("auth:forgotPassword.title")}</CardTitle>
           <p className="text-gray-600 mt-2">
-            Submit your email and the backend will accept the reset request.
+            {t("auth:forgotPassword.description")}
           </p>
         </CardHeader>
         <CardContent>
@@ -63,18 +70,18 @@ export function ForgotPassword() {
             }}
           >
             <div>
-              <Label htmlFor="forgot-password-email">Email Address</Label>
+              <Label htmlFor="forgot-password-email">{t("auth:forgotPassword.emailLabel")}</Label>
               <Input
                 id="forgot-password-email"
                 type="email"
-                placeholder="you@example.com"
+                placeholder={t("auth:forgotPassword.emailPlaceholder")}
                 className="mt-2"
                 value={email}
                 onChange={(event) => setEmail(event.target.value)}
               />
             </div>
             <Button className="w-full" size="lg" disabled={mutation.isSubmitting}>
-              {mutation.isSubmitting ? "Sending..." : "Send Reset Link"}
+              {mutation.isSubmitting ? t("auth:forgotPassword.submitting") : t("auth:forgotPassword.submit")}
             </Button>
           </form>
           <div className="mt-6 text-center">
@@ -83,11 +90,12 @@ export function ForgotPassword() {
               className="inline-flex items-center gap-2 text-sm text-blue-600 hover:text-blue-700"
             >
               <ArrowLeft className="w-4 h-4" />
-              Back to Login
+              {t("auth:forgotPassword.backToLogin")}
             </Link>
           </div>
         </CardContent>
-      </Card>
+        </Card>
+      </div>
     </div>
   );
 }

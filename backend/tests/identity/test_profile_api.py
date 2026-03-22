@@ -49,4 +49,4 @@ def test_forgot_password_request_is_public(api_client, user):
     )
 
     assert response.status_code == 202
-    assert "If an account exists" in response.json()["detail"]
+    assert response.json()["detail"] == "Nếu email tồn tại trong hệ thống, hướng dẫn đặt lại mật khẩu sẽ được gửi."

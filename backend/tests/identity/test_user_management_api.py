@@ -53,7 +53,7 @@ def test_admin_cannot_lock_their_own_account(
     response = api_client.post(f"/api/v1/users/{admin_user.id}/lock/")
 
     assert response.status_code == 400
-    assert response.json()["detail"] == "You cannot lock your own account."
+    assert response.json()["detail"] == "Bạn không thể tự khóa tài khoản của mình."
 
 
 @pytest.mark.django_db
@@ -67,4 +67,4 @@ def test_admin_cannot_delete_their_own_account(
     response = api_client.delete(f"/api/v1/users/{admin_user.id}/")
 
     assert response.status_code == 400
-    assert response.json()["detail"] == "You cannot delete your own account."
+    assert response.json()["detail"] == "Bạn không thể tự xóa tài khoản của mình."

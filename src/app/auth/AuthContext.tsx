@@ -7,6 +7,7 @@ import {
   type ReactNode,
 } from "react";
 
+import i18n from "../i18n";
 import { apiRequest, AUTH_ERROR_EVENT } from "../lib/http";
 import { notify } from "../lib/notify";
 import { clearStoredTokens, getStoredTokens, setStoredTokens, type AuthTokens } from "../lib/storage";
@@ -49,9 +50,9 @@ const AuthContext = createContext<AuthContextValue | null>(null);
 const ADMIN_ROLES = ["administrator", "examiner", "proctor"];
 const normalizeAuthErrorMessage = (message?: string) => {
   if (message?.trim() === "User is inactive") {
-    return "Your account is inactive or locked. Please contact an administrator.";
+    return i18n.t("auth:errors.inactiveAccount");
   }
-  return message?.trim() || "Your session has ended. Please sign in again.";
+  return message?.trim() || i18n.t("auth:errors.sessionEnded");
 };
 
 export const getDefaultRouteForProfile = (profile: AuthProfile | null) => {
@@ -141,7 +142,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       const customEvent = event as CustomEvent<{ message?: string }>;
       logout();
       void notify.error(normalizeAuthErrorMessage(customEvent.detail?.message), {
-        title: "Session ended",
+        title: i18n.t("auth:errors.sessionEndedTitle"),
         timer: 4000,
       });
     };

@@ -9,10 +9,12 @@ from rest_framework.generics import ListAPIView
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
+from rest_framework.exceptions import PermissionDenied
 
 from apps.exam_authoring.models import Exam
 from apps.grading.models import Result
 from apps.materials.models import Material
+from apps.platform_core.i18n import t
 
 from ..models import ExamSession, SessionQuestion
 from ..services import (
@@ -128,9 +130,9 @@ class ExamSessionViewSet(mixins.RetrieveModelMixin, viewsets.GenericViewSet):
     def get_object(self):
         session = super().get_object()
         if not user_can_access_session(user=self.request.user, session=session):
-            from rest_framework.exceptions import PermissionDenied
-
-            raise PermissionDenied("You do not have access to this session.")
+            raise PermissionDenied(
+                t(vi="Bạn không có quyền truy cập phiên thi này.", en="You do not have access to this session.")
+            )
         return session
 
     @action(detail=True, methods=["post"])
@@ -161,9 +163,9 @@ class SessionAnswerWriteAPIView(APIView):
     def put(self, request, session_id, question_id):
         session = get_object_or_404(ExamSession, pk=session_id)
         if not user_can_access_session(user=request.user, session=session):
-            from rest_framework.exceptions import PermissionDenied
-
-            raise PermissionDenied("You do not have access to this session.")
+            raise PermissionDenied(
+                t(vi="Bạn không có quyền truy cập phiên thi này.", en="You do not have access to this session.")
+            )
 
         session_question = get_object_or_404(
             SessionQuestion.objects.select_related("session"),

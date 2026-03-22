@@ -5,6 +5,7 @@ from rest_framework import serializers
 from apps.exam_authoring.models import Exam
 from apps.grading.api.serializers import ResultSerializer
 from apps.materials.api.serializers import MaterialSerializer
+from apps.platform_core.i18n import t
 from apps.question_bank.models import QuestionOption
 
 from ..models import AutosaveSnapshot, ExamSession, SessionAnswer, SessionQuestion
@@ -194,7 +195,9 @@ class SessionAnswerWriteSerializer(serializers.Serializer):
 
     def validate(self, attrs):
         if not attrs:
-            raise serializers.ValidationError("At least one field must be provided.")
+            raise serializers.ValidationError(
+                t(vi="Phải cung cấp ít nhất một trường dữ liệu.", en="At least one field must be provided.")
+            )
         return attrs
 
 

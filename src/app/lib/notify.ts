@@ -1,5 +1,6 @@
 import Swal, { type SweetAlertIcon } from "sweetalert2";
 import "sweetalert2/dist/sweetalert2.min.css";
+import i18n from "../i18n";
 
 interface NotifyOptions {
   timer?: number;
@@ -49,9 +50,9 @@ export const notify = {
   error: (message: string, options?: NotifyOptions) =>
     Swal.fire({
       icon: "error",
-      title: options?.title ?? "Error",
+      title: options?.title ?? i18n.t("common:status.error", { defaultValue: "Error" }),
       text: message,
-      confirmButtonText: options?.timer ? undefined : "Close",
+      confirmButtonText: options?.timer ? undefined : i18n.t("common:actions.close"),
       showConfirmButton: !options?.timer,
       position: "center",
       heightAuto: false,
@@ -67,8 +68,8 @@ export const notify = {
       html: options.html,
       position: "center",
       showCancelButton: true,
-      confirmButtonText: options.confirmText ?? "Confirm",
-      cancelButtonText: options.cancelText ?? "Cancel",
+      confirmButtonText: options.confirmText ?? i18n.t("common:actions.confirm"),
+      cancelButtonText: options.cancelText ?? i18n.t("common:actions.cancel"),
       confirmButtonColor: options.confirmButtonColor,
       cancelButtonColor: options.cancelButtonColor,
       reverseButtons: options.reverseButtons ?? true,

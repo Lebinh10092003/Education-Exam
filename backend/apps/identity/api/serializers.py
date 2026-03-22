@@ -6,6 +6,7 @@ from django.contrib.auth.password_validation import validate_password
 
 from apps.identity.models import Permission, Profile, Role, User
 from apps.institutions.models import School
+from apps.platform_core.i18n import t
 
 
 class EduExamTokenObtainPairSerializer(TokenObtainPairSerializer):
@@ -29,11 +30,18 @@ class EduExamTokenObtainPairSerializer(TokenObtainPairSerializer):
         password = attrs.get("password")
 
         if not identifier:
-            raise serializers.ValidationError({"identifier": "This field is required."})
+            raise serializers.ValidationError(
+                {"identifier": t(vi="Trường này là bắt buộc.", en="This field is required.")}
+            )
 
         user = User.objects.filter(Q(username__iexact=identifier) | Q(email__iexact=identifier)).first()
         if user is None or not user.check_password(password) or not user.is_active:
-            raise serializers.ValidationError("No active account found with the given credentials.")
+            raise serializers.ValidationError(
+                t(
+                    vi="Không tìm thấy tài khoản đang hoạt động với thông tin đăng nhập đã cung cấp.",
+                    en="No active account found with the given credentials.",
+                )
+            )
 
         self.user = user
         data = super().validate({"email": user.email, "password": password})
@@ -123,7 +131,9 @@ class ChangePasswordSerializer(serializers.Serializer):
     def validate_current_password(self, value):
         user = self.context["request"].user
         if not user.check_password(value):
-            raise serializers.ValidationError("Current password is incorrect.")
+            raise serializers.ValidationError(
+                t(vi="Mật khẩu hiện tại không chính xác.", en="Current password is incorrect.")
+            )
         return value
 
     def validate_new_password(self, value):
@@ -133,6 +143,20 @@ class ChangePasswordSerializer(serializers.Serializer):
 
 class ForgotPasswordSerializer(serializers.Serializer):
     email = serializers.EmailField()
+
+
+class ResetPasswordSerializer(serializers.Serializer):
+    uid = serializers.CharField()
+    token = serializers.CharField()
+    new_password = serializers.CharField()
+    confirm_password = serializers.CharField()
+
+    def validate(self, attrs):
+        if attrs["new_password"] != attrs["confirm_password"]:
+            raise serializers.ValidationError(
+                {"confirm_password": t(vi="Mật khẩu xác nhận không khớp.", en="Password confirmation does not match.")}
+            )
+        return attrs
 
 
 class PermissionSerializer(serializers.ModelSerializer):

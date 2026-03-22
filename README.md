@@ -38,6 +38,16 @@ AWS_S3_ENDPOINT_URL=
 
 Chi khi nao ban chu dong dung object storage moi can bat `USE_S3_STORAGE=True` va dien cac bien `AWS_*`.
 
+Mac dinh forgot/reset password se gui email qua console backend:
+
+```env
+EMAIL_BACKEND=django.core.mail.backends.console.EmailBackend
+DEFAULT_FROM_EMAIL=no-reply@eduexam.local
+FRONTEND_BASE_URL=http://127.0.0.1:5173
+```
+
+Neu dung SMTP that, sua lai `EMAIL_BACKEND` va cac bien email theo he thong cua ban. `FRONTEND_BASE_URL` duoc dung de tao link reset password trong email.
+
 Database `eduexam` phai ton tai truoc khi chay `migrate`.
 
 Neu may ban da co `psql` trong `PATH`, co the tao nhanh:

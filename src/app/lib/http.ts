@@ -1,5 +1,5 @@
 import { buildApiUrl } from "./env";
-import { clearStoredTokens, getStoredTokens, setStoredTokens, type AuthTokens } from "./storage";
+import { clearStoredTokens, getStoredLocale, getStoredTokens, setStoredTokens, type AuthTokens } from "./storage";
 
 export const AUTH_ERROR_EVENT = "eduexam:auth-error";
 
@@ -123,6 +123,7 @@ const refreshAccessToken = async (): Promise<AuthTokens | null> => {
     const response = await fetch(buildApiUrl("/api/v1/auth/refresh/"), {
       method: "POST",
       headers: {
+        "Accept-Language": getStoredLocale(),
         "Content-Type": "application/json",
       },
       body: JSON.stringify({ refresh: tokens.refresh }),
@@ -168,6 +169,10 @@ const buildRequestInit = (
     headers,
     signal: options.signal,
   };
+
+  if (!headers.has("Accept-Language")) {
+    headers.set("Accept-Language", getStoredLocale());
+  }
 
   if (options.auth !== false) {
     withAuthHeaders(headers, tokens?.access);

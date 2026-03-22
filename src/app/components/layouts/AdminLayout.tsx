@@ -1,5 +1,6 @@
 import { Suspense, useEffect, useState } from "react";
 import { Outlet, Link, useLocation } from "react-router";
+import { useTranslation } from "react-i18next";
 import {
   LayoutDashboard,
   Users,
@@ -21,6 +22,7 @@ import {
   Menu,
   X,
 } from "lucide-react";
+import { LanguageSwitcher } from "../LanguageSwitcher";
 import { Avatar, AvatarFallback } from "../ui/avatar";
 import {
   DropdownMenu,
@@ -37,24 +39,25 @@ import { NOTIFICATION_STATE_CHANGED_EVENT } from "../../lib/notifications";
 import { RouteContentLoader } from "../RouteContentLoader";
 
 const navItems = [
-  { icon: LayoutDashboard, label: "Dashboard", path: "/" },
-  { icon: Users, label: "User Management", path: "/users" },
-  { icon: UsersRound, label: "Candidate Groups", path: "/groups" },
-  { icon: BookOpen, label: "Subjects", path: "/subjects" },
-  { icon: MessageSquareText, label: "Question Bank", path: "/question-bank" },
-  { icon: FileCheck, label: "Exam Management", path: "/exams" },
-  { icon: Calendar, label: "Exam Periods", path: "/exam-periods" },
-  { icon: MapPin, label: "Exam Rooms", path: "/exam-rooms" },
-  { icon: Play, label: "Live Monitoring", path: "/exams" },
-  { icon: GraduationCap, label: "Manual Grading", path: "/manual-grading" },
-  { icon: BookMarked, label: "Materials Library", path: "/materials" },
-  { icon: BarChart3, label: "Results & Reports", path: "/results" },
-  { icon: Shield, label: "Roles & Permissions", path: "/roles-permissions" },
-  { icon: Bell, label: "Notifications", path: "/notifications" },
-  { icon: Activity, label: "Audit & Security", path: "/audit" },
+  { icon: LayoutDashboard, labelKey: "admin.dashboard", path: "/" },
+  { icon: Users, labelKey: "admin.users", path: "/users" },
+  { icon: UsersRound, labelKey: "admin.groups", path: "/groups" },
+  { icon: BookOpen, labelKey: "admin.subjects", path: "/subjects" },
+  { icon: MessageSquareText, labelKey: "admin.questionBank", path: "/question-bank" },
+  { icon: FileCheck, labelKey: "admin.exams", path: "/exams" },
+  { icon: Calendar, labelKey: "admin.examPeriods", path: "/exam-periods" },
+  { icon: MapPin, labelKey: "admin.examRooms", path: "/exam-rooms" },
+  { icon: Play, labelKey: "admin.liveMonitoring", path: "/exams" },
+  { icon: GraduationCap, labelKey: "admin.manualGrading", path: "/manual-grading" },
+  { icon: BookMarked, labelKey: "admin.materials", path: "/materials" },
+  { icon: BarChart3, labelKey: "admin.results", path: "/results" },
+  { icon: Shield, labelKey: "admin.roles", path: "/roles-permissions" },
+  { icon: Bell, labelKey: "admin.notifications", path: "/notifications" },
+  { icon: Activity, labelKey: "admin.audit", path: "/audit" },
 ];
 
 export function AdminLayout() {
+  const { t } = useTranslation(["navigation", "common"]);
   const location = useLocation();
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
@@ -63,8 +66,9 @@ export function AdminLayout() {
     () => apiRequest<{ unread_count: number }>("/api/v1/notifications/unread-count/"),
     [location.pathname],
   );
-  const displayName = profile?.full_name ?? "EduExam User";
+  const displayName = profile?.full_name ?? t("common:fallback.adminUser");
   const primaryRole = profile?.roles?.[0] ?? "user";
+  const translatedRole = t(`common:roles.${primaryRole}`, { defaultValue: primaryRole });
   const email = profile?.email ?? "";
   const unreadCount = notificationCount.data?.unread_count ?? 0;
   const initials = displayName
@@ -79,8 +83,10 @@ export function AdminLayout() {
     }
     return location.pathname === path || location.pathname.startsWith(`${path}/`);
   };
-  const currentLabel =
-    navItems.find((item) => getActiveState(item.path))?.label ?? "Dashboard";
+  const currentLabel = t(
+    navItems.find((item) => getActiveState(item.path))?.labelKey ?? "admin.dashboard",
+    { ns: "navigation" },
+  );
 
   useEffect(() => {
     setMobileSidebarOpen(false);
@@ -134,7 +140,7 @@ export function AdminLayout() {
             const isActive = getActiveState(item.path);
             return (
               <Link
-                key={`mobile:${item.label}:${item.path}`}
+                key={`mobile:${item.labelKey}:${item.path}`}
                 to={item.path}
                 className={`flex items-center gap-3 px-4 py-3 transition-colors ${
                   isActive
@@ -143,7 +149,7 @@ export function AdminLayout() {
                 }`}
               >
                 <item.icon className="h-5 w-5 flex-shrink-0" />
-                <span className="font-medium">{item.label}</span>
+                <span className="font-medium">{t(item.labelKey, { ns: "navigation" })}</span>
               </Link>
             );
           })}
@@ -178,7 +184,7 @@ export function AdminLayout() {
             const isActive = getActiveState(item.path);
             return (
               <Link
-                key={`${item.label}:${item.path}`}
+                key={`${item.labelKey}:${item.path}`}
                 to={item.path}
                 className={`flex items-center gap-3 px-6 py-3 transition-colors ${
                   isActive
@@ -188,7 +194,7 @@ export function AdminLayout() {
               >
                 <item.icon className="w-5 h-5 flex-shrink-0" />
                 {!sidebarCollapsed && (
-                  <span className="font-medium">{item.label}</span>
+                  <span className="font-medium">{t(item.labelKey, { ns: "navigation" })}</span>
                 )}
               </Link>
             );
@@ -219,14 +225,14 @@ export function AdminLayout() {
               </button>
               <div className="min-w-0">
                 <div className="hidden items-center gap-2 text-sm sm:flex">
-                  <span className="text-gray-500">EduExam</span>
+                  <span className="text-gray-500">{t("common:app.name")}</span>
                   <span className="text-gray-300">/</span>
                   <span className="font-medium text-gray-900">
                     {currentLabel}
                   </span>
                 </div>
                 <div className="sm:hidden">
-                  <p className="text-xs uppercase tracking-wide text-gray-500">Current Page</p>
+                  <p className="text-xs uppercase tracking-wide text-gray-500">{t("navigation:currentPage")}</p>
                   <p className="truncate text-sm font-semibold text-gray-900">{currentLabel}</p>
                 </div>
               </div>
@@ -235,7 +241,7 @@ export function AdminLayout() {
                   <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
                   <input
                     type="text"
-                    placeholder="Search..."
+                    placeholder={t("navigation:searchPlaceholder")}
                     className="w-full rounded-lg border border-gray-300 py-2 pl-10 pr-4 focus:border-transparent focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
                 </div>
@@ -243,6 +249,7 @@ export function AdminLayout() {
             </div>
 
             <div className="flex items-center justify-between gap-3 sm:justify-end">
+              <LanguageSwitcher />
               <Link to="/notifications" className="relative rounded-lg p-2 transition-colors hover:bg-gray-100">
                 <Bell className="h-5 w-5 text-gray-700" />
                 {unreadCount > 0 ? (
@@ -258,23 +265,23 @@ export function AdminLayout() {
                     <AvatarFallback>{initials}</AvatarFallback>
                   </Avatar>
                   <div className="hidden min-w-0 text-left sm:block">
-                    <div className="truncate text-sm font-medium text-gray-900">
-                      {displayName}
-                    </div>
-                    <div className="truncate text-xs text-gray-500">{primaryRole}</div>
+                  <div className="truncate text-sm font-medium text-gray-900">
+                    {displayName}
+                  </div>
+                    <div className="truncate text-xs text-gray-500">{translatedRole}</div>
                   </div>
                   <ChevronDown className="h-4 w-4 text-gray-500" />
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-56">
-                  <DropdownMenuLabel>My Account</DropdownMenuLabel>
+                  <DropdownMenuLabel>{t("navigation:myAccount")}</DropdownMenuLabel>
                   <div className="px-2 pb-2 text-xs text-gray-500">{email}</div>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem asChild>
-                    <Link to="/profile">Profile</Link>
+                    <Link to="/profile">{t("common:actions.profile")}</Link>
                   </DropdownMenuItem>
-                  <DropdownMenuItem>Settings</DropdownMenuItem>
+                  <DropdownMenuItem>{t("common:actions.settings")}</DropdownMenuItem>
                   <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={logout}>Logout</DropdownMenuItem>
+                  <DropdownMenuItem onClick={logout}>{t("common:actions.logout")}</DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
             </div>
@@ -285,7 +292,7 @@ export function AdminLayout() {
               <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
               <input
                 type="text"
-                placeholder="Search..."
+                placeholder={t("navigation:searchPlaceholder")}
                 className="w-full rounded-lg border border-gray-300 py-2 pl-10 pr-4 focus:border-transparent focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
             </div>

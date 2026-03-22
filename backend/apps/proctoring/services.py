@@ -12,6 +12,7 @@ from apps.exam_authoring.models import Exam, ExamAssignment
 from apps.notifications.models import Notification
 from apps.notifications.services import create_notifications_for_permission
 from apps.platform_core.audit import record_audit_event
+from apps.platform_core.i18n import t
 
 from .models import (
     ClientCapability,
@@ -335,7 +336,7 @@ def build_exam_monitoring_snapshot(*, exam):
 @transaction.atomic
 def resolve_violation_case(*, case, reviewer, decision, notes="", request=None):
     if decision not in {ViolationReview.Decision.RESOLVED, ViolationReview.Decision.DISMISSED}:
-        raise ValidationError("Invalid decision.")
+        raise ValidationError(t(vi="Quyet dinh khong hop le.", en="Invalid decision."))
 
     review = ViolationReview.objects.create(
         case=case,
@@ -377,11 +378,15 @@ def resolve_violation_case(*, case, reviewer, decision, notes="", request=None):
 
 def assert_candidate_session_access(*, session, user):
     if session.candidate_id != user.id:
-        raise PermissionDenied("You do not have access to this proctoring session.")
+        raise PermissionDenied(
+            t(vi="Bạn không có quyền truy cập phiên giám sát này.", en="You do not have access to this proctoring session.")
+        )
     return session
 
 
 def assert_admin_monitoring_access(*, user):
     if not user.is_authenticated or not user.has_platform_permission("proctoring.view"):
-        raise PermissionDenied("You do not have permission to monitor proctoring data.")
+        raise PermissionDenied(
+            t(vi="Bạn không có quyền theo dõi dữ liệu giám sát.", en="You do not have permission to monitor proctoring data.")
+        )
     return user
