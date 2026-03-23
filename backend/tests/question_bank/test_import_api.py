@@ -35,6 +35,8 @@ def test_json_import_creates_batch_and_questions(api_client, admin_token, subjec
     assert data["status"] == "completed"
     assert data["success_count"] == 1
     assert data["error_count"] == 0
+    assert len(data["created_question_ids"]) == 1
+    assert all(isinstance(question_id, int) for question_id in data["created_question_ids"])
 
 
 @pytest.mark.django_db
@@ -57,3 +59,5 @@ def test_csv_import_records_row_errors_without_crashing(api_client, admin_token,
     assert data["status"] == "completed"
     assert data["success_count"] == 1
     assert data["error_count"] == 1
+    assert len(data["created_question_ids"]) == 1
+    assert all(isinstance(question_id, int) for question_id in data["created_question_ids"])

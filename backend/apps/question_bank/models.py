@@ -159,6 +159,7 @@ class QuestionImportBatch(TimeStampedModel):
     total_records = models.PositiveIntegerField(default=0)
     success_count = models.PositiveIntegerField(default=0)
     error_count = models.PositiveIntegerField(default=0)
+    created_question_ids = models.JSONField(default=list, blank=True)
 
     class Meta:
         ordering = ("-created_at",)

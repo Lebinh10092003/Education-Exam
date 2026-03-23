@@ -31,7 +31,6 @@ const toast = Swal.mixin({
   showCloseButton: false,
   timer: 2400,
   timerProgressBar: true,
-  heightAuto: false,
   didOpen: bindTimerControls,
 });
 

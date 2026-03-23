@@ -1,13 +1,22 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router";
-import { Check, ChevronLeft, ChevronRight, Search } from "lucide-react";
+import { Check, ChevronLeft, ChevronRight, Search, Upload } from "lucide-react";
 import { notify } from "../lib/notify";
 
+import { ImportTemplateActions } from "../components/imports/ImportTemplateActions";
 import { PageHeader } from "../components/PageHeader";
 import { Badge } from "../components/ui/badge";
 import { Button } from "../components/ui/button";
 import { Card, CardContent } from "../components/ui/card";
 import { Checkbox } from "../components/ui/checkbox";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "../components/ui/dialog";
 import { Input } from "../components/ui/input";
 import { Label } from "../components/ui/label";
 import {
@@ -19,6 +28,8 @@ import {
 } from "../components/ui/select";
 import { Textarea } from "../components/ui/textarea";
 import { apiRequest, type PaginatedResponse } from "../lib/http";
+import { questionImportTemplate } from "../lib/importTemplates";
+import { validateQuestionImportFile } from "../lib/questionImportValidation";
 import { useAsyncList } from "../hooks/useAsyncList";
 import { useDebouncedValue } from "../hooks/useDebouncedValue";
 import { useMutationState } from "../hooks/useMutationState";
@@ -64,6 +75,25 @@ interface QuestionRecord {
   current_revision: {
     question_text: string;
   };
+}
+
+interface QuestionImportBatchResult {
+  id: number;
+  source_format: "csv" | "json";
+  file_name: string;
+  status: string;
+  total_records: number;
+  success_count: number;
+  error_count: number;
+  created_question_ids: number[];
+  errors: Array<{
+    id: number;
+    row_number: number;
+    message: string;
+    field_name?: string;
+    raw_payload?: unknown;
+  }>;
+  created_at: string;
 }
 
 interface ExamRecord {
@@ -216,10 +246,15 @@ export function ExamCreationWizard() {
   const [questionSearchQuery, setQuestionSearchQuery] = useState("");
   const [groupSearchQuery, setGroupSearchQuery] = useState("");
   const [formState, setFormState] = useState<ExamFormState>(buildDefaultFormState);
+  const [isImportDialogOpen, setIsImportDialogOpen] = useState(false);
+  const [importFormat, setImportFormat] = useState<"csv" | "json">("csv");
+  const [importFile, setImportFile] = useState<File | null>(null);
+  const [importResult, setImportResult] = useState<QuestionImportBatchResult | null>(null);
 
   const debouncedQuestionSearch = useDebouncedValue(questionSearchQuery, 300);
   const debouncedGroupSearch = useDebouncedValue(groupSearchQuery, 300);
   const mutation = useMutationState();
+  const importMutation = useMutationState();
 
   const subjectsList = useAsyncList(
     async () => apiRequest<PaginatedResponse<SubjectOption>>("/api/v1/subjects/"),
@@ -322,6 +357,7 @@ export function ExamCreationWizard() {
           ? previous.random_rule_counts
           : { easy: "", medium: "", hard: "" },
     }));
+    setImportResult(null);
   };
 
   const buildRandomRulesPayload = () =>
@@ -415,6 +451,70 @@ export function ExamCreationWizard() {
   const periods = periodsList.data?.results ?? [];
   const rooms = roomsList.data?.results ?? [];
   const questions = questionsList.data?.results ?? [];
+  const currentSubject =
+    subjects.find((subject) => String(subject.id) === formState.subject_id) ??
+    examDetails.data?.subject ??
+    null;
+
+  const closeImportDialog = (nextOpen: boolean) => {
+    setIsImportDialogOpen(nextOpen);
+    if (!nextOpen) {
+      setImportFile(null);
+      importMutation.setError(null);
+    }
+  };
+
+  const handleImportQuestions = async () => {
+    if (!currentSubject) {
+      notify.error("Choose a subject before importing questions.");
+      return;
+    }
+
+    if (!importFile) {
+      notify.error("Choose a file to import.");
+      return;
+    }
+
+    const validation = await validateQuestionImportFile({
+      file: importFile,
+      sourceFormat: importFormat,
+      expectedSubjectCode: currentSubject.code,
+    });
+
+    if (!validation.ok) {
+      notify.error(validation.error ?? `All imported rows must use subject_code ${currentSubject.code}.`);
+      return;
+    }
+
+    const formData = new FormData();
+    formData.set("source_format", importFormat);
+    formData.set("file", importFile);
+
+    await importMutation.run(async () => {
+      const batch = await apiRequest<QuestionImportBatchResult>("/api/v1/question-imports/", {
+        method: "POST",
+        body: formData,
+      });
+      setImportResult(batch);
+      setFormState((previous) => ({
+        ...previous,
+        manual_question_ids: Array.from(
+          new Set([...previous.manual_question_ids, ...batch.created_question_ids]),
+        ),
+      }));
+      await questionsList.reload();
+      closeImportDialog(false);
+
+      if (batch.error_count > 0) {
+        notify.warning(
+          `Imported ${batch.success_count} questions. ${batch.error_count} rows need attention.`,
+        );
+        return;
+      }
+
+      notify.success(`Imported ${batch.success_count} questions and added them to this exam.`);
+    });
+  };
 
   return (
     <div>
@@ -464,7 +564,12 @@ export function ExamCreationWizard() {
         </div>
       </div>
 
-      {(subjectsList.error || groupsList.error || questionsList.error || examDetails.error || mutation.error) && (
+      {(subjectsList.error ||
+        groupsList.error ||
+        questionsList.error ||
+        examDetails.error ||
+        mutation.error ||
+        importMutation.error) && (
         <div className="mb-6 max-w-4xl mx-auto rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
           {subjectsList.error ||
             groupsList.error ||
@@ -472,7 +577,8 @@ export function ExamCreationWizard() {
             roomsList.error ||
             questionsList.error ||
             examDetails.error ||
-            mutation.error}
+            mutation.error ||
+            importMutation.error}
         </div>
       )}
 
@@ -657,9 +763,52 @@ export function ExamCreationWizard() {
                       <p className="text-sm text-gray-500">
                         Search the current subject and explicitly include questions in this exam version.
                       </p>
+                      {currentSubject && (
+                        <p className="mt-1 text-xs text-blue-700">
+                          Current subject: {currentSubject.name} ({currentSubject.code})
+                        </p>
+                      )}
                     </div>
-                    <Badge variant="outline">{formState.manual_question_ids.length} selected</Badge>
+                    <div className="flex items-center gap-2">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setIsImportDialogOpen(true)}
+                        disabled={!currentSubject}
+                      >
+                        <Upload className="w-4 h-4 mr-2" />
+                        Import Questions
+                      </Button>
+                      <Badge variant="outline">{formState.manual_question_ids.length} selected</Badge>
+                    </div>
                   </div>
+
+                  {importResult && (
+                    <div className="mb-4 rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-900">
+                      <p>
+                        Imported <strong>{importResult.success_count}</strong> of{" "}
+                        <strong>{importResult.total_records}</strong> rows from{" "}
+                        <strong>{importResult.file_name}</strong>.
+                      </p>
+                      <p className="mt-1">
+                        Auto-selected <strong>{importResult.created_question_ids.length}</strong> newly
+                        imported questions for this exam.
+                      </p>
+                      {importResult.error_count > 0 && (
+                        <div className="mt-3 space-y-1 text-blue-950">
+                          <p>
+                            <strong>{importResult.error_count}</strong> rows failed:
+                          </p>
+                          {importResult.errors.map((error) => (
+                            <p key={error.id ?? `${error.row_number}-${error.message}`}>
+                              Row {error.row_number}: {error.message}
+                            </p>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
 
                   <div className="relative mb-4">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
@@ -893,6 +1042,83 @@ export function ExamCreationWizard() {
           )}
         </CardContent>
       </Card>
+
+      <Dialog open={isImportDialogOpen} onOpenChange={closeImportDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Import Questions</DialogTitle>
+            <DialogDescription>
+              Upload a CSV or JSON file for the current exam subject and auto-select the
+              successfully created questions.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-900">
+              {currentSubject ? (
+                <>
+                  Current exam subject: <strong>{currentSubject.name}</strong> (
+                  <strong>{currentSubject.code}</strong>). All imported rows must use this
+                  `subject_code`.
+                </>
+              ) : (
+                "Choose a subject in step 1 before importing questions."
+              )}
+            </div>
+            <div>
+              <Label>File Format</Label>
+              <Select
+                value={importFormat}
+                onValueChange={(value: "csv" | "json") => setImportFormat(value)}
+              >
+                <SelectTrigger className="mt-2">
+                  <SelectValue placeholder="Select format" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="csv">CSV</SelectItem>
+                  <SelectItem value="json">JSON</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label>Upload File</Label>
+              <Input
+                type="file"
+                className="mt-2"
+                accept={importFormat === "csv" ? ".csv,text/csv" : ".json,application/json"}
+                onChange={(event) => setImportFile(event.target.files?.[0] ?? null)}
+              />
+            </div>
+            <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-gray-200 bg-gray-50 px-4 py-3">
+              <div>
+                <p className="text-sm font-medium text-gray-900">Need a backend-compatible sample file?</p>
+                <p className="text-xs text-gray-500">
+                  Preview the expected structure or download a ready-to-fill template.
+                </p>
+              </div>
+              <ImportTemplateActions
+                template={questionImportTemplate}
+                selectedFormat={importFormat}
+              />
+            </div>
+            <div className="rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-900">
+              Required import fields include `subject_code`, `difficulty`, `question_type`, and
+              `question_text`.
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" type="button" onClick={() => closeImportDialog(false)}>
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              onClick={() => void handleImportQuestions()}
+              disabled={importMutation.isSubmitting || !currentSubject}
+            >
+              {importMutation.isSubmitting ? "Importing..." : "Import Questions"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <div className="flex items-center justify-between max-w-4xl mx-auto mt-6">
         <Button variant="outline" onClick={prevStep} disabled={currentStep === 1}>

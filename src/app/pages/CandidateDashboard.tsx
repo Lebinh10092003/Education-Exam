@@ -5,7 +5,7 @@ import {
   CalendarDays,
   Clock3,
   FileCheck,
-  PlayCircle,
+  FileText,
   RotateCcw,
 } from "lucide-react";
 
@@ -16,6 +16,7 @@ import { Button } from "../components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
 import { apiRequest } from "../lib/http";
 import { useAsyncList } from "../hooks/useAsyncList";
+import { getExamPrimaryAction } from "./candidateExamShared";
 
 interface CandidateDashboardExam {
   id: number;
@@ -119,7 +120,7 @@ export function CandidateDashboard() {
         action={
           <>
             <Button variant="outline" asChild>
-              <Link to="/candidate/results">View Results</Link>
+              <Link to="/candidate/exams">My Exams</Link>
             </Button>
             <Button asChild>
               <Link to="/candidate/practice">Open Practice</Link>
@@ -200,8 +201,7 @@ export function CandidateDashboard() {
               <div className="py-10 text-center text-sm text-gray-500">Loading dashboard...</div>
             ) : overview?.upcoming_exams.length ? (
               overview.upcoming_exams.map((exam) => {
-                const canResume = Boolean(exam.active_session_id);
-                const canStart = exam.attempts_remaining > 0 || canResume;
+                const action = getExamPrimaryAction(exam);
                 return (
                   <div key={exam.id} className="rounded-xl border border-gray-200 bg-gray-50 p-4">
                     <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
@@ -217,11 +217,18 @@ export function CandidateDashboard() {
                         </p>
                       </div>
 
-                      {canStart ? (
+                      {!action.disabled ? (
                         <Button asChild>
-                          <Link to={`/candidate/exam/${exam.id}`}>
-                            {canResume ? <RotateCcw className="h-4 w-4" /> : <PlayCircle className="h-4 w-4" />}
-                            {canResume ? "Resume" : "Start"}
+                          <Link
+                            to={action.href}
+                            state={action.href.includes("/instructions") ? { exam } : undefined}
+                          >
+                            {action.href.includes("/candidate/exam/") ? (
+                              <RotateCcw className="h-4 w-4" />
+                            ) : (
+                              <FileText className="h-4 w-4" />
+                            )}
+                            {action.label}
                           </Link>
                         </Button>
                       ) : (
@@ -277,7 +284,14 @@ export function CandidateDashboard() {
                         </p>
                         <p className="text-xs text-gray-500">{formatDateTime(result.published_at)}</p>
                       </div>
-                      <Badge variant="outline">{formatNumber(result.percentage)}%</Badge>
+                      <div className="flex flex-col items-end gap-2">
+                        <Badge variant="outline">{formatNumber(result.percentage)}%</Badge>
+                        <Button variant="outline" size="sm" asChild>
+                          <Link to={`/candidate/results/${result.id}`}>
+                            View
+                          </Link>
+                        </Button>
+                      </div>
                     </div>
                   </div>
                 ))

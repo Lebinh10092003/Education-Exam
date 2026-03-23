@@ -1,28 +1,99 @@
-import { Suspense } from "react";
+import { Suspense, useEffect, useMemo, useState } from "react";
 import { Link, Outlet, useLocation } from "react-router";
-import { useTranslation } from "react-i18next";
-import { Award, BookOpen, LayoutDashboard, LogOut, PlayCircle } from "lucide-react";
+import {
+  Award,
+  Bell,
+  BookOpen,
+  CircleHelp,
+  FileText,
+  Home,
+  LogOut,
+  Menu,
+  Play,
+  User,
+  X,
+} from "lucide-react";
 
 import { useAuth } from "../../auth/useAuth";
-import { LanguageSwitcher } from "../LanguageSwitcher";
+import { useAsyncList } from "../../hooks/useAsyncList";
+import { apiRequest, isApiError } from "../../lib/http";
+import { NOTIFICATION_STATE_CHANGED_EVENT } from "../../lib/notifications";
 import { RouteContentLoader } from "../RouteContentLoader";
 import { Avatar, AvatarFallback } from "../ui/avatar";
 import { Badge } from "../ui/badge";
 import { Button } from "../ui/button";
+import { cn } from "../ui/utils";
 
-const navItems = [
-  { labelKey: "candidate.dashboard", path: "/candidate/dashboard", icon: LayoutDashboard },
-  { labelKey: "candidate.practice", path: "/candidate/practice", icon: PlayCircle },
-  { labelKey: "candidate.results", path: "/candidate/results", icon: Award },
-  { labelKey: "candidate.materials", path: "/candidate/materials", icon: BookOpen },
+const primaryNavItems = [
+  { path: "/candidate", label: "Dashboard", icon: Home },
+  { path: "/candidate/exams", label: "My Exams", icon: FileText },
+  { path: "/candidate/practice", label: "Practice", icon: Play },
+  { path: "/candidate/materials", label: "Materials", icon: BookOpen },
+  { path: "/candidate/results", label: "Results", icon: Award },
+  { path: "/candidate/notifications", label: "Notifications", icon: Bell },
 ];
 
+const secondaryNavItems = [
+  { path: "/candidate/help", label: "Help", icon: CircleHelp },
+  { path: "/candidate/profile", label: "Profile", icon: User },
+];
+
+const loadUnreadCount = async () => {
+  try {
+    return await apiRequest<{ unread_count: number }>("/api/v1/notifications/unread-count/");
+  } catch (error) {
+    if (isApiError(error) && error.status === 403) {
+      return { unread_count: 0 };
+    }
+    throw error;
+  }
+};
+
+const findActiveLabel = (pathname: string) => {
+  if (pathname === "/candidate" || pathname === "/candidate/dashboard") {
+    return "Dashboard";
+  }
+
+  const matchedPrimary = primaryNavItems.find(
+    (item) => pathname === item.path || pathname.startsWith(`${item.path}/`),
+  );
+  if (matchedPrimary) {
+    return matchedPrimary.label;
+  }
+
+  const matchedSecondary = secondaryNavItems.find(
+    (item) => pathname === item.path || pathname.startsWith(`${item.path}/`),
+  );
+  if (matchedSecondary) {
+    return matchedSecondary.label;
+  }
+
+  return "Student Portal";
+};
+
 export function CandidateLayout() {
-  const { t } = useTranslation(["navigation", "common"]);
   const location = useLocation();
   const { logout, profile } = useAuth();
+  const unreadCount = useAsyncList(loadUnreadCount, []);
+  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
 
-  if (location.pathname.startsWith("/candidate/exam/")) {
+  useEffect(() => {
+    const refreshUnreadCount = () => {
+      void unreadCount.reload().catch(() => undefined);
+    };
+
+    window.addEventListener(NOTIFICATION_STATE_CHANGED_EVENT, refreshUnreadCount);
+    return () => window.removeEventListener(NOTIFICATION_STATE_CHANGED_EVENT, refreshUnreadCount);
+  }, [unreadCount.reload]);
+
+  useEffect(() => {
+    setMobileSidebarOpen(false);
+  }, [location.pathname]);
+
+  if (
+    location.pathname.startsWith("/candidate/exam/") ||
+    location.pathname.startsWith("/candidate/practice/sessions/")
+  ) {
     return (
       <Suspense fallback={<RouteContentLoader fullHeight />}>
         <Outlet />
@@ -30,84 +101,222 @@ export function CandidateLayout() {
     );
   }
 
-  const displayName = profile?.full_name ?? t("common:fallback.candidateUser");
+  const displayName = profile?.full_name?.trim() || profile?.email || "Candidate";
+  const schoolName = profile?.school?.name ?? "";
   const initials =
     displayName
       .split(" ")
       .filter(Boolean)
       .slice(0, 2)
       .map((part) => part[0]?.toUpperCase())
-      .join("") || "CA";
-  const schoolName = profile?.school?.name ?? "";
+      .join("") || "ST";
+  const activeLabel = useMemo(() => findActiveLabel(location.pathname), [location.pathname]);
 
   const isActive = (path: string) => {
-    if (path === "/candidate/dashboard") {
-      return location.pathname === "/candidate" || location.pathname === path;
+    if (path === "/candidate") {
+      return location.pathname === "/candidate" || location.pathname === "/candidate/dashboard";
     }
     return location.pathname === path || location.pathname.startsWith(`${path}/`);
   };
 
+  const renderNavLink = (
+    item: { path: string; label: string; icon: typeof Home },
+    options: { compact?: boolean } = {},
+  ) => {
+    const active = isActive(item.path);
+    const badgeValue = item.path === "/candidate/notifications" ? unreadCount.data?.unread_count ?? 0 : 0;
+
+    return (
+      <Link
+        key={item.path}
+        to={item.path}
+        className={cn(
+          "flex items-center gap-3 rounded-2xl px-3 py-3 text-sm font-medium transition-colors",
+          active
+            ? "bg-blue-600 text-white shadow-sm"
+            : "text-slate-700 hover:bg-slate-100 hover:text-slate-950",
+          options.compact ? "px-4" : "",
+        )}
+      >
+        <item.icon className="h-4 w-4 shrink-0" />
+        <span className="truncate">{item.label}</span>
+        {badgeValue > 0 ? (
+          <Badge className={cn(
+            "ml-auto min-w-5 rounded-full px-1.5 py-0 text-[11px]",
+            active ? "bg-white/20 text-white hover:bg-white/20" : "bg-red-500 text-white hover:bg-red-500",
+          )}>
+            {badgeValue > 99 ? "99+" : badgeValue}
+          </Badge>
+        ) : null}
+      </Link>
+    );
+  };
+
   return (
-    <div className="min-h-screen bg-gray-50">
-      <header className="border-b border-gray-200 bg-white">
-        <div className="mx-auto flex max-w-7xl flex-col gap-4 px-4 py-4 sm:px-6 lg:flex-row lg:items-center lg:justify-between">
-          <div className="flex items-center gap-3">
-            <Link to="/candidate/dashboard" className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-600 shadow-sm">
-                <span className="text-lg font-bold text-white">E</span>
-              </div>
-              <div>
-                <p className="text-lg font-semibold text-gray-900">{t("common:app.name")}</p>
-                <p className="text-xs uppercase tracking-[0.2em] text-gray-500">{t("navigation:candidate.portal")}</p>
-              </div>
-            </Link>
-            {schoolName ? <Badge variant="outline">{schoolName}</Badge> : null}
+    <div className="flex min-h-screen bg-[linear-gradient(180deg,#eff6ff_0%,#f8fafc_14%,#f8fafc_100%)]">
+      {mobileSidebarOpen ? (
+        <button
+          type="button"
+          aria-label="Close navigation"
+          className="fixed inset-0 z-40 bg-slate-950/40 lg:hidden"
+          onClick={() => setMobileSidebarOpen(false)}
+        />
+      ) : null}
+
+      <aside
+        className={`fixed inset-y-0 left-0 z-50 flex w-72 max-w-[85vw] flex-col border-r border-slate-200 bg-white transition-transform duration-300 lg:hidden ${
+          mobileSidebarOpen ? "translate-x-0" : "-translate-x-full"
+        }`}
+      >
+        <div className="flex h-16 items-center justify-between border-b border-slate-200 px-4">
+          <Link to="/candidate" className="flex items-center gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-blue-600 shadow-sm">
+              <span className="text-lg font-bold text-white">E</span>
+            </div>
+            <div>
+              <p className="text-base font-semibold text-slate-950">EduExam</p>
+              <p className="text-[11px] uppercase tracking-[0.22em] text-slate-500">Student Portal</p>
+            </div>
+          </Link>
+          <button
+            type="button"
+            className="rounded-xl p-2 text-slate-600 transition-colors hover:bg-slate-100"
+            onClick={() => setMobileSidebarOpen(false)}
+          >
+            <X className="h-5 w-5" />
+          </button>
+        </div>
+
+        <div className="flex-1 overflow-y-auto px-4 py-5">
+          {schoolName ? (
+            <Badge variant="outline" className="mb-5 rounded-full border-blue-200 bg-blue-50 text-blue-700">
+              {schoolName}
+            </Badge>
+          ) : null}
+
+          <div className="space-y-1">
+            {primaryNavItems.map((item) => renderNavLink(item, { compact: true }))}
           </div>
 
-          <nav className="flex flex-wrap items-center gap-2">
-            {navItems.map((item) => {
-              const active = isActive(item.path);
-              return (
-                <Link
-                  key={item.path}
-                  to={item.path}
-                  className={`inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm font-medium transition-colors ${
-                    active
-                      ? "bg-blue-600 text-white"
-                      : "border border-gray-200 bg-white text-gray-700 hover:bg-gray-100"
-                  }`}
-                >
-                  <item.icon className="h-4 w-4" />
-                  {t(item.labelKey, { ns: "navigation" })}
-                </Link>
-              );
-            })}
-          </nav>
-
-          <div className="flex items-center justify-between gap-3">
-            <LanguageSwitcher />
-            <div className="flex min-w-0 items-center gap-3">
-              <Avatar className="h-10 w-10">
-                <AvatarFallback>{initials}</AvatarFallback>
-              </Avatar>
-              <div className="min-w-0">
-                <p className="truncate text-sm font-medium text-gray-900">{displayName}</p>
-                <p className="truncate text-xs text-gray-500">{profile?.email ?? ""}</p>
-              </div>
+          <div className="mt-6 border-t border-slate-200 pt-4">
+            <p className="px-4 text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-400">Account</p>
+            <div className="mt-2 space-y-1">
+              {secondaryNavItems.map((item) => renderNavLink(item, { compact: true }))}
             </div>
-            <Button variant="outline" size="sm" onClick={logout}>
-              <LogOut className="h-4 w-4" />
-              {t("common:actions.logout")}
-            </Button>
           </div>
         </div>
-      </header>
 
-      <main className="mx-auto max-w-7xl px-4 py-6 sm:px-6">
-        <Suspense fallback={<RouteContentLoader />}>
-          <Outlet />
-        </Suspense>
-      </main>
+        <div className="border-t border-slate-200 p-4">
+          <div className="mb-3 flex items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-3">
+            <Avatar className="h-10 w-10">
+              <AvatarFallback>{initials}</AvatarFallback>
+            </Avatar>
+            <div className="min-w-0">
+              <p className="truncate text-sm font-medium text-slate-900">{displayName}</p>
+              <p className="truncate text-xs text-slate-500">{profile?.email ?? ""}</p>
+            </div>
+          </div>
+          <Button className="w-full" variant="outline" onClick={logout}>
+            <LogOut className="h-4 w-4" />
+            Logout
+          </Button>
+        </div>
+      </aside>
+
+      <aside className="hidden w-72 shrink-0 border-r border-slate-200 bg-white lg:flex lg:flex-col">
+        <div className="border-b border-slate-200 px-6 py-5">
+          <Link to="/candidate" className="flex items-center gap-3">
+            <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-blue-600 shadow-sm">
+              <span className="text-lg font-bold text-white">E</span>
+            </div>
+            <div>
+              <p className="text-lg font-semibold text-slate-950">EduExam</p>
+              <p className="text-[11px] uppercase tracking-[0.24em] text-slate-500">Student Portal</p>
+            </div>
+          </Link>
+          {schoolName ? (
+            <Badge variant="outline" className="mt-4 rounded-full border-blue-200 bg-blue-50 text-blue-700">
+              {schoolName}
+            </Badge>
+          ) : null}
+        </div>
+
+        <div className="flex-1 overflow-y-auto px-4 py-5">
+          <div className="space-y-1">
+            {primaryNavItems.map((item) => renderNavLink(item))}
+          </div>
+
+          <div className="mt-6 border-t border-slate-200 pt-4">
+            <p className="px-3 text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-400">Account</p>
+            <div className="mt-2 space-y-1">
+              {secondaryNavItems.map((item) => renderNavLink(item))}
+            </div>
+          </div>
+        </div>
+
+        <div className="border-t border-slate-200 p-4">
+          <div className="mb-3 flex items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-3">
+            <Avatar className="h-10 w-10">
+              <AvatarFallback>{initials}</AvatarFallback>
+            </Avatar>
+            <div className="min-w-0">
+              <p className="truncate text-sm font-medium text-slate-900">{displayName}</p>
+              <p className="truncate text-xs text-slate-500">{profile?.email ?? ""}</p>
+            </div>
+          </div>
+          <Button className="w-full" variant="outline" onClick={logout}>
+            <LogOut className="h-4 w-4" />
+            Logout
+          </Button>
+        </div>
+      </aside>
+
+      <div className="flex min-w-0 flex-1 flex-col">
+        <header className="border-b border-slate-200/80 bg-white/95 px-4 py-4 backdrop-blur sm:px-6">
+          <div className="flex items-center justify-between gap-4">
+            <div className="flex min-w-0 items-center gap-3">
+              <button
+                type="button"
+                className="rounded-xl p-2 text-slate-600 transition-colors hover:bg-slate-100 lg:hidden"
+                onClick={() => setMobileSidebarOpen(true)}
+              >
+                <Menu className="h-5 w-5" />
+              </button>
+              <div className="min-w-0">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-400">Current Section</p>
+                <p className="truncate text-lg font-semibold text-slate-950">{activeLabel}</p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-3">
+              {!isActive("/candidate/notifications") && (unreadCount.data?.unread_count ?? 0) > 0 ? (
+                <Link
+                  to="/candidate/notifications"
+                  className="inline-flex items-center gap-2 rounded-full border border-red-200 bg-red-50 px-3 py-2 text-sm font-medium text-red-700"
+                >
+                  <Bell className="h-4 w-4" />
+                  {unreadCount.data?.unread_count}
+                </Link>
+              ) : null}
+              <div className="hidden items-center gap-3 rounded-full border border-slate-200 bg-white px-3 py-1.5 sm:flex">
+                <Avatar className="h-9 w-9">
+                  <AvatarFallback>{initials}</AvatarFallback>
+                </Avatar>
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-medium text-slate-900">{displayName}</p>
+                  <p className="truncate text-xs text-slate-500">{profile?.email ?? ""}</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </header>
+
+        <main className="flex-1 overflow-y-auto px-4 py-8 sm:px-6">
+          <Suspense fallback={<RouteContentLoader />}>
+            <Outlet />
+          </Suspense>
+        </main>
+      </div>
     </div>
   );
 }

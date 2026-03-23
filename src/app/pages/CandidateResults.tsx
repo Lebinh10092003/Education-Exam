@@ -17,51 +17,15 @@ import {
   SelectTrigger,
   SelectValue,
 } from "../components/ui/select";
-import {
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetHeader,
-  SheetTitle,
-  SheetTrigger,
-} from "../components/ui/sheet";
 import { useAsyncList } from "../hooks/useAsyncList";
 import { useDebouncedValue } from "../hooks/useDebouncedValue";
 import { apiRequest, type PaginatedResponse } from "../lib/http";
-
-interface CandidateResultRecord {
-  id: number;
-  workflow_status: string;
-  publish_state: string;
-  score: string;
-  total_marks: string;
-  percentage: string;
-  result_status: string;
-  passed: boolean | null;
-  completed_date: string | null;
-  published_at: string | null;
-  time_taken_minutes: number;
-  exam: {
-    id: number;
-    name: string;
-    subject_name: string;
-  };
-  candidate: {
-    id: number;
-    email: string;
-    full_name: string;
-  };
-}
-
-const toNumber = (value: string | number) => Number(value || 0);
-const formatNumber = (value: string | number) => toNumber(value).toFixed(2).replace(/\.00$/, "");
-const formatDate = (value: string | null) =>
-  value
-    ? new Intl.DateTimeFormat("en-GB", {
-        dateStyle: "medium",
-        timeStyle: "short",
-      }).format(new Date(value))
-    : "Not available";
+import {
+  type CandidateResultRecord,
+  formatResultDate,
+  formatResultNumber,
+  toResultNumber,
+} from "./candidateResultsShared";
 
 export function CandidateResults() {
   const [searchQuery, setSearchQuery] = useState("");
@@ -102,7 +66,7 @@ export function CandidateResults() {
       };
     }
 
-    const percentages = filteredResults.map((result) => toNumber(result.percentage));
+    const percentages = filteredResults.map((result) => toResultNumber(result.percentage));
     const passCount = filteredResults.filter((result) => result.passed).length;
     return {
       totalExams: filteredResults.length,
@@ -118,7 +82,7 @@ export function CandidateResults() {
         .sort((left, right) => (left.published_at ?? "").localeCompare(right.published_at ?? ""))
         .map((result, index) => ({
           label: `#${index + 1}`,
-          score: toNumber(result.percentage),
+          score: toResultNumber(result.percentage),
         })),
     [filteredResults],
   );
@@ -127,7 +91,7 @@ export function CandidateResults() {
     const totals = filteredResults.reduce<Record<string, { total: number; count: number }>>((accumulator, result) => {
       const subject = result.exam.subject_name;
       accumulator[subject] ??= { total: 0, count: 0 };
-      accumulator[subject].total += toNumber(result.percentage);
+      accumulator[subject].total += toResultNumber(result.percentage);
       accumulator[subject].count += 1;
       return accumulator;
     }, {});
@@ -145,7 +109,7 @@ export function CandidateResults() {
         description="Published scores and performance trends from your completed exams."
         action={
           <Button variant="outline" asChild>
-            <Link to="/candidate/practice">Back to Practice</Link>
+            <Link to="/candidate/dashboard">Back to Dashboard</Link>
           </Button>
         }
       />
@@ -315,12 +279,12 @@ export function CandidateResults() {
                         </div>
                       </td>
                       <td className="px-4 py-4 text-sm font-medium text-gray-900">
-                        {formatNumber(result.score)} / {formatNumber(result.total_marks)}
+                        {formatResultNumber(result.score)} / {formatResultNumber(result.total_marks)}
                       </td>
                       <td className="px-4 py-4">
                         <div className="space-y-1">
-                          <Progress value={toNumber(result.percentage)} className="h-2 w-28" />
-                          <p className="text-xs text-gray-500">{formatNumber(result.percentage)}%</p>
+                          <Progress value={toResultNumber(result.percentage)} className="h-2 w-28" />
+                          <p className="text-xs text-gray-500">{formatResultNumber(result.percentage)}%</p>
                         </div>
                       </td>
                       <td className="px-4 py-4">
@@ -329,64 +293,14 @@ export function CandidateResults() {
                           <Badge variant="outline">{result.result_status}</Badge>
                         </div>
                       </td>
-                      <td className="px-4 py-4 text-sm text-gray-600">{formatDate(result.published_at)}</td>
+                      <td className="px-4 py-4 text-sm text-gray-600">{formatResultDate(result.published_at)}</td>
                       <td className="px-4 py-4">
-                        <Sheet>
-                          <SheetTrigger asChild>
-                            <Button size="sm" variant="outline">
-                              <Eye className="h-4 w-4" />
-                              View
-                            </Button>
-                          </SheetTrigger>
-                          <SheetContent className="sm:max-w-lg">
-                            <SheetHeader>
-                              <SheetTitle>{result.exam.name}</SheetTitle>
-                              <SheetDescription>{result.exam.subject_name}</SheetDescription>
-                            </SheetHeader>
-
-                            <div className="mt-6 space-y-6">
-                              <div className="rounded-xl border border-blue-200 bg-blue-50 p-5 text-center">
-                                <p className="text-5xl font-bold text-gray-900">{formatNumber(result.percentage)}%</p>
-                                <p className="mt-2 text-sm text-gray-600">
-                                  {formatNumber(result.score)} / {formatNumber(result.total_marks)} points
-                                </p>
-                                <div className="mt-3 flex justify-center">
-                                  <StatusBadge status={result.result_status.toLowerCase()} />
-                                </div>
-                              </div>
-
-                              <div className="grid grid-cols-2 gap-4">
-                                <div className="rounded-lg border border-gray-200 p-4">
-                                  <p className="text-xs uppercase tracking-wide text-gray-500">Workflow</p>
-                                  <p className="mt-2 text-lg font-semibold text-gray-900">
-                                    {result.workflow_status.replace(/_/g, " ")}
-                                  </p>
-                                </div>
-                                <div className="rounded-lg border border-gray-200 p-4">
-                                  <p className="text-xs uppercase tracking-wide text-gray-500">Duration</p>
-                                  <p className="mt-2 text-lg font-semibold text-gray-900">
-                                    {result.time_taken_minutes} minutes
-                                  </p>
-                                </div>
-                              </div>
-
-                              <div className="space-y-3 rounded-lg border border-gray-200 p-4 text-sm">
-                                <div className="flex items-center justify-between gap-3">
-                                  <span className="text-gray-500">Completed</span>
-                                  <span className="font-medium text-gray-900">{formatDate(result.completed_date)}</span>
-                                </div>
-                                <div className="flex items-center justify-between gap-3">
-                                  <span className="text-gray-500">Published</span>
-                                  <span className="font-medium text-gray-900">{formatDate(result.published_at)}</span>
-                                </div>
-                                <div className="flex items-center justify-between gap-3">
-                                  <span className="text-gray-500">Candidate</span>
-                                  <span className="font-medium text-gray-900">{result.candidate.full_name}</span>
-                                </div>
-                              </div>
-                            </div>
-                          </SheetContent>
-                        </Sheet>
+                        <Button size="sm" variant="outline" asChild>
+                          <Link to={`/candidate/results/${result.id}`} state={{ result }}>
+                            <Eye className="h-4 w-4" />
+                            View
+                          </Link>
+                        </Button>
                       </td>
                     </tr>
                   ))}

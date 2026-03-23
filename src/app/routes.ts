@@ -1,5 +1,5 @@
 import { createElement, lazy, type ComponentType } from "react";
-import { createBrowserRouter } from "react-router";
+import { createBrowserRouter, Navigate, useParams } from "react-router";
 import { TakeExam } from "./pages/TakeExam";
 import { PracticeExam } from "./pages/PracticeExam";
 import { ForgotPassword } from "./pages/ForgotPassword";
@@ -35,7 +35,6 @@ const QuestionBankRoute = lazyRoute(() => import("./pages/QuestionBank"), "Quest
 const ExamManagementRoute = lazyRoute(() => import("./pages/ExamManagement"), "ExamManagement");
 const ExamCreationWizardRoute = lazyRoute(() => import("./pages/ExamCreationWizard"), "ExamCreationWizard");
 const ExamAssignmentRoute = lazyRoute(() => import("./pages/ExamAssignment"), "ExamAssignment");
-const LiveMonitoringRoute = lazyRoute(() => import("./pages/LiveMonitoring"), "LiveMonitoring");
 const ExamDetailRoute = lazyRoute(() => import("./pages/ExamDetail"), "ExamDetail");
 const ManualGradingRoute = lazyRoute(() => import("./pages/ManualGrading"), "ManualGrading");
 const RolesPermissionsRoute = lazyRoute(() => import("./pages/RolesPermissions"), "RolesPermissions");
@@ -44,11 +43,29 @@ const AuditCenterRoute = lazyRoute(() => import("./pages/AuditCenter"), "AuditCe
 const ExamPeriodsRoute = lazyRoute(() => import("./pages/ExamPeriods"), "ExamPeriods");
 const ExamRoomsRoute = lazyRoute(() => import("./pages/ExamRooms"), "ExamRooms");
 const CandidateDashboardRoute = lazyRoute(() => import("./pages/CandidateDashboard"), "CandidateDashboard");
+const MyExamsRoute = lazyRoute(() => import("./pages/MyExams"), "MyExams");
+const ExamInstructionsRoute = lazyRoute(() => import("./pages/ExamInstructions"), "ExamInstructions");
 const CandidateResultsRoute = lazyRoute(() => import("./pages/CandidateResults"), "CandidateResults");
+const ResultDetailRoute = lazyRoute(() => import("./pages/ResultDetail"), "ResultDetail");
 const CandidateMaterialsRoute = lazyRoute(() => import("./pages/CandidateMaterials"), "CandidateMaterials");
+const StudentNotificationsRoute = lazyRoute(() => import("./pages/StudentNotifications"), "StudentNotifications");
+const StudentProfileRoute = lazyRoute(() => import("./pages/StudentProfile"), "StudentProfile");
+const StudentHelpRoute = lazyRoute(() => import("./pages/StudentHelp"), "StudentHelp");
+const PracticeSessionRoute = lazyRoute(() => import("./pages/PracticeSession"), "PracticeSession");
+const PracticeReviewRoute = lazyRoute(() => import("./pages/PracticeReview"), "PracticeReview");
 const MaterialsLibraryRoute = lazyRoute(() => import("./pages/MaterialsLibrary"), "MaterialsLibrary");
 const ResultsReportsRoute = lazyRoute(() => import("./pages/ResultsReports"), "ResultsReports");
 const ProfileRoute = lazyRoute(() => import("./pages/Profile"), "Profile");
+
+export function ExamMonitorRedirectRoute() {
+  const { id } = useParams();
+
+  if (!id) {
+    return createElement(Navigate, { replace: true, to: "/exams" });
+  }
+
+  return createElement(Navigate, { replace: true, to: `/exams/${id}?tab=monitoring` });
+}
 
 export const routeConfig = [
   {
@@ -77,7 +94,7 @@ export const routeConfig = [
       { path: "exams/:id", Component: ExamDetailRoute },
       { path: "exams/:id/edit", Component: ExamCreationWizardRoute },
       { path: "exams/:id/assign", Component: ExamAssignmentRoute },
-      { path: "exams/:id/monitor", Component: LiveMonitoringRoute },
+      { path: "exams/:id/monitor", Component: ExamMonitorRedirectRoute },
       { path: "exam-periods", Component: ExamPeriodsRoute },
       { path: "exam-rooms", Component: ExamRoomsRoute },
       { path: "manual-grading", Component: ManualGradingRoute },
@@ -95,10 +112,18 @@ export const routeConfig = [
     children: [
       { index: true, Component: CandidateDashboardRoute },
       { path: "dashboard", Component: CandidateDashboardRoute },
+      { path: "exams", Component: MyExamsRoute },
+      { path: "exams/:id/instructions", Component: ExamInstructionsRoute },
       { path: "exam/:id", Component: TakeExam },
       { path: "practice", Component: PracticeExam },
+      { path: "practice/sessions/:id", Component: PracticeSessionRoute },
+      { path: "practice/sessions/:id/review", Component: PracticeReviewRoute },
       { path: "results", Component: CandidateResultsRoute },
+      { path: "results/:id", Component: ResultDetailRoute },
       { path: "materials", Component: CandidateMaterialsRoute },
+      { path: "notifications", Component: StudentNotificationsRoute },
+      { path: "profile", Component: StudentProfileRoute },
+      { path: "help", Component: StudentHelpRoute },
     ],
   },
 ];

@@ -11,10 +11,18 @@ from ..models import (
     ClientCapability,
     ProctorEvidence,
     ProctorEvent,
+    ProctoringMediaState,
     SessionHeartbeat,
     ViolationCase,
     ViolationReview,
 )
+
+
+def _safe_file_url(file_field):
+    try:
+        return file_field.url if file_field else ""
+    except ValueError:
+        return ""
 
 
 class FlexibleJSONField(serializers.JSONField):
@@ -99,10 +107,7 @@ class ProctorEvidenceSerializer(serializers.ModelSerializer):
 
     @extend_schema_field(OpenApiTypes.URI)
     def get_file_url(self, obj):
-        try:
-            return obj.file.url if obj.file else ""
-        except ValueError:
-            return ""
+        return _safe_file_url(obj.file)
 
 
 class ProctorEvidenceCreateSerializer(serializers.Serializer):
@@ -110,6 +115,38 @@ class ProctorEvidenceCreateSerializer(serializers.Serializer):
     evidence_type = serializers.ChoiceField(choices=ProctorEvidence.EvidenceType.choices)
     metadata = FlexibleJSONField(required=False, default=dict)
     file = serializers.FileField()
+
+
+class MediaProviderTokenSerializer(serializers.Serializer):
+    provider = serializers.CharField()
+    server_url = serializers.CharField()
+    room_name = serializers.CharField()
+    participant_name = serializers.CharField()
+    access_token = serializers.CharField()
+    expires_at = serializers.CharField()
+
+
+class ProctoringMediaStateSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ProctoringMediaState
+        fields = (
+            "provider",
+            "room_name",
+            "participant_name",
+            "webcam_publish_status",
+            "screen_capture_status",
+            "webcam_publish_error",
+            "last_publish_at",
+            "last_status_at",
+            "metadata",
+        )
+
+
+class ProctoringMediaStateWriteSerializer(serializers.Serializer):
+    webcam_publish_status = serializers.ChoiceField(choices=ProctoringMediaState.PublishStatus.choices)
+    screen_capture_status = serializers.ChoiceField(choices=ProctoringMediaState.CaptureStatus.choices)
+    webcam_publish_error = serializers.CharField(required=False, allow_blank=True, default="")
+    metadata = FlexibleJSONField(required=False, default=dict)
 
 
 class CandidateSummarySerializer(serializers.Serializer):
@@ -125,6 +162,12 @@ class MonitoringExamSerializer(serializers.Serializer):
 
 
 class MonitoringCandidateStatusSerializer(serializers.Serializer):
+    class MediaSerializer(serializers.Serializer):
+        webcam_publish_status = serializers.CharField()
+        screen_capture_status = serializers.CharField()
+        last_publish_at = serializers.CharField(allow_null=True)
+
+    session_id = serializers.IntegerField(allow_null=True)
     candidate = CandidateSummarySerializer()
     status = serializers.CharField()
     progress_percentage = serializers.IntegerField()
@@ -133,6 +176,7 @@ class MonitoringCandidateStatusSerializer(serializers.Serializer):
     time_elapsed_minutes = serializers.IntegerField()
     connection_status = serializers.CharField()
     last_activity_at = serializers.CharField(allow_null=True)
+    media = MediaSerializer()
 
 
 class MonitoringAlertSerializer(serializers.Serializer):
@@ -167,10 +211,18 @@ class ViolationReviewSerializer(serializers.ModelSerializer):
 
 
 class ViolationCaseSerializer(serializers.ModelSerializer):
+    class EvidencePreviewSerializer(serializers.Serializer):
+        id = serializers.IntegerField()
+        evidence_type = serializers.CharField()
+        file_url = serializers.CharField()
+        captured_at = serializers.CharField()
+        deleted_at = serializers.CharField(allow_null=True)
+
     candidate = serializers.SerializerMethodField()
     exam = serializers.SerializerMethodField()
     event_ids = serializers.SerializerMethodField()
     evidence_ids = serializers.SerializerMethodField()
+    evidence_items = serializers.SerializerMethodField()
     reviews = ViolationReviewSerializer(many=True, read_only=True)
 
     class Meta:
@@ -186,6 +238,7 @@ class ViolationCaseSerializer(serializers.ModelSerializer):
             "summary",
             "event_ids",
             "evidence_ids",
+            "evidence_items",
             "resolved_at",
             "resolution_notes",
             "reviews",
@@ -216,6 +269,24 @@ class ViolationCaseSerializer(serializers.ModelSerializer):
     @extend_schema_field({"type": "array", "items": {"type": "integer"}})
     def get_evidence_ids(self, obj):
         return list(obj.evidences.values_list("id", flat=True))
+
+    @extend_schema_field(EvidencePreviewSerializer(many=True))
+    def get_evidence_items(self, obj):
+        evidences = sorted(
+            obj.evidences.all(),
+            key=lambda evidence: evidence.captured_at,
+            reverse=True,
+        )[:4]
+        return [
+            {
+                "id": evidence.id,
+                "evidence_type": evidence.evidence_type,
+                "file_url": _safe_file_url(evidence.file),
+                "captured_at": evidence.captured_at.isoformat(),
+                "deleted_at": evidence.deleted_at.isoformat() if evidence.deleted_at else None,
+            }
+            for evidence in evidences
+        ]
 
 
 class ViolationCaseResolveSerializer(serializers.Serializer):

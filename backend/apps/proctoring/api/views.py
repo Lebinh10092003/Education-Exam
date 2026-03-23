@@ -1,4 +1,5 @@
-from django.db.models import Q
+from drf_spectacular.types import OpenApiTypes
+from django.http import HttpResponse
 from django.shortcuts import get_object_or_404
 from drf_spectacular.utils import extend_schema
 from rest_framework import mixins, status, viewsets
@@ -12,25 +13,33 @@ from apps.exam_authoring.models import Exam
 from apps.exam_delivery.models import ExamSession
 from apps.identity.permissions import HasAPIPermissionCode
 
-from ..models import ProctorEvent, ViolationCase
+from ..exporters import build_violation_cases_workbook, serialize_workbook
+from ..models import ProctorEvent
 from ..services import (
     assert_admin_monitoring_access,
     assert_candidate_session_access,
     build_exam_monitoring_snapshot,
     create_proctor_evidence,
+    issue_admin_view_token,
+    issue_candidate_publish_token,
     record_heartbeat,
     record_proctor_event,
     register_client_capability,
     resolve_violation_case,
+    update_media_status,
 )
+from .querysets import build_violation_case_queryset
 from .serializers import (
     ClientCapabilitySerializer,
     ClientCapabilityWriteSerializer,
     ExamMonitoringSnapshotSerializer,
+    MediaProviderTokenSerializer,
     ProctorEvidenceCreateSerializer,
     ProctorEvidenceSerializer,
     ProctorEventSerializer,
     ProctorEventWriteSerializer,
+    ProctoringMediaStateSerializer,
+    ProctoringMediaStateWriteSerializer,
     SessionHeartbeatSerializer,
     SessionHeartbeatWriteSerializer,
     ViolationCaseResolveSerializer,
@@ -130,6 +139,49 @@ class CandidateSessionEvidenceView(APIView):
         return Response(output.data, status=status.HTTP_201_CREATED)
 
 
+class CandidateSessionMediaPublishTokenView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    @extend_schema(responses={status.HTTP_200_OK: MediaProviderTokenSerializer})
+    def post(self, request, session_id):
+        session = _get_candidate_session(session_id, request.user)
+        payload = issue_candidate_publish_token(session=session, user=request.user)
+        return Response(MediaProviderTokenSerializer(payload).data)
+
+
+class CandidateSessionMediaStatusView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    @extend_schema(
+        request=ProctoringMediaStateWriteSerializer,
+        responses={status.HTTP_200_OK: ProctoringMediaStateSerializer},
+    )
+    def post(self, request, session_id):
+        session = _get_candidate_session(session_id, request.user)
+        serializer = ProctoringMediaStateWriteSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        media_state = update_media_status(
+            session=session,
+            **serializer.validated_data,
+        )
+        return Response(ProctoringMediaStateSerializer(media_state).data)
+
+
+class AdminSessionMediaViewTokenView(APIView):
+    permission_classes = [IsAuthenticated, HasAPIPermissionCode]
+    permission_code = "proctoring.view"
+
+    @extend_schema(responses={status.HTTP_200_OK: MediaProviderTokenSerializer})
+    def post(self, request, session_id):
+        assert_admin_monitoring_access(user=request.user)
+        session = get_object_or_404(
+            ExamSession.objects.select_related("candidate", "exam"),
+            pk=session_id,
+        )
+        payload = issue_admin_view_token(session=session, user=request.user)
+        return Response(MediaProviderTokenSerializer(payload).data)
+
+
 class ExamMonitoringSnapshotView(APIView):
     permission_classes = [IsAuthenticated, HasAPIPermissionCode]
     permission_code = "proctoring.view"
@@ -141,6 +193,28 @@ class ExamMonitoringSnapshotView(APIView):
         payload = build_exam_monitoring_snapshot(exam=exam)
         serializer = ExamMonitoringSnapshotSerializer(payload)
         return Response(serializer.data)
+
+
+class ViolationCaseExportView(APIView):
+    permission_classes = [IsAuthenticated, HasAPIPermissionCode]
+    permission_code = "proctoring.view"
+
+    @extend_schema(responses={status.HTTP_200_OK: OpenApiTypes.BINARY})
+    def get(self, request):
+        assert_admin_monitoring_access(user=request.user)
+
+        exam_id = request.query_params.get("exam")
+        if not exam_id:
+            return Response({"detail": "exam is required."}, status=status.HTTP_400_BAD_REQUEST)
+
+        workbook = build_violation_cases_workbook(build_violation_case_queryset(request))
+        payload = serialize_workbook(workbook)
+        response = HttpResponse(
+            payload,
+            content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        )
+        response["Content-Disposition"] = f'attachment; filename="eduexam-violation-history-exam-{exam_id}.xlsx"'
+        return response
 
 
 class ViolationCaseViewSet(
@@ -156,35 +230,7 @@ class ViolationCaseViewSet(
     }
 
     def get_queryset(self):
-        queryset = (
-            ViolationCase.objects.select_related(
-                "session",
-                "session__candidate",
-                "session__exam",
-                "session__exam__subject",
-            )
-            .prefetch_related("events", "evidences", "reviews", "reviews__reviewer")
-            .order_by("status", "-created_at")
-        )
-        status_filter = self.request.query_params.get("status")
-        if status_filter:
-            queryset = queryset.filter(status=status_filter)
-        severity_filter = self.request.query_params.get("severity")
-        if severity_filter:
-            queryset = queryset.filter(severity=severity_filter)
-        exam_id = self.request.query_params.get("exam")
-        if exam_id:
-            queryset = queryset.filter(session__exam_id=exam_id)
-        search = self.request.query_params.get("search")
-        if search:
-            queryset = queryset.filter(
-                Q(session__candidate__email__icontains=search)
-                | Q(session__candidate__full_name__icontains=search)
-                | Q(session__exam__name__icontains=search)
-                | Q(title__icontains=search)
-                | Q(summary__icontains=search)
-            )
-        return queryset
+        return build_violation_case_queryset(self.request)
 
     @action(detail=True, methods=["post"])
     def resolve(self, request, pk=None):

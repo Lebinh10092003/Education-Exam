@@ -94,6 +94,21 @@ const getErrorMessage = (payload: unknown, fallback: string) => {
   return fallback;
 };
 
+const summarizeHtmlError = (html: string) => {
+  const normalizedFallback = html.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
+  if (typeof DOMParser === "undefined") {
+    return normalizedFallback;
+  }
+
+  const documentNode = new DOMParser().parseFromString(html, "text/html");
+  const title = documentNode.querySelector("title")?.textContent?.replace(/\s+/g, " ").trim();
+  const summaryHeading = documentNode.querySelector("#summary h1")?.textContent?.replace(/\s+/g, " ").trim();
+  const exceptionValue = documentNode.querySelector("pre.exception_value")?.textContent?.replace(/\s+/g, " ").trim();
+  const firstParagraph = documentNode.querySelector("#info p")?.textContent?.replace(/\s+/g, " ").trim();
+
+  return exceptionValue || summaryHeading || title || firstParagraph || normalizedFallback;
+};
+
 const parseResponseBody = async (response: Response) => {
   if (response.status === 204) {
     return null;
@@ -105,7 +120,13 @@ const parseResponseBody = async (response: Response) => {
   }
 
   const text = await response.text();
-  return text ? { detail: text } : null;
+  if (!text) {
+    return null;
+  }
+  if (/<html[\s>]/i.test(text) || /<!doctype html/i.test(text)) {
+    return { detail: summarizeHtmlError(text) };
+  }
+  return { detail: text };
 };
 
 const refreshAccessToken = async (): Promise<AuthTokens | null> => {

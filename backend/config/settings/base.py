@@ -24,6 +24,13 @@ env = environ.Env(
     EMAIL_BACKEND=(str, "django.core.mail.backends.console.EmailBackend"),
     DEFAULT_FROM_EMAIL=(str, "no-reply@eduexam.local"),
     FRONTEND_BASE_URL=(str, "http://127.0.0.1:5173"),
+    PROCTORING_MEDIA_PROVIDER=(str, "livekit"),
+    PROCTORING_MEDIA_URL=(str, "ws://127.0.0.1:7880"),
+    PROCTORING_MEDIA_API_KEY=(str, "devkey"),
+    PROCTORING_MEDIA_API_SECRET=(str, "devsecret-livekit-token-signing-key-123456"),
+    PROCTORING_MEDIA_ROOM_PREFIX=(str, "eduexam-"),
+    PROCTORING_MEDIA_TOKEN_TTL_SECONDS=(int, 900),
+    PROCTORING_EVIDENCE_RETENTION_DAYS=(int, 15),
 )
 
 environ.Env.read_env(BASE_DIR / ".env")
@@ -55,6 +62,7 @@ INSTALLED_APPS = [
     "apps.proctoring",
     "apps.materials",
     "apps.notifications",
+    "apps.practice",
 ]
 
 MIDDLEWARE = [
@@ -119,6 +127,13 @@ MEDIA_ROOT = BASE_DIR / "media"
 EMAIL_BACKEND = env("EMAIL_BACKEND")
 DEFAULT_FROM_EMAIL = env("DEFAULT_FROM_EMAIL")
 FRONTEND_BASE_URL = env("FRONTEND_BASE_URL")
+PROCTORING_MEDIA_PROVIDER = env("PROCTORING_MEDIA_PROVIDER")
+PROCTORING_MEDIA_URL = env("PROCTORING_MEDIA_URL")
+PROCTORING_MEDIA_API_KEY = env("PROCTORING_MEDIA_API_KEY")
+PROCTORING_MEDIA_API_SECRET = env("PROCTORING_MEDIA_API_SECRET")
+PROCTORING_MEDIA_ROOM_PREFIX = env("PROCTORING_MEDIA_ROOM_PREFIX")
+PROCTORING_MEDIA_TOKEN_TTL_SECONDS = env.int("PROCTORING_MEDIA_TOKEN_TTL_SECONDS")
+PROCTORING_EVIDENCE_RETENTION_DAYS = env.int("PROCTORING_EVIDENCE_RETENTION_DAYS")
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 AUTH_USER_MODEL = "identity.User"
@@ -162,9 +177,12 @@ SPECTACULAR_SETTINGS = {
         "SessionHeartbeatConnectionStatusEnum": "apps.proctoring.models.SessionHeartbeat.ConnectionStatus",
         "ProctorEventTypeEnum": "apps.proctoring.models.ProctorEvent.EventType",
         "ProctorEventSeverityEnum": "apps.proctoring.models.ProctorEvent.Severity",
+        "ProctoringMediaStatePublishStatusEnum": "apps.proctoring.models.ProctoringMediaState.PublishStatus",
+        "ProctoringMediaStateCaptureStatusEnum": "apps.proctoring.models.ProctoringMediaState.CaptureStatus",
         "ProctorEvidenceTypeEnum": "apps.proctoring.models.ProctorEvidence.EvidenceType",
         "ViolationCaseStatusEnum": "apps.proctoring.models.ViolationCase.Status",
         "ViolationReviewDecisionEnum": "apps.proctoring.models.ViolationReview.Decision",
+        "PracticeSessionStatusEnum": "apps.practice.models.PracticeSession.Status",
     },
 }
 

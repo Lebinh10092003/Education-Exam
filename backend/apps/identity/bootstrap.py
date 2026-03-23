@@ -63,11 +63,17 @@ SYSTEM_ROLE_DEFINITIONS = {
     },
     "candidate": {
         "name": "Candidate",
-        "permission_codes": [],
+        "permission_codes": [
+            "notifications.view",
+            "notifications.manage",
+        ],
     },
     "student": {
         "name": "Student",
-        "permission_codes": [],
+        "permission_codes": [
+            "notifications.view",
+            "notifications.manage",
+        ],
     },
     "proctor": {
         "name": "Proctor",

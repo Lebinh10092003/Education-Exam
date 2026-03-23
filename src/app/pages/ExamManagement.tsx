@@ -281,7 +281,7 @@ export function ExamManagement() {
                         </Button>
                       </Link>
                       {(exam.status === "open" || exam.delivery_summary.in_progress_sessions > 0) && (
-                        <Link to={`/exams/${exam.id}/monitor`}>
+                        <Link to={`/exams/${exam.id}?tab=monitoring`}>
                           <Button size="sm" variant="outline">
                             <Eye className="mr-2 h-4 w-4" />
                             Monitor
@@ -439,7 +439,7 @@ export function ExamManagement() {
                               </Button>
                             </Link>
                             {(exam.status === "open" || exam.delivery_summary.in_progress_sessions > 0) && (
-                              <Link to={`/exams/${exam.id}/monitor`}>
+                              <Link to={`/exams/${exam.id}?tab=monitoring`}>
                                 <Button size="sm" variant="ghost" title="Monitor">
                                   <Eye className="w-4 h-4" />
                                 </Button>

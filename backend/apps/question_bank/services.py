@@ -227,6 +227,7 @@ def import_questions_from_upload(*, uploaded_by, source_format, uploaded_file):
         file_name=uploaded_file.name,
         status=QuestionImportBatch.Status.PENDING,
     )
+    created_question_ids = []
 
     content = uploaded_file.read().decode("utf-8")
     if source_format == QuestionImportBatch.SourceFormat.JSON:
@@ -240,7 +241,7 @@ def import_questions_from_upload(*, uploaded_by, source_format, uploaded_file):
     for index, row in enumerate(rows, start=1):
         try:
             payload = _build_question_payload_from_import(row)
-            create_question(
+            question = create_question(
                 subject=payload["subject"],
                 created_by=uploaded_by,
                 difficulty=payload["difficulty"],
@@ -254,6 +255,7 @@ def import_questions_from_upload(*, uploaded_by, source_format, uploaded_file):
                 acceptable_answers=payload["acceptable_answers"],
             )
             batch.success_count += 1
+            created_question_ids.append(question.id)
         except Exception as exc:  # noqa: BLE001
             QuestionImportError.objects.create(
                 batch=batch,
@@ -264,5 +266,6 @@ def import_questions_from_upload(*, uploaded_by, source_format, uploaded_file):
             batch.error_count += 1
 
     batch.status = QuestionImportBatch.Status.COMPLETED
-    batch.save(update_fields=["success_count", "error_count", "status"])
+    batch.created_question_ids = created_question_ids
+    batch.save(update_fields=["success_count", "error_count", "status", "created_question_ids"])
     return batch

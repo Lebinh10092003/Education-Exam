@@ -2,6 +2,7 @@ import logging
 
 from asgiref.sync import async_to_sync
 from channels.layers import get_channel_layer
+from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.db import transaction
 from django.db.models import Q
@@ -14,10 +15,12 @@ from apps.notifications.services import create_notifications_for_permission
 from apps.platform_core.audit import record_audit_event
 from apps.platform_core.i18n import t
 
+from .media import get_media_provider
 from .models import (
     ClientCapability,
     ProctorEvidence,
     ProctorEvent,
+    ProctoringMediaState,
     SessionHeartbeat,
     ViolationCase,
     ViolationReview,
@@ -111,7 +114,7 @@ def _assigned_candidates_for_exam(exam):
 
 def _latest_session_by_candidate(exam):
     sessions = (
-        exam.sessions.select_related("candidate")
+        exam.sessions.select_related("candidate", "proctoring_media_state")
         .prefetch_related("questions__answer", "heartbeats")
         .order_by("candidate_id", "-attempt_number")
     )
@@ -250,6 +253,70 @@ def create_proctor_evidence(*, session, evidence_type, file, metadata=None, uplo
     return evidence
 
 
+@transaction.atomic
+def update_media_status(
+    *,
+    session,
+    webcam_publish_status,
+    screen_capture_status,
+    metadata=None,
+    webcam_publish_error="",
+    provider=None,
+    room_name="",
+    participant_name="",
+):
+    now = timezone.now()
+    media_state, _ = ProctoringMediaState.objects.get_or_create(
+        session=session,
+        defaults={"provider": provider or settings.PROCTORING_MEDIA_PROVIDER},
+    )
+    media_state.provider = provider or media_state.provider or settings.PROCTORING_MEDIA_PROVIDER
+    if room_name:
+        media_state.room_name = room_name
+    if participant_name:
+        media_state.participant_name = participant_name
+    media_state.webcam_publish_status = webcam_publish_status
+    media_state.screen_capture_status = screen_capture_status
+    media_state.webcam_publish_error = webcam_publish_error
+    media_state.last_status_at = now
+    if webcam_publish_status == ProctoringMediaState.PublishStatus.PUBLISHING:
+        media_state.last_publish_at = now
+    media_state.metadata = {**media_state.metadata, **(metadata or {})}
+    media_state.save()
+    _broadcast_exam_monitoring_update(
+        exam_id=session.exam_id,
+        message_type="media_state",
+        payload={
+            "session_id": session.id,
+            "candidate_id": session.candidate_id,
+            "webcam_publish_status": media_state.webcam_publish_status,
+            "screen_capture_status": media_state.screen_capture_status,
+            "last_publish_at": media_state.last_publish_at.isoformat() if media_state.last_publish_at else None,
+        },
+    )
+    return media_state
+
+
+def issue_candidate_publish_token(*, session, user):
+    assert_candidate_session_access(session=session, user=user)
+    payload = get_media_provider().build_publish_token(session=session, user=user)
+    update_media_status(
+        session=session,
+        provider=payload["provider"],
+        room_name=payload["room_name"],
+        participant_name=payload["participant_name"],
+        webcam_publish_status=ProctoringMediaState.PublishStatus.IDLE,
+        screen_capture_status=ProctoringMediaState.CaptureStatus.UNAVAILABLE,
+        metadata={"server_url": payload["server_url"]},
+    )
+    return payload
+
+
+def issue_admin_view_token(*, session, user):
+    assert_admin_monitoring_access(user=user)
+    return get_media_provider().build_view_token(session=session, user=user)
+
+
 def build_exam_monitoring_snapshot(*, exam):
     assigned_candidates = list(_assigned_candidates_for_exam(exam))
     latest_sessions = _latest_session_by_candidate(exam)
@@ -260,6 +327,7 @@ def build_exam_monitoring_snapshot(*, exam):
         if session is None:
             candidate_statuses.append(
                 {
+                    "session_id": None,
                     "candidate": {
                         "id": candidate.id,
                         "email": candidate.email,
@@ -272,6 +340,11 @@ def build_exam_monitoring_snapshot(*, exam):
                     "time_elapsed_minutes": 0,
                     "connection_status": "offline",
                     "last_activity_at": None,
+                    "media": {
+                        "webcam_publish_status": ProctoringMediaState.PublishStatus.IDLE,
+                        "screen_capture_status": ProctoringMediaState.CaptureStatus.UNAVAILABLE,
+                        "last_publish_at": None,
+                    },
                 }
             )
             continue
@@ -280,9 +353,11 @@ def build_exam_monitoring_snapshot(*, exam):
         answered_count = session.questions.filter(answer__is_answered=True).count()
         progress_percentage = int((answered_count / total_questions) * 100) if total_questions else 0
         last_heartbeat = session.heartbeats.order_by("-recorded_at").first()
+        media_state = getattr(session, "proctoring_media_state", None)
         end_time = session.submitted_at or timezone.now()
         candidate_statuses.append(
             {
+                "session_id": session.id,
                 "candidate": {
                     "id": candidate.id,
                     "email": candidate.email,
@@ -295,6 +370,23 @@ def build_exam_monitoring_snapshot(*, exam):
                 "time_elapsed_minutes": max(0, int((end_time - session.started_at).total_seconds() // 60)),
                 "connection_status": last_heartbeat.connection_status if last_heartbeat else "offline",
                 "last_activity_at": session.last_activity_at.isoformat() if session.last_activity_at else None,
+                "media": {
+                    "webcam_publish_status": (
+                        media_state.webcam_publish_status
+                        if media_state
+                        else ProctoringMediaState.PublishStatus.IDLE
+                    ),
+                    "screen_capture_status": (
+                        media_state.screen_capture_status
+                        if media_state
+                        else ProctoringMediaState.CaptureStatus.UNAVAILABLE
+                    ),
+                    "last_publish_at": (
+                        media_state.last_publish_at.isoformat()
+                        if media_state and media_state.last_publish_at
+                        else None
+                    ),
+                },
             }
         )
 

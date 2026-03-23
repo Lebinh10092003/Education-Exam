@@ -90,3 +90,47 @@ def test_candidate_can_post_proctor_event_and_evidence(api_client, subject, admi
     assert evidence_response.status_code == 201
     assert evidence_response.json()["evidence_type"] == "screen_capture"
     assert ProctorEvent.objects.get(id=event_id).violation_cases.count() == 1
+
+
+@pytest.mark.django_db
+def test_candidate_can_request_media_publish_token(api_client, subject, admin_user, candidate_user):
+    _, session = build_active_session(
+        subject=subject,
+        admin_user=admin_user,
+        candidate_user=candidate_user,
+    )
+    token = str(RefreshToken.for_user(candidate_user).access_token)
+    api_client.credentials(HTTP_AUTHORIZATION=f"Bearer {token}")
+
+    response = api_client.post(
+        f"/api/v1/proctoring/sessions/{session.id}/media/publish-token/",
+        {},
+        format="json",
+    )
+
+    assert response.status_code == 200
+    assert response.json()["participant_name"]
+
+
+@pytest.mark.django_db
+def test_candidate_can_report_media_status(api_client, subject, admin_user, candidate_user):
+    _, session = build_active_session(
+        subject=subject,
+        admin_user=admin_user,
+        candidate_user=candidate_user,
+    )
+    token = str(RefreshToken.for_user(candidate_user).access_token)
+    api_client.credentials(HTTP_AUTHORIZATION=f"Bearer {token}")
+
+    response = api_client.post(
+        f"/api/v1/proctoring/sessions/{session.id}/media/status/",
+        {
+            "webcam_publish_status": "publishing",
+            "screen_capture_status": "ready",
+            "metadata": {"browser": "chromium"},
+        },
+        format="json",
+    )
+
+    assert response.status_code == 200
+    assert response.json()["webcam_publish_status"] == "publishing"

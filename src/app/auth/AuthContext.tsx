@@ -64,7 +64,7 @@ export const getDefaultRouteForProfile = (profile: AuthProfile | null) => {
     return "/";
   }
 
-  return "/candidate/practice";
+  return "/candidate";
 };
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {

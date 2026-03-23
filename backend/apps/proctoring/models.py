@@ -5,6 +5,10 @@ from django.utils import timezone
 from apps.platform_core.models import TimeStampedModel
 
 
+def _default_proctor_evidence_expiry():
+    return timezone.now() + timezone.timedelta(days=settings.PROCTORING_EVIDENCE_RETENTION_DAYS)
+
+
 class ClientCapability(TimeStampedModel):
     class ClientType(models.TextChoices):
         WEB = "web", "Web"
@@ -23,6 +27,46 @@ class ClientCapability(TimeStampedModel):
 
     def __str__(self):
         return f"ClientCapability<{self.session_id}:{self.client_type}>"
+
+
+class ProctoringMediaState(TimeStampedModel):
+    class PublishStatus(models.TextChoices):
+        IDLE = "idle", "Idle"
+        PUBLISHING = "publishing", "Publishing"
+        FAILED = "failed", "Failed"
+        STOPPED = "stopped", "Stopped"
+
+    class CaptureStatus(models.TextChoices):
+        UNAVAILABLE = "unavailable", "Unavailable"
+        READY = "ready", "Ready"
+        REVOKED = "revoked", "Revoked"
+        FAILED = "failed", "Failed"
+
+    session = models.OneToOneField(
+        "exam_delivery.ExamSession",
+        on_delete=models.CASCADE,
+        related_name="proctoring_media_state",
+    )
+    provider = models.CharField(max_length=32, default=settings.PROCTORING_MEDIA_PROVIDER)
+    room_name = models.CharField(max_length=255, blank=True)
+    participant_name = models.CharField(max_length=255, blank=True)
+    webcam_publish_status = models.CharField(
+        max_length=16,
+        choices=PublishStatus.choices,
+        default=PublishStatus.IDLE,
+    )
+    screen_capture_status = models.CharField(
+        max_length=16,
+        choices=CaptureStatus.choices,
+        default=CaptureStatus.UNAVAILABLE,
+    )
+    webcam_publish_error = models.TextField(blank=True)
+    last_publish_at = models.DateTimeField(null=True, blank=True)
+    last_status_at = models.DateTimeField(null=True, blank=True)
+    metadata = models.JSONField(default=dict, blank=True)
+
+    def __str__(self):
+        return f"ProctoringMediaState<{self.session_id}:{self.webcam_publish_status}>"
 
 
 class SessionHeartbeat(TimeStampedModel):
@@ -122,6 +166,9 @@ class ProctorEvidence(TimeStampedModel):
     file = models.FileField(upload_to="proctoring/evidence/")
     metadata = models.JSONField(default=dict, blank=True)
     captured_at = models.DateTimeField(default=timezone.now)
+    expires_at = models.DateTimeField(default=_default_proctor_evidence_expiry)
+    deleted_at = models.DateTimeField(null=True, blank=True)
+    deletion_error = models.TextField(blank=True)
 
     class Meta:
         ordering = ("-captured_at", "-id")

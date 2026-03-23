@@ -1,5 +1,5 @@
-import { useMemo } from "react";
-import { Link, useNavigate, useParams } from "react-router";
+import { useMemo, useState } from "react";
+import { Link, useNavigate, useParams, useSearchParams } from "react-router";
 import {
   CalendarRange,
   Clock,
@@ -19,6 +19,7 @@ import { Badge } from "../components/ui/badge";
 import { Button } from "../components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../components/ui/tabs";
+import { LiveMonitoring } from "./LiveMonitoring";
 import { apiRequest } from "../lib/http";
 import { notify } from "../lib/notify";
 import { useAsyncList } from "../hooks/useAsyncList";
@@ -119,10 +120,15 @@ const formatDateTime = (value: string | null) => {
 
 const formatBoolean = (value: boolean) => (value ? "Enabled" : "Disabled");
 
+type ExamTab = "details" | "assignments" | "questions" | "rules" | "monitoring";
+
 export function ExamDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [currentTab, setCurrentTab] = useState<Exclude<ExamTab, "monitoring">>("details");
   const mutation = useMutationState();
+  const requestedMonitoringTab = searchParams.get("tab") === "monitoring";
 
   const examDetail = useAsyncList(
     async () => {
@@ -136,6 +142,7 @@ export function ExamDetail() {
   );
 
   const exam = examDetail.data;
+  const activeTab: ExamTab = exam?.enable_proctoring && requestedMonitoringTab ? "monitoring" : currentTab;
   const stats = useMemo(() => {
     if (!exam) {
       return {
@@ -153,6 +160,17 @@ export function ExamDetail() {
 
     return { assigned, completed, inProgress, notStarted };
   }, [exam]);
+
+  const updateTab = (nextTab: ExamTab) => {
+    const nextSearchParams = new URLSearchParams(searchParams);
+    if (nextTab === "monitoring") {
+      nextSearchParams.set("tab", "monitoring");
+    } else {
+      nextSearchParams.delete("tab");
+      setCurrentTab(nextTab);
+    }
+    setSearchParams(nextSearchParams);
+  };
 
   const cloneExam = async () => {
     if (!exam) {
@@ -234,7 +252,7 @@ export function ExamDetail() {
                 Assign Candidates
               </Button>
             </Link>
-            <Link to={`/exams/${exam.id}/monitor`}>
+            <Link to={`/exams/${exam.id}?tab=monitoring`}>
               <Button variant="outline">
                 <Play className="mr-2 h-4 w-4" />
                 Live Monitor
@@ -310,12 +328,13 @@ export function ExamDetail() {
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr),320px]">
         <Card>
           <CardContent className="p-6">
-            <Tabs defaultValue="details" className="space-y-6">
+            <Tabs value={activeTab} onValueChange={(value) => updateTab(value as ExamTab)} className="space-y-6">
               <TabsList>
                 <TabsTrigger value="details">Details</TabsTrigger>
                 <TabsTrigger value="assignments">Assignments</TabsTrigger>
                 <TabsTrigger value="questions">Questions</TabsTrigger>
                 <TabsTrigger value="rules">Random Rules</TabsTrigger>
+                {exam.enable_proctoring ? <TabsTrigger value="monitoring">Monitoring</TabsTrigger> : null}
               </TabsList>
 
               <TabsContent value="details" className="space-y-6">
@@ -507,6 +526,12 @@ export function ExamDetail() {
                   </div>
                 )}
               </TabsContent>
+
+              {exam.enable_proctoring ? (
+                <TabsContent value="monitoring" className="space-y-3">
+                  <LiveMonitoring embedded examId={exam.id} />
+                </TabsContent>
+              ) : null}
             </Tabs>
           </CardContent>
         </Card>
@@ -522,7 +547,7 @@ export function ExamDetail() {
                 Manage Assignments
               </Button>
             </Link>
-            <Link to={`/exams/${exam.id}/monitor`} className="block">
+            <Link to={`/exams/${exam.id}?tab=monitoring`} className="block">
               <Button variant="outline" className="w-full justify-start">
                 <Eye className="mr-2 h-4 w-4" />
                 Monitor Delivery

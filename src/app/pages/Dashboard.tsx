@@ -199,7 +199,7 @@ export function Dashboard() {
                         {alert.exam_id ? (
                           <Link
                             className="mt-2 inline-block text-xs font-medium text-blue-600 hover:text-blue-700"
-                            to={`/exams/${alert.exam_id}/monitor`}
+                            to={`/exams/${alert.exam_id}?tab=monitoring`}
                           >
                             Open monitoring
                           </Link>

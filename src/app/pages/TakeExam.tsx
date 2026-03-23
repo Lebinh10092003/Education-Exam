@@ -17,6 +17,21 @@ import { Label } from "../components/ui/label";
 import { Badge } from "../components/ui/badge";
 import { Textarea } from "../components/ui/textarea";
 import { apiRequest } from "../lib/http";
+import {
+  captureTrackSnapshot,
+  requestProctoringStreams,
+  type ProctoringCaptureResources,
+} from "../lib/proctoringCapture";
+import {
+  connectCandidatePublisher,
+  disconnectRoom,
+  recordProctoringEvent,
+  reportMediaStatus,
+  requestPublishToken,
+  uploadProctorEvidence,
+  type ConnectedMediaRoom,
+  type ProctorEventResponse,
+} from "../lib/proctoringMedia";
 
 interface SessionQuestion {
   id: number;
@@ -97,6 +112,16 @@ const formatTime = (seconds: number) => {
 const formatDateTime = (value: string) =>
   new Intl.DateTimeFormat("en-GB", { dateStyle: "medium", timeStyle: "short" }).format(new Date(value));
 
+const assignPreviewStream = (
+  element: (HTMLVideoElement & { srcObject?: MediaStream | null }) | null,
+  stream: MediaStream | null,
+) => {
+  if (!element) {
+    return;
+  }
+  element.srcObject = stream;
+};
+
 export function TakeExam() {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -110,6 +135,10 @@ export function TakeExam() {
   const [lastSavedAt, setLastSavedAt] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [proctoringBlockReason, setProctoringBlockReason] = useState<string | null>(null);
+  const [proctoringReady, setProctoringReady] = useState(false);
+  const [isProctoringSetupPending, setIsProctoringSetupPending] = useState(false);
+  const [localPreviewStream, setLocalPreviewStream] = useState<MediaStream | null>(null);
   const [connectionStatus, setConnectionStatus] = useState<"stable" | "offline" | "unstable">(
     navigator.onLine ? "stable" : "offline",
   );
@@ -119,6 +148,12 @@ export function TakeExam() {
   const heartbeatPendingRef = useRef(false);
   const autosavePendingRef = useRef(false);
   const capabilityRegisteredSessionIdRef = useRef<number | null>(null);
+  const captureResourcesRef = useRef<ProctoringCaptureResources | null>(null);
+  const liveRoomRef = useRef<ConnectedMediaRoom | null>(null);
+  const setupPreviewRef = useRef<HTMLVideoElement | null>(null);
+  const examPreviewRef = useRef<HTMLVideoElement | null>(null);
+  const screenEndedHandlerRef = useRef<(() => void) | null>(null);
+  const violationCapturePendingRef = useRef(false);
 
   const enqueueSessionMutation = async <T,>(task: () => Promise<T>) => {
     const previous = requestQueueRef.current;
@@ -159,7 +194,6 @@ export function TakeExam() {
       answer_text: string;
       is_marked_for_review: boolean;
     }>,
-    options?: { silent?: boolean },
   ) => {
     if (!session) {
       return;
@@ -181,9 +215,6 @@ export function TakeExam() {
       });
       setLastSavedAt(response.updated_at);
       dirtyEssayQuestionIdsRef.current.delete(questionId);
-      if (!options?.silent) {
-        notify.success("Answer saved.");
-      }
     } catch (saveError) {
       const message = saveError instanceof Error ? saveError.message : "Unable to save answer.";
       notify.error(message);
@@ -208,8 +239,86 @@ export function TakeExam() {
         answer_text: question.answer_text,
         is_marked_for_review: question.is_marked_for_review,
       },
-      { silent: true },
     );
+  };
+
+  const cleanupProctoringResources = async () => {
+    if (captureResourcesRef.current?.screenTrack && screenEndedHandlerRef.current) {
+      captureResourcesRef.current.screenTrack.removeEventListener("ended", screenEndedHandlerRef.current);
+    }
+    screenEndedHandlerRef.current = null;
+    await disconnectRoom(liveRoomRef.current);
+    liveRoomRef.current = null;
+    captureResourcesRef.current?.dispose();
+    captureResourcesRef.current = null;
+    setLocalPreviewStream(null);
+  };
+
+  const ensureFullscreenMode = async () => {
+    if (!document.fullscreenEnabled) {
+      throw new Error("Fullscreen mode is required to start this exam.");
+    }
+    if (document.fullscreenElement) {
+      return;
+    }
+    const requestFullscreen = document.documentElement.requestFullscreen?.bind(document.documentElement);
+    if (!requestFullscreen) {
+      throw new Error("Fullscreen mode is not supported in this browser.");
+    }
+    await requestFullscreen();
+  };
+
+  const captureViolationEvidence = async (event: ProctorEventResponse, message: string) => {
+    if (!session) {
+      return;
+    }
+
+    const captureResources = captureResourcesRef.current;
+    if (!captureResources) {
+      return;
+    }
+
+    const webcamSnapshot = await captureTrackSnapshot(captureResources.webcamTrack);
+    await enqueueSessionMutation(() =>
+      uploadProctorEvidence(session.id, event.id, "webcam_snapshot", webcamSnapshot, { message }),
+    );
+
+    if (!captureResources.screenTrack) {
+      return;
+    }
+
+    const screenSnapshot = await captureTrackSnapshot(captureResources.screenTrack);
+    await enqueueSessionMutation(() =>
+      uploadProctorEvidence(session.id, event.id, "screen_capture", screenSnapshot, { message }),
+    );
+  };
+
+  const reportViolation = async (
+    eventType: string,
+    severity: "info" | "warning" | "critical",
+    message: string,
+  ) => {
+    if (!session || violationCapturePendingRef.current) {
+      return;
+    }
+
+    violationCapturePendingRef.current = true;
+    try {
+      const event = await enqueueSessionMutation(() =>
+        recordProctoringEvent(session.id, {
+          event_type: eventType,
+          severity,
+          metadata: { message },
+        }),
+      );
+      await captureViolationEvidence(event, message);
+    } catch (violationError) {
+      const errorMessage =
+        violationError instanceof Error ? violationError.message : "Unable to capture proctoring evidence.";
+      notify.error(errorMessage);
+    } finally {
+      violationCapturePendingRef.current = false;
+    }
   };
 
   const loadSession = async () => {
@@ -227,6 +336,9 @@ export function TakeExam() {
         method: "POST",
       });
       setSession(nextSession);
+      setProctoringBlockReason(null);
+      setProctoringReady(!nextSession.enable_proctoring);
+      setIsProctoringSetupPending(false);
       setTimeRemaining(nextSession.remaining_seconds);
       const nextIndex = Math.max(
         nextSession.questions.findIndex((question) => !question.is_answered),
@@ -243,6 +355,153 @@ export function TakeExam() {
   useEffect(() => {
     void loadSession();
   }, [examId]);
+
+  useEffect(() => {
+    return () => {
+      void cleanupProctoringResources();
+    };
+  }, []);
+
+  useEffect(() => {
+    assignPreviewStream(
+      setupPreviewRef.current as (HTMLVideoElement & { srcObject?: MediaStream | null }) | null,
+      localPreviewStream,
+    );
+    assignPreviewStream(
+      examPreviewRef.current as (HTMLVideoElement & { srcObject?: MediaStream | null }) | null,
+      localPreviewStream,
+    );
+    return () => {
+      assignPreviewStream(
+        setupPreviewRef.current as (HTMLVideoElement & { srcObject?: MediaStream | null }) | null,
+        null,
+      );
+      assignPreviewStream(
+        examPreviewRef.current as (HTMLVideoElement & { srcObject?: MediaStream | null }) | null,
+        null,
+      );
+    };
+  }, [localPreviewStream, proctoringReady]);
+
+  useEffect(() => {
+    if (session?.status === "submitted") {
+      void cleanupProctoringResources();
+    }
+  }, [session?.status]);
+
+  const beginProtectedExam = async () => {
+    if (!session || !session.enable_proctoring) {
+      return;
+    }
+
+    let enteredFullscreen = false;
+    setIsProctoringSetupPending(true);
+    setProctoringReady(false);
+
+    try {
+      let captureResources = captureResourcesRef.current;
+      if (!captureResources) {
+        await cleanupProctoringResources();
+        captureResources = await requestProctoringStreams();
+        captureResourcesRef.current = captureResources;
+        setLocalPreviewStream(captureResources.webcamStream);
+
+        const onScreenShareEnded = () => {
+          void enqueueSessionMutation(() =>
+            reportMediaStatus(session.id, {
+              webcam_publish_status: "publishing",
+              screen_capture_status: "revoked",
+              metadata: { reason: "screen_share_ended" },
+            }),
+          ).catch(() => undefined);
+          void reportViolation("manual_alert", "critical", "Screen sharing ended during the exam.");
+        };
+        screenEndedHandlerRef.current = onScreenShareEnded;
+        captureResources.screenTrack.addEventListener("ended", onScreenShareEnded);
+      }
+
+      const wasAlreadyFullscreen = Boolean(document.fullscreenElement);
+      try {
+        await ensureFullscreenMode();
+        enteredFullscreen = !wasAlreadyFullscreen && Boolean(document.fullscreenElement);
+      } catch (fullscreenError) {
+        const message =
+          fullscreenError instanceof Error
+            ? fullscreenError.message
+            : "Fullscreen mode is required to start this exam.";
+        setProctoringBlockReason(
+          captureResourcesRef.current
+            ? "Camera, microphone, and screen are ready. Click again to re-enter fullscreen and start the exam."
+            : message,
+        );
+        return;
+      }
+
+      if (capabilityRegisteredSessionIdRef.current !== session.id) {
+        capabilityRegisteredSessionIdRef.current = session.id;
+        await enqueueSessionMutation(() =>
+          apiRequest(`/api/v1/proctoring/sessions/${session.id}/capability/`, {
+            method: "POST",
+            body: {
+              client_type: "web",
+              client_version: "vite-react",
+              capabilities: {
+                fullscreen_enabled: document.fullscreenEnabled,
+                online: navigator.onLine,
+                user_agent: navigator.userAgent,
+                webcam: true,
+                microphone: true,
+                screen_capture: true,
+              },
+              attestation_payload: {},
+              user_agent: navigator.userAgent,
+            },
+          }),
+        );
+      }
+
+      if (!liveRoomRef.current) {
+        const publishToken = await enqueueSessionMutation(() => requestPublishToken(session.id));
+        liveRoomRef.current = await connectCandidatePublisher(
+          publishToken,
+          captureResources.webcamTrack,
+        );
+
+        await enqueueSessionMutation(() =>
+          reportMediaStatus(session.id, {
+            webcam_publish_status: "publishing",
+            screen_capture_status: "ready",
+            metadata: {
+              provider: publishToken.provider,
+              room_name: publishToken.room_name,
+              participant_name: publishToken.participant_name,
+            },
+          }),
+        );
+      }
+      setProctoringBlockReason(null);
+      setProctoringReady(true);
+    } catch (proctoringError) {
+      const message =
+        proctoringError instanceof Error
+          ? proctoringError.message
+          : "Camera, microphone, and screen access are required.";
+      capabilityRegisteredSessionIdRef.current = null;
+      setProctoringReady(false);
+      setProctoringBlockReason(message);
+      notify.error(message);
+      await cleanupProctoringResources();
+      if (enteredFullscreen && document.fullscreenElement && document.exitFullscreen) {
+        try {
+          await document.exitFullscreen();
+        } catch {
+          // Ignore exit errors and surface the original setup failure instead.
+        }
+      }
+    } finally {
+      setIsProctoringSetupPending(false);
+    }
+  };
 
   useEffect(() => {
     if (!session || session.status !== "in_progress") {
@@ -264,6 +523,10 @@ export function TakeExam() {
 
   useEffect(() => {
     if (!session || session.status !== "in_progress") {
+      return;
+    }
+
+    if (session.enable_proctoring && !proctoringReady) {
       return;
     }
 
@@ -293,38 +556,16 @@ export function TakeExam() {
     }, 30000);
 
     return () => window.clearInterval(intervalId);
-  }, [session?.id, session?.status]);
+  }, [proctoringReady, session?.enable_proctoring, session?.id, session?.status]);
 
   useEffect(() => {
-    if (!session || !session.enable_proctoring || session.status !== "in_progress") {
+    if (!session || session.status !== "in_progress") {
       return;
     }
 
-    const registerCapability = () => {
-      if (capabilityRegisteredSessionIdRef.current === session.id) {
-        return;
-      }
-
-      capabilityRegisteredSessionIdRef.current = session.id;
-      void enqueueSessionMutation(() =>
-        apiRequest(`/api/v1/proctoring/sessions/${session.id}/capability/`, {
-          method: "POST",
-          body: {
-            client_type: "web",
-            client_version: "vite-react",
-            capabilities: {
-              fullscreen_enabled: document.fullscreenEnabled,
-              online: navigator.onLine,
-              user_agent: navigator.userAgent,
-            },
-            attestation_payload: {},
-            user_agent: navigator.userAgent,
-          },
-        }),
-      ).catch(() => {
-        capabilityRegisteredSessionIdRef.current = null;
-      });
-    };
+    if (session.enable_proctoring && (!proctoringReady || proctoringBlockReason)) {
+      return;
+    }
 
     const sendHeartbeat = () => {
       if (heartbeatPendingRef.current) {
@@ -353,25 +594,19 @@ export function TakeExam() {
 
     const handleVisibilityChange = () => {
       if (document.hidden) {
-        void enqueueSessionMutation(() =>
-          apiRequest(`/api/v1/proctoring/sessions/${session.id}/events/`, {
-            method: "POST",
-            body: {
-              event_type: "tab_switch",
-              severity: "warning",
-              metadata: {
-                message: "Candidate switched away from the exam tab.",
-              },
-            },
-          }),
-        ).catch(() => undefined);
+        void reportViolation("tab_switch", "warning", "Candidate switched away from the exam tab.");
+      }
+    };
+
+    const handleFullscreenChange = () => {
+      if (session.enable_proctoring && document.fullscreenEnabled && !document.fullscreenElement) {
+        void reportViolation("fullscreen_exit", "warning", "Candidate exited fullscreen mode.");
       }
     };
 
     const handleOnline = () => setConnectionStatus("stable");
     const handleOffline = () => setConnectionStatus("offline");
 
-    registerCapability();
     sendHeartbeat();
 
     const heartbeatInterval = window.setInterval(() => {
@@ -379,16 +614,18 @@ export function TakeExam() {
     }, 20000);
 
     document.addEventListener("visibilitychange", handleVisibilityChange);
+    document.addEventListener("fullscreenchange", handleFullscreenChange);
     window.addEventListener("online", handleOnline);
     window.addEventListener("offline", handleOffline);
 
     return () => {
       window.clearInterval(heartbeatInterval);
       document.removeEventListener("visibilitychange", handleVisibilityChange);
+      document.removeEventListener("fullscreenchange", handleFullscreenChange);
       window.removeEventListener("online", handleOnline);
       window.removeEventListener("offline", handleOffline);
     };
-  }, [session?.enable_proctoring, session?.id, session?.status]);
+  }, [proctoringBlockReason, proctoringReady, session?.enable_proctoring, session?.id, session?.status]);
 
   const currentQuestion = session?.questions[currentQuestionIndex] ?? null;
 
@@ -444,7 +681,7 @@ export function TakeExam() {
     }
     const nextMarked = !currentQuestion.is_marked_for_review;
     updateQuestion(currentQuestion.id, { is_marked_for_review: nextMarked });
-    await saveAnswer(currentQuestion.id, { is_marked_for_review: nextMarked }, { silent: true });
+    await saveAnswer(currentQuestion.id, { is_marked_for_review: nextMarked });
   };
 
   const handleSubmit = async () => {
@@ -527,8 +764,86 @@ export function TakeExam() {
             <h1 className="text-xl font-semibold text-gray-900 mb-2">Unable to open exam</h1>
             <p className="text-sm text-gray-600 mb-6">{error ?? "This exam session is unavailable."}</p>
             <Button asChild>
-              <Link to="/candidate/practice">Back to My Exams</Link>
+              <Link to="/candidate/exams">Back to My Exams</Link>
             </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  if (session.status !== "submitted" && session.enable_proctoring && !proctoringReady) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50 px-6">
+        <Card className="w-full max-w-xl">
+          <CardContent className="p-8">
+            <div className="text-center mb-8">
+              <h1 className="text-xl font-semibold text-gray-900 mb-2">Protected Exam Setup</h1>
+              <p className="text-sm text-gray-600">
+                Grant camera, microphone, screen, and fullscreen access before the exam starts.
+              </p>
+            </div>
+
+            <div className="rounded-xl border border-blue-200 bg-blue-50 p-4 text-sm text-blue-900">
+              <p className="font-medium">This step unlocks the exam interface.</p>
+              <p className="mt-2">
+                Fullscreen keeps the exam locked in focus, while webcam live plus screen evidence are required for
+                proctoring.
+              </p>
+            </div>
+
+            <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700">
+              <p className="font-medium text-slate-900">Permissions requested</p>
+              <ul className="mt-2 list-disc space-y-1 pl-5">
+                <li>Camera for live invigilation</li>
+                <li>Microphone permission for protected-exam verification</li>
+                <li>Screen access for violation evidence capture</li>
+                <li>Browser fullscreen before the first question appears</li>
+              </ul>
+            </div>
+
+            {proctoringBlockReason ? (
+              <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+                {proctoringBlockReason}
+              </div>
+            ) : null}
+
+            {localPreviewStream ? (
+              <div className="mt-4 rounded-xl border border-sky-200 bg-sky-50 p-4">
+                <div className="mb-3 flex items-center justify-between gap-3">
+                  <div>
+                    <p className="text-sm font-semibold text-slate-900">Your Webcam Preview</p>
+                    <p className="text-xs text-slate-600">
+                      Permissions are ready. Fullscreen still has to remain active before the exam unlocks.
+                    </p>
+                  </div>
+                  <Badge variant="outline">Preview</Badge>
+                </div>
+                <div className="overflow-hidden rounded-xl border border-slate-200 bg-slate-950">
+                  <video
+                    ref={setupPreviewRef}
+                    aria-label="Your webcam preview"
+                    autoPlay
+                    muted
+                    playsInline
+                    className="aspect-video h-full w-full object-cover"
+                  />
+                </div>
+              </div>
+            ) : null}
+
+            <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:justify-center">
+              <Button onClick={() => void beginProtectedExam()} disabled={isProctoringSetupPending}>
+                {isProctoringSetupPending
+                  ? "Starting Monitoring..."
+                  : localPreviewStream
+                    ? "Enter Fullscreen and Start Exam"
+                    : "Grant Permissions and Start Monitoring"}
+              </Button>
+              <Button asChild>
+                <Link to="/candidate/exams">Back to My Exams</Link>
+              </Button>
+            </div>
           </CardContent>
         </Card>
       </div>
@@ -577,7 +892,7 @@ export function TakeExam() {
                 Refresh
               </Button>
               <Button asChild>
-                <Link to="/candidate/practice">Back to My Exams</Link>
+                <Link to="/candidate/exams">Back to My Exams</Link>
               </Button>
             </div>
           </CardContent>
@@ -714,6 +1029,36 @@ export function TakeExam() {
             <Card className="lg:sticky lg:top-24">
               <CardContent className="p-4 sm:p-6">
                 <h3 className="font-semibold text-gray-900 mb-4">Question Navigator</h3>
+
+                {session.enable_proctoring ? (
+                  <div className="mb-4 rounded-xl border border-sky-200 bg-sky-50 p-3">
+                    <div className="mb-3 flex items-center justify-between gap-3">
+                      <div>
+                        <p className="text-sm font-semibold text-slate-900">Your Webcam Preview</p>
+                        <p className="text-xs text-slate-600">
+                          {proctoringReady ? "Monitoring active" : "Preview will appear after monitoring starts"}
+                        </p>
+                      </div>
+                      <Badge variant="outline">{proctoringReady ? "Live" : "Pending"}</Badge>
+                    </div>
+                    <div className="overflow-hidden rounded-xl border border-slate-200 bg-slate-950">
+                      {proctoringReady && localPreviewStream ? (
+                        <video
+                          ref={examPreviewRef}
+                          aria-label="Your webcam preview"
+                          autoPlay
+                          muted
+                          playsInline
+                          className="aspect-video h-full w-full object-cover"
+                        />
+                      ) : (
+                        <div className="flex aspect-video items-center justify-center px-4 text-center text-xs text-slate-200">
+                          Webcam preview will appear here once monitoring is ready.
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ) : null}
 
                 <div className="space-y-2 mb-4 pb-4 border-b border-gray-200">
                   <div className="flex items-center justify-between text-sm">

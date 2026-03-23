@@ -2,250 +2,198 @@
 
 EduExam la he thong thi truc tuyen gom:
 
-- frontend Vite + React o thu muc goc
+- frontend Vite + React o thu muc goc repo
 - backend Django API o thu muc `backend/`
+- Redis cho websocket/realtime
+- LiveKit cho webcam live trong proctoring
 
-Repo nay chi dung `1 README.md` nay de huong dan clone, cap nhat va chay du an tren bat ky may nao.
+README nay chi huong dan cho Windows PowerShell va da duoc chinh theo trang thai hien tai cua du an.
 
-## Yeu cau moi truong
+## Chay tu clone moi
+
+### Yeu cau moi truong
 
 - Git
-- Node.js 20+ va npm
+- Node.js 20+
 - Python 3.12+
-- PostgreSQL local
-- Redis local la tuy chon
+- Docker Desktop
+- Windows PowerShell
 
-`Redis` khong bat buoc de chay CRUD/API co ban, nhung mot so tinh nang realtime hoac background co the can.
+### Dich vu local can co
 
-## Cau hinh database mac dinh
+De chay dung du an hien tai sau khi clone, local can:
 
-File `backend/.env.example` dang dung PostgreSQL local:
+- SQLite local cho database
+- Redis local cho websocket va realtime monitoring
+- LiveKit local cho webcam live proctoring
 
-```env
-DATABASE_URL=postgresql://postgres:postgres@localhost:5432/eduexam
-```
+PostgreSQL va MinIO hien khong bat buoc de chay local.
 
-Neu may ban dung user, password, port hoac ten database khac, sua lai `DATABASE_URL` trong `backend/.env`.
-Mac dinh repo dung filesystem local cho file upload. Neu ban khong dung MinIO/S3, giu:
-
-```env
-USE_S3_STORAGE=False
-AWS_ACCESS_KEY_ID=
-AWS_SECRET_ACCESS_KEY=
-AWS_STORAGE_BUCKET_NAME=
-AWS_S3_ENDPOINT_URL=
-```
-
-Chi khi nao ban chu dong dung object storage moi can bat `USE_S3_STORAGE=True` va dien cac bien `AWS_*`.
-
-Mac dinh forgot/reset password se gui email qua console backend:
-
-```env
-EMAIL_BACKEND=django.core.mail.backends.console.EmailBackend
-DEFAULT_FROM_EMAIL=no-reply@eduexam.local
-FRONTEND_BASE_URL=http://127.0.0.1:5173
-```
-
-Neu dung SMTP that, sua lai `EMAIL_BACKEND` va cac bien email theo he thong cua ban. `FRONTEND_BASE_URL` duoc dung de tao link reset password trong email.
-
-Database `eduexam` phai ton tai truoc khi chay `migrate`.
-
-Neu may ban da co `psql` trong `PATH`, co the tao nhanh:
+### Buoc 1: clone repo
 
 ```powershell
-psql -U postgres -c "CREATE DATABASE eduexam;"
-```
-
-## Lan dau clone va chay
-
-### Cach nhanh cho Windows PowerShell
-
-```powershell
-git clone <repo-url>
+git clone https://github.com/Lebinh10092003/Education-Exam.git Education-Exam
 cd Education-Exam
+```
 
-npm install
+### Buoc 2: cai frontend, backend, env, va local services
+
+```powershell
+npm.cmd install
 
 cd backend
-python -m venv .venv
+py -m venv .venv
+.\.venv\Scripts\python.exe -m pip install --upgrade pip
 .\.venv\Scripts\python.exe -m pip install -e .
-Copy-Item .env.example .env
+
+if (!(Test-Path .env)) { Copy-Item .env.example .env }
+
+$dbPath = ((Join-Path (Resolve-Path .).Path "db.sqlite3") -replace '\\', '/')
+$envContent = Get-Content .env
+$envContent = $envContent -replace '^DATABASE_URL=.*', "DATABASE_URL=sqlite:///$dbPath"
+$envContent = $envContent -replace '^REDIS_URL=.*', 'REDIS_URL=redis://127.0.0.1:6379/0'
+$envContent = $envContent -replace '^CELERY_BROKER_URL=.*', 'CELERY_BROKER_URL=redis://127.0.0.1:6379/0'
+$envContent = $envContent -replace '^CELERY_RESULT_BACKEND=.*', 'CELERY_RESULT_BACKEND=redis://127.0.0.1:6379/1'
+$envContent = $envContent -replace '^FRONTEND_BASE_URL=.*', 'FRONTEND_BASE_URL=http://127.0.0.1:5173'
+$envContent = $envContent -replace '^PROCTORING_MEDIA_PROVIDER=.*', 'PROCTORING_MEDIA_PROVIDER=livekit'
+$envContent = $envContent -replace '^PROCTORING_MEDIA_URL=.*', 'PROCTORING_MEDIA_URL=ws://127.0.0.1:7880'
+$envContent = $envContent -replace '^PROCTORING_MEDIA_API_KEY=.*', 'PROCTORING_MEDIA_API_KEY=devkey'
+$envContent = $envContent -replace '^PROCTORING_MEDIA_API_SECRET=.*', 'PROCTORING_MEDIA_API_SECRET=devsecret-livekit-token-signing-key-123456'
+$envContent = $envContent -replace '^PROCTORING_MEDIA_ROOM_PREFIX=.*', 'PROCTORING_MEDIA_ROOM_PREFIX=eduexam-'
+$envContent = $envContent -replace '^PROCTORING_MEDIA_TOKEN_TTL_SECONDS=.*', 'PROCTORING_MEDIA_TOKEN_TTL_SECONDS=900'
+$envContent = $envContent -replace '^PROCTORING_EVIDENCE_RETENTION_DAYS=.*', 'PROCTORING_EVIDENCE_RETENTION_DAYS=15'
+$envContent | Set-Content .env
+
+if (-not (Select-String -Path .env -Pattern '^DATABASE_URL=' -Quiet)) { Add-Content .env "DATABASE_URL=sqlite:///$dbPath" }
+if (-not (Select-String -Path .env -Pattern '^REDIS_URL=' -Quiet)) { Add-Content .env 'REDIS_URL=redis://127.0.0.1:6379/0' }
+if (-not (Select-String -Path .env -Pattern '^CELERY_BROKER_URL=' -Quiet)) { Add-Content .env 'CELERY_BROKER_URL=redis://127.0.0.1:6379/0' }
+if (-not (Select-String -Path .env -Pattern '^CELERY_RESULT_BACKEND=' -Quiet)) { Add-Content .env 'CELERY_RESULT_BACKEND=redis://127.0.0.1:6379/1' }
+if (-not (Select-String -Path .env -Pattern '^FRONTEND_BASE_URL=' -Quiet)) { Add-Content .env 'FRONTEND_BASE_URL=http://127.0.0.1:5173' }
+if (-not (Select-String -Path .env -Pattern '^PROCTORING_MEDIA_PROVIDER=' -Quiet)) { Add-Content .env 'PROCTORING_MEDIA_PROVIDER=livekit' }
+if (-not (Select-String -Path .env -Pattern '^PROCTORING_MEDIA_URL=' -Quiet)) { Add-Content .env 'PROCTORING_MEDIA_URL=ws://127.0.0.1:7880' }
+if (-not (Select-String -Path .env -Pattern '^PROCTORING_MEDIA_API_KEY=' -Quiet)) { Add-Content .env 'PROCTORING_MEDIA_API_KEY=devkey' }
+if (-not (Select-String -Path .env -Pattern '^PROCTORING_MEDIA_API_SECRET=' -Quiet)) { Add-Content .env 'PROCTORING_MEDIA_API_SECRET=devsecret-livekit-token-signing-key-123456' }
+if (-not (Select-String -Path .env -Pattern '^PROCTORING_MEDIA_ROOM_PREFIX=' -Quiet)) { Add-Content .env 'PROCTORING_MEDIA_ROOM_PREFIX=eduexam-' }
+if (-not (Select-String -Path .env -Pattern '^PROCTORING_MEDIA_TOKEN_TTL_SECONDS=' -Quiet)) { Add-Content .env 'PROCTORING_MEDIA_TOKEN_TTL_SECONDS=900' }
+if (-not (Select-String -Path .env -Pattern '^PROCTORING_EVIDENCE_RETENTION_DAYS=' -Quiet)) { Add-Content .env 'PROCTORING_EVIDENCE_RETENTION_DAYS=15' }
+
+docker compose up -d redis livekit
+
 .\.venv\Scripts\python.exe manage.py migrate
 .\.venv\Scripts\python.exe manage.py reset_demo_data
 ```
 
-Sau do mo 2 cua so terminal:
+### Buoc 3: mo backend va frontend
 
-Terminal 1, chay backend:
+Backend:
 
 ```powershell
 cd Education-Exam\backend
 .\.venv\Scripts\python.exe manage.py runserver 0.0.0.0:8000
 ```
 
-Terminal 2, chay frontend:
+Frontend:
 
 ```powershell
 cd Education-Exam
-npm run dev
+npm.cmd run dev
 ```
 
-### Cach nhanh cho macOS/Linux
+Truy cap:
 
-```bash
-git clone <repo-url>
-cd Education-Exam
-
-npm install
-
-cd backend
-python3 -m venv .venv
-source .venv/bin/activate
-pip install -e .
-cp .env.example .env
-python manage.py migrate
-python manage.py reset_demo_data
-```
-
-Sau do mo 2 terminal:
-
-Terminal 1, chay backend:
-
-```bash
-cd Education-Exam/backend
-source .venv/bin/activate
-python manage.py runserver 0.0.0.0:8000
-```
-
-Terminal 2, chay frontend:
-
-```bash
-cd Education-Exam
-npm run dev
-```
-
-Frontend thuong chay tai `http://127.0.0.1:5173`.
-Backend thuong chay tai `http://127.0.0.1:8000`.
-
-## Moi lan cap nhat du an tren may da co source
-
-Neu may ban da clone repo tu truoc va muon cap nhat code moi nhat:
-
-### Windows PowerShell
-
-```powershell
-cd Education-Exam
-git pull
-npm install
-
-cd backend
-.\.venv\Scripts\python.exe -m pip install -e .
-.\.venv\Scripts\python.exe manage.py migrate
-.\.venv\Scripts\python.exe manage.py reset_demo_data
-```
-
-### macOS/Linux
-
-```bash
-cd Education-Exam
-git pull
-npm install
-
-cd backend
-source .venv/bin/activate
-pip install -e .
-python manage.py migrate
-python manage.py reset_demo_data
-```
-
-`reset_demo_data` se xoa toan bo du lieu nghiep vu trong database hien tai roi tao lai bo data demo co dinh de test end-to-end.
-Lenh nay se seed materials/proctoring files vao filesystem local theo cau hinh mac dinh, nen khong can MinIO de chay local.
+- Frontend: `http://127.0.0.1:5173`
+- Backend API: `http://127.0.0.1:8000/api/v1/`
+- Swagger: `http://127.0.0.1:8000/api/docs/`
 
 ## Tai khoan demo mac dinh
 
-Lenh `reset_demo_data` hien tai tao:
+Sau `reset_demo_data`, du an tao san:
 
-- admin demo
-- examiner
-- proctor
-- candidate, group, exam, session, result, materials, notifications, audit, proctoring data
-- system permissions
-- system roles
-- role `administrator` cho tai khoan admin
+- Administrator: `admin@example.com / admin123456`
+- Examiner: `examiner1@example.com / admin123456`
+- Proctor: `proctor1@example.com / admin123456`
+- Candidate: `candidate01@example.com / admin123456`
 
-Tai khoan dang nhap mac dinh:
+## Cap nhat repo da clone san
 
-- Email: `admin@example.com`
-- Password: `admin123456`
+```powershell
+cd Education-Exam
+git pull
+npm.cmd install
 
-Neu chi can admin demo va RBAC toi thieu, van co the dung:
-
-```bash
 cd backend
-python manage.py seed_demo_data
+.\.venv\Scripts\python.exe -m pip install -e .
+docker compose up -d redis livekit
+.\.venv\Scripts\python.exe manage.py migrate
+.\.venv\Scripts\python.exe manage.py reset_demo_data
 ```
 
-## Chay lai du an sau khi da setup xong
+## Troubleshooting nhanh
 
-Moi lan mo lai du an, chi can:
-
-Backend:
-
-### Windows PowerShell
+Neu vao bai thi ma gap loi `could not establish signal connection: Failed to fetch`, thuong la LiveKit local chua chay:
 
 ```powershell
 cd Education-Exam\backend
-.\.venv\Scripts\python.exe manage.py runserver 0.0.0.0:8000
+docker compose up -d redis livekit
 ```
 
-### macOS/Linux
+Neu backend da chay tu truoc khi bat Redis hoac LiveKit, restart backend sau khi `docker compose up`.
 
-```bash
-cd Education-Exam/backend
-source .venv/bin/activate
-python manage.py runserver 0.0.0.0:8000
-```
+Neu ban muon test webcam live va monitoring realtime, khong duoc bo qua Redis va LiveKit.
 
-Frontend:
+## Copy-paste nhanh
 
-```bash
+Block duoi day da bao gom clone, setup, migrate, seed demo data, va mo 2 cua so PowerShell de chay backend + frontend.
+
+```powershell
+git clone https://github.com/Lebinh10092003/Education-Exam.git Education-Exam
 cd Education-Exam
-npm run dev
-```
 
-## Cau hinh frontend khi can
+$repo = (Resolve-Path .).Path
 
-Thong thuong frontend khong can them file `.env` khi chay local, vi Vite da proxy `/api` va `/ws` sang backend.
+npm.cmd install
 
-Neu frontend chay o host khac, tao `.env.local` o thu muc goc:
-
-```env
-VITE_API_BASE_URL=http://127.0.0.1:8000
-VITE_WS_BASE_URL=ws://127.0.0.1:8000
-```
-
-## Cau truc chinh
-
-- `src/`: frontend source code
-- `backend/`: Django API, migrations, tests, settings
-- `public/`: static asset frontend
-- `dist/`: build output frontend
-
-## Lenh huu ich
-
-Frontend:
-
-```bash
-npm run dev
-npm run build
-npm run test -- src/app/routes.test.tsx
-```
-
-Backend:
-
-```bash
 cd backend
-python manage.py check
-python -m pytest tests -q
-python manage.py spectacular --file openapi.yaml
+py -m venv .venv
+.\.venv\Scripts\python.exe -m pip install --upgrade pip
+.\.venv\Scripts\python.exe -m pip install -e .
+
+if (!(Test-Path .env)) { Copy-Item .env.example .env }
+
+$dbPath = ((Join-Path (Resolve-Path .).Path "db.sqlite3") -replace '\\', '/')
+$envContent = Get-Content .env
+$envContent = $envContent -replace '^DATABASE_URL=.*', "DATABASE_URL=sqlite:///$dbPath"
+$envContent = $envContent -replace '^REDIS_URL=.*', 'REDIS_URL=redis://127.0.0.1:6379/0'
+$envContent = $envContent -replace '^CELERY_BROKER_URL=.*', 'CELERY_BROKER_URL=redis://127.0.0.1:6379/0'
+$envContent = $envContent -replace '^CELERY_RESULT_BACKEND=.*', 'CELERY_RESULT_BACKEND=redis://127.0.0.1:6379/1'
+$envContent = $envContent -replace '^FRONTEND_BASE_URL=.*', 'FRONTEND_BASE_URL=http://127.0.0.1:5173'
+$envContent = $envContent -replace '^PROCTORING_MEDIA_PROVIDER=.*', 'PROCTORING_MEDIA_PROVIDER=livekit'
+$envContent = $envContent -replace '^PROCTORING_MEDIA_URL=.*', 'PROCTORING_MEDIA_URL=ws://127.0.0.1:7880'
+$envContent = $envContent -replace '^PROCTORING_MEDIA_API_KEY=.*', 'PROCTORING_MEDIA_API_KEY=devkey'
+$envContent = $envContent -replace '^PROCTORING_MEDIA_API_SECRET=.*', 'PROCTORING_MEDIA_API_SECRET=devsecret-livekit-token-signing-key-123456'
+$envContent = $envContent -replace '^PROCTORING_MEDIA_ROOM_PREFIX=.*', 'PROCTORING_MEDIA_ROOM_PREFIX=eduexam-'
+$envContent = $envContent -replace '^PROCTORING_MEDIA_TOKEN_TTL_SECONDS=.*', 'PROCTORING_MEDIA_TOKEN_TTL_SECONDS=900'
+$envContent = $envContent -replace '^PROCTORING_EVIDENCE_RETENTION_DAYS=.*', 'PROCTORING_EVIDENCE_RETENTION_DAYS=15'
+$envContent | Set-Content .env
+
+if (-not (Select-String -Path .env -Pattern '^DATABASE_URL=' -Quiet)) { Add-Content .env "DATABASE_URL=sqlite:///$dbPath" }
+if (-not (Select-String -Path .env -Pattern '^REDIS_URL=' -Quiet)) { Add-Content .env 'REDIS_URL=redis://127.0.0.1:6379/0' }
+if (-not (Select-String -Path .env -Pattern '^CELERY_BROKER_URL=' -Quiet)) { Add-Content .env 'CELERY_BROKER_URL=redis://127.0.0.1:6379/0' }
+if (-not (Select-String -Path .env -Pattern '^CELERY_RESULT_BACKEND=' -Quiet)) { Add-Content .env 'CELERY_RESULT_BACKEND=redis://127.0.0.1:6379/1' }
+if (-not (Select-String -Path .env -Pattern '^FRONTEND_BASE_URL=' -Quiet)) { Add-Content .env 'FRONTEND_BASE_URL=http://127.0.0.1:5173' }
+if (-not (Select-String -Path .env -Pattern '^PROCTORING_MEDIA_PROVIDER=' -Quiet)) { Add-Content .env 'PROCTORING_MEDIA_PROVIDER=livekit' }
+if (-not (Select-String -Path .env -Pattern '^PROCTORING_MEDIA_URL=' -Quiet)) { Add-Content .env 'PROCTORING_MEDIA_URL=ws://127.0.0.1:7880' }
+if (-not (Select-String -Path .env -Pattern '^PROCTORING_MEDIA_API_KEY=' -Quiet)) { Add-Content .env 'PROCTORING_MEDIA_API_KEY=devkey' }
+if (-not (Select-String -Path .env -Pattern '^PROCTORING_MEDIA_API_SECRET=' -Quiet)) { Add-Content .env 'PROCTORING_MEDIA_API_SECRET=devsecret-livekit-token-signing-key-123456' }
+if (-not (Select-String -Path .env -Pattern '^PROCTORING_MEDIA_ROOM_PREFIX=' -Quiet)) { Add-Content .env 'PROCTORING_MEDIA_ROOM_PREFIX=eduexam-' }
+if (-not (Select-String -Path .env -Pattern '^PROCTORING_MEDIA_TOKEN_TTL_SECONDS=' -Quiet)) { Add-Content .env 'PROCTORING_MEDIA_TOKEN_TTL_SECONDS=900' }
+if (-not (Select-String -Path .env -Pattern '^PROCTORING_EVIDENCE_RETENTION_DAYS=' -Quiet)) { Add-Content .env 'PROCTORING_EVIDENCE_RETENTION_DAYS=15' }
+
+docker compose up -d redis livekit
+
+.\.venv\Scripts\python.exe manage.py migrate
+.\.venv\Scripts\python.exe manage.py reset_demo_data
+
+Start-Process powershell -ArgumentList "-NoExit", "-Command", "cd '$repo\\backend'; .\\.venv\\Scripts\\python.exe manage.py runserver 0.0.0.0:8000"
+Start-Process powershell -ArgumentList "-NoExit", "-Command", "cd '$repo'; npm.cmd run dev"
 ```

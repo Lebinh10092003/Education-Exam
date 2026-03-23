@@ -211,6 +211,7 @@ class QuestionImportBatchSerializer(serializers.ModelSerializer):
             "total_records",
             "success_count",
             "error_count",
+            "created_question_ids",
             "errors",
             "created_at",
         )
