@@ -3,6 +3,7 @@ import json
 
 from drf_spectacular.types import OpenApiTypes
 from drf_spectacular.utils import extend_schema_field
+from django.utils import timezone
 from rest_framework import serializers
 
 from apps.platform_core.i18n import t
@@ -16,13 +17,7 @@ from ..models import (
     ViolationCase,
     ViolationReview,
 )
-
-
-def _safe_file_url(file_field):
-    try:
-        return file_field.url if file_field else ""
-    except ValueError:
-        return ""
+from ..retention import safe_evidence_file_url
 
 
 class FlexibleJSONField(serializers.JSONField):
@@ -107,7 +102,7 @@ class ProctorEvidenceSerializer(serializers.ModelSerializer):
 
     @extend_schema_field(OpenApiTypes.URI)
     def get_file_url(self, obj):
-        return _safe_file_url(obj.file)
+        return safe_evidence_file_url(obj)
 
 
 class ProctorEvidenceCreateSerializer(serializers.Serializer):
@@ -159,6 +154,44 @@ class MonitoringExamSerializer(serializers.Serializer):
     id = serializers.IntegerField()
     name = serializers.CharField()
     subject_name = serializers.CharField()
+
+
+class ExamMonitoringHubItemSerializer(serializers.Serializer):
+    id = serializers.IntegerField()
+    name = serializers.CharField()
+    subject_name = serializers.CharField(source="subject.name")
+    status = serializers.CharField()
+    total_candidates = serializers.IntegerField()
+    total_sessions = serializers.IntegerField()
+    in_progress_sessions = serializers.IntegerField()
+    submitted_sessions = serializers.IntegerField()
+    alert_count = serializers.IntegerField()
+    critical_alert_count = serializers.IntegerField()
+    latest_alert_at = serializers.DateTimeField(allow_null=True)
+    highest_alert_severity = serializers.SerializerMethodField()
+
+    def get_highest_alert_severity(self, obj):
+        if obj.critical_alert_count:
+            return "critical"
+        if obj.alert_count:
+            return "warning"
+        return "quiet"
+
+
+class ExamMonitoringHubSummarySerializer(serializers.Serializer):
+    exam_count = serializers.IntegerField()
+    total_candidates = serializers.IntegerField()
+    in_progress_sessions = serializers.IntegerField()
+    alert_count = serializers.IntegerField()
+    critical_exam_count = serializers.IntegerField()
+
+
+class ExamMonitoringHubListResponseSerializer(serializers.Serializer):
+    count = serializers.IntegerField()
+    next = serializers.CharField(allow_null=True)
+    previous = serializers.CharField(allow_null=True)
+    results = ExamMonitoringHubItemSerializer(many=True)
+    summary = ExamMonitoringHubSummarySerializer()
 
 
 class MonitoringCandidateStatusSerializer(serializers.Serializer):
@@ -272,6 +305,7 @@ class ViolationCaseSerializer(serializers.ModelSerializer):
 
     @extend_schema_field(EvidencePreviewSerializer(many=True))
     def get_evidence_items(self, obj):
+        now = timezone.now()
         evidences = sorted(
             obj.evidences.all(),
             key=lambda evidence: evidence.captured_at,
@@ -281,7 +315,7 @@ class ViolationCaseSerializer(serializers.ModelSerializer):
             {
                 "id": evidence.id,
                 "evidence_type": evidence.evidence_type,
-                "file_url": _safe_file_url(evidence.file),
+                "file_url": safe_evidence_file_url(evidence, now=now),
                 "captured_at": evidence.captured_at.isoformat(),
                 "deleted_at": evidence.deleted_at.isoformat() if evidence.deleted_at else None,
             }

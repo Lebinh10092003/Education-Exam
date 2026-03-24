@@ -440,32 +440,53 @@ const UNIT_TRANSLATIONS = {
   users: "người dùng",
 } as const;
 
+const EN_EXACT_TRANSLATIONS: Record<string, string> = Object.fromEntries(
+  Object.entries(VI_EXACT_TRANSLATIONS).map(([english, vietnamese]) => [vietnamese, english]),
+);
+
 const normalizeLocale = (locale: string): LegacyLocale => (locale.toLowerCase().startsWith("vi") ? "vi" : "en");
 
 const translateDynamicText = (locale: LegacyLocale, value: string): string => {
-  if (locale !== "vi") {
-    return value;
-  }
-
-  const exactPatterns: Array<[RegExp, (...matches: string[]) => string]> = [
-    [/^(\d+) monitoring alerts$/, (count) => `${count} cảnh báo giám sát`],
-    [/^(\d+) recent exams loaded$/, (count) => `${count} kỳ thi gần đây đã tải`],
-    [/^(\d+) candidates this month$/, (count) => `${count} thí sinh trong tháng này`],
-    [/^Average (\d+(?:\.\d+)?)%$/, (score) => `Trung bình ${score}%`],
-    [/^Attempts (\d+)\/(\d+)$/, (used, total) => `Lượt làm ${used}/${total}`],
-    [/^Page (\d+)$/, (page) => `Trang ${page}`],
-    [/^All \((\d+)\)$/, (count) => `Tất cả (${count})`],
-    [/^Unread \((\d+)\)$/, (count) => `Chưa đọc (${count})`],
-    [/^Read \((\d+)\)$/, (count) => `Đã đọc (${count})`],
-    [/^Saved (.+)$/, (time) => `Đã lưu ${time}`],
-    [/^(\d+) minutes$/, (minutes) => `${minutes} phút`],
-    [/^(\d+) points$/, (points) => `${points} điểm`],
-    [/^Question (\d+) of (\d+)$/, (index, total) => `Câu hỏi ${index}/${total}`],
-    [/^(\d+) notification\(s\) selected$/, (count) => `Đã chọn ${count} thông báo`],
-    [/^(\d+) selected$/, (count) => `${count} đã chọn`],
-    [/^(\d+) members$/, (count) => `${count} thành viên`],
-    [/^Step (\d+) of (\d+)$/, (current, total) => `Bước ${current}/${total}`],
-  ];
+  const exactPatterns: Array<[RegExp, (...matches: string[]) => string]> =
+    locale === "vi"
+      ? [
+          [/^(\d+) monitoring alerts$/, (count) => `${count} cảnh báo giám sát`],
+          [/^(\d+) recent exams loaded$/, (count) => `${count} kỳ thi gần đây đã tải`],
+          [/^(\d+) candidates this month$/, (count) => `${count} thí sinh trong tháng này`],
+          [/^Average (\d+(?:\.\d+)?)%$/, (score) => `Trung bình ${score}%`],
+          [/^Attempts (\d+)\/(\d+)$/, (used, total) => `Lượt làm ${used}/${total}`],
+          [/^Page (\d+)$/, (page) => `Trang ${page}`],
+          [/^All \((\d+)\)$/, (count) => `Tất cả (${count})`],
+          [/^Unread \((\d+)\)$/, (count) => `Chưa đọc (${count})`],
+          [/^Read \((\d+)\)$/, (count) => `Đã đọc (${count})`],
+          [/^Saved (.+)$/, (time) => `Đã lưu ${time}`],
+          [/^(\d+) minutes$/, (minutes) => `${minutes} phút`],
+          [/^(\d+) points$/, (points) => `${points} điểm`],
+          [/^Question (\d+) of (\d+)$/, (index, total) => `Câu hỏi ${index}/${total}`],
+          [/^(\d+) notification\(s\) selected$/, (count) => `Đã chọn ${count} thông báo`],
+          [/^(\d+) selected$/, (count) => `${count} đã chọn`],
+          [/^(\d+) members$/, (count) => `${count} thành viên`],
+          [/^Step (\d+) of (\d+)$/, (current, total) => `Bước ${current}/${total}`],
+        ]
+      : [
+          [/^(\d+) cảnh báo giám sát$/, (count) => `${count} monitoring alerts`],
+          [/^(\d+) kỳ thi gần đây đã tải$/, (count) => `${count} recent exams loaded`],
+          [/^(\d+) thí sinh trong tháng này$/, (count) => `${count} candidates this month`],
+          [/^Trung bình (\d+(?:\.\d+)?)%$/, (score) => `Average ${score}%`],
+          [/^Lượt làm (\d+)\/(\d+)$/, (used, total) => `Attempts ${used}/${total}`],
+          [/^Trang (\d+)$/, (page) => `Page ${page}`],
+          [/^Tất cả \((\d+)\)$/, (count) => `All (${count})`],
+          [/^Chưa đọc \((\d+)\)$/, (count) => `Unread (${count})`],
+          [/^Đã đọc \((\d+)\)$/, (count) => `Read (${count})`],
+          [/^Đã lưu (.+)$/, (time) => `Saved ${time}`],
+          [/^(\d+) phút$/, (minutes) => `${minutes} minutes`],
+          [/^(\d+) điểm$/, (points) => `${points} points`],
+          [/^Câu hỏi (\d+)\/(\d+)$/, (index, total) => `Question ${index} of ${total}`],
+          [/^Đã chọn (\d+) thông báo$/, (count) => `${count} notification(s) selected`],
+          [/^(\d+) đã chọn$/, (count) => `${count} selected`],
+          [/^(\d+) thành viên$/, (count) => `${count} members`],
+          [/^Bước (\d+)\/(\d+)$/, (current, total) => `Step ${current} of ${total}`],
+        ];
 
   for (const [pattern, formatter] of exactPatterns) {
     const match = value.match(pattern);
@@ -474,11 +495,21 @@ const translateDynamicText = (locale: LegacyLocale, value: string): string => {
     }
   }
 
-  const showingMatch = value.match(/^Showing (\d+)-(\d+) of (\d+) ([A-Za-z]+)(?:\(s\))?$/);
-  if (showingMatch) {
-    const [, start, end, total, unit] = showingMatch;
-    const translatedUnit = UNIT_TRANSLATIONS[unit.toLowerCase() as keyof typeof UNIT_TRANSLATIONS] ?? unit;
-    return `Hiển thị ${start}-${end} trên tổng số ${total} ${translatedUnit}`;
+  if (locale === "vi") {
+    const showingMatch = value.match(/^Showing (\d+)-(\d+) of (\d+) ([A-Za-z]+)(?:\(s\))?$/);
+    if (showingMatch) {
+      const [, start, end, total, unit] = showingMatch;
+      const translatedUnit = UNIT_TRANSLATIONS[unit.toLowerCase() as keyof typeof UNIT_TRANSLATIONS] ?? unit;
+      return `Hiển thị ${start}-${end} trên tổng số ${total} ${translatedUnit}`;
+    }
+  } else {
+    const showingMatch = value.match(/^Hiển thị (\d+)-(\d+) trên tổng số (\d+) (.+)$/);
+    if (showingMatch) {
+      const [, start, end, total, unit] = showingMatch;
+      const reverseUnit =
+        Object.entries(UNIT_TRANSLATIONS).find(([, vietnamese]) => vietnamese === unit)?.[0] ?? unit;
+      return `Showing ${start}-${end} of ${total} ${reverseUnit}`;
+    }
   }
 
   return value;
@@ -492,7 +523,7 @@ export function translateLegacyUiText(locale: string, value: string): string {
   }
 
   const translated =
-    (normalizedLocale === "vi" ? VI_EXACT_TRANSLATIONS[trimmed] : undefined) ??
+    (normalizedLocale === "vi" ? VI_EXACT_TRANSLATIONS[trimmed] : EN_EXACT_TRANSLATIONS[trimmed]) ??
     translateDynamicText(normalizedLocale, trimmed);
 
   if (translated === trimmed) {

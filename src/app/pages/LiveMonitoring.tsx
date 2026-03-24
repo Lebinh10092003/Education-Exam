@@ -51,6 +51,7 @@ import { getStoredTokens } from "../lib/storage";
 import { exportViolationHistoryExcel } from "./liveMonitoringExport";
 import {
   ALERTS_PAGE_SIZE,
+  CANDIDATE_CONNECTION_FILTER_OPTIONS,
   CANDIDATES_PAGE_SIZE,
   HISTORY_PAGE_SIZE,
   clampPage,
@@ -1033,7 +1034,7 @@ export function LiveMonitoring({ examId: examIdProp, embedded = false }: LiveMon
               <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr),180px,180px,180px]">
                 <div className="relative"><Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" /><Input aria-label="Search candidates" className="pl-10" placeholder="Search candidate name or email" value={candidateSearch} onChange={(event) => setCandidateSearch(event.target.value)} /></div>
                 <Select value={candidateStatusFilter} onValueChange={setCandidateStatusFilter}><SelectTrigger><SelectValue placeholder="All statuses" /></SelectTrigger><SelectContent><SelectItem value="all">All statuses</SelectItem><SelectItem value="not_started">Not started</SelectItem><SelectItem value="in_progress">In progress</SelectItem><SelectItem value="submitted">Submitted</SelectItem></SelectContent></Select>
-                <Select value={candidateConnectionFilter} onValueChange={setCandidateConnectionFilter}><SelectTrigger><SelectValue placeholder="All connections" /></SelectTrigger><SelectContent><SelectItem value="all">All connections</SelectItem><SelectItem value="stable">Stable</SelectItem><SelectItem value="intermittent">Intermittent</SelectItem><SelectItem value="offline">Offline</SelectItem></SelectContent></Select>
+                <Select value={candidateConnectionFilter} onValueChange={setCandidateConnectionFilter}><SelectTrigger><SelectValue placeholder="All connections" /></SelectTrigger><SelectContent>{CANDIDATE_CONNECTION_FILTER_OPTIONS.map((option) => <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>)}</SelectContent></Select>
                 <Select value={candidateWebcamFilter} onValueChange={setCandidateWebcamFilter}><SelectTrigger><SelectValue placeholder="All webcams" /></SelectTrigger><SelectContent><SelectItem value="all">All webcams</SelectItem><SelectItem value="publishing">Live available</SelectItem><SelectItem value="not_live">Not live</SelectItem></SelectContent></Select>
               </div>
 
@@ -1117,8 +1118,8 @@ export function LiveMonitoring({ examId: examIdProp, embedded = false }: LiveMon
       </Tabs>
 
       <Sheet open={selectedCaseId !== null} onOpenChange={(open) => (!open ? closeViolationCase() : undefined)}>
-        <SheetContent className="w-full overflow-y-auto sm:max-w-2xl">
-          <SheetHeader className="px-0 pt-0">
+        <SheetContent className="w-full overflow-y-auto px-6 py-6 sm:max-w-2xl">
+          <SheetHeader className="p-0 pr-12">
             <SheetTitle>Violation Detail</SheetTitle>
             <SheetDescription>Review evidence, notes, and current resolution state without leaving the monitoring workspace.</SheetDescription>
           </SheetHeader>

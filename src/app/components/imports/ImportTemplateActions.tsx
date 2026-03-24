@@ -83,7 +83,7 @@ export function ImportTemplateActions({
       </div>
 
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent className="max-w-5xl overflow-hidden">
+        <DialogContent className="overflow-hidden sm:max-w-5xl">
           <DialogHeader>
             <DialogTitle>{template.title}</DialogTitle>
             <DialogDescription>{template.description}</DialogDescription>

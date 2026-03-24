@@ -7,6 +7,7 @@ from .views import (
     CandidateSessionEvidenceView,
     CandidateSessionEventView,
     CandidateSessionHeartbeatView,
+    ExamMonitoringHubListView,
     CandidateSessionMediaPublishTokenView,
     CandidateSessionMediaStatusView,
     ExamMonitoringSnapshotView,
@@ -19,6 +20,11 @@ router = SimpleRouter()
 router.register("proctoring/cases", ViolationCaseViewSet, basename="proctoring-cases")
 
 urlpatterns = [
+    path(
+        "proctoring/exams/monitoring/",
+        ExamMonitoringHubListView.as_view(),
+        name="proctoring-exams-monitoring-hub",
+    ),
     path(
         "proctoring/cases/export/",
         ViolationCaseExportView.as_view(),

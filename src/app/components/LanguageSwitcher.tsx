@@ -1,4 +1,3 @@
-import { useEffect, useState } from "react";
 import { Languages } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
@@ -18,29 +17,17 @@ const normalizeLocale = (value: string | undefined): AppLocale =>
 
 export function LanguageSwitcher() {
   const { t, i18n } = useTranslation("common");
-  const [currentLocale, setCurrentLocale] = useState<AppLocale>(() =>
-    normalizeLocale(i18n.language || i18n.resolvedLanguage),
-  );
-
-  useEffect(() => {
-    const syncLocale = (locale?: string) => {
-      setCurrentLocale(normalizeLocale(locale ?? i18n.language ?? i18n.resolvedLanguage));
-    };
-
-    syncLocale();
-    i18n.on("languageChanged", syncLocale);
-
-    return () => {
-      i18n.off("languageChanged", syncLocale);
-    };
-  }, [i18n]);
+  const currentLocale = normalizeLocale(i18n.language ?? i18n.resolvedLanguage);
 
   const handleChange = async (locale: string) => {
     if (locale !== "vi" && locale !== "en") {
       return;
     }
 
-    setCurrentLocale(locale);
+    if (locale === currentLocale) {
+      return;
+    }
+
     setStoredLocale(locale);
     await i18n.changeLanguage(locale);
   };
@@ -53,7 +40,11 @@ export function LanguageSwitcher() {
           {currentLocale.toUpperCase()}
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-44">
+      <DropdownMenuContent
+        align="end"
+        className="w-44"
+        data-legacy-i18n-ignore="true"
+      >
         <DropdownMenuLabel>{t("locale.label")}</DropdownMenuLabel>
         <DropdownMenuRadioGroup value={currentLocale} onValueChange={(value) => void handleChange(value)}>
           <DropdownMenuRadioItem value="vi">{t("locale.vietnamese")}</DropdownMenuRadioItem>

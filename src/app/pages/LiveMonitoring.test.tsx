@@ -4,6 +4,7 @@ import { MemoryRouter, Route, Routes } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { LiveMonitoring } from "./LiveMonitoring";
+import { CANDIDATE_CONNECTION_FILTER_OPTIONS } from "./liveMonitoringShared";
 
 const mockApiRequest = vi.fn();
 const mockNotifyError = vi.fn();
@@ -279,6 +280,28 @@ describe("LiveMonitoring", () => {
     expect(screen.getByAltText(/webcam evidence/i)).toBeInTheDocument();
   });
 
+  it("applies consistent sheet padding for the violation detail panel", async () => {
+    const user = userEvent.setup();
+
+    render(
+      <MemoryRouter initialEntries={["/exams/1/monitor"]}>
+        <Routes>
+          <Route path="/exams/:id/monitor" element={<LiveMonitoring />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    await user.click(await screen.findByRole("tab", { name: /live alerts/i }));
+    await user.click((await screen.findAllByRole("button", { name: /view violation/i }))[0]);
+
+    const sheetTitle = await screen.findByText(/violation detail/i);
+    const sheetHeader = sheetTitle.closest('[data-slot="sheet-header"]');
+    const sheetContent = sheetTitle.closest('[data-slot="sheet-content"]');
+
+    expect(sheetHeader).toHaveClass("p-0", "pr-12");
+    expect(sheetContent).toHaveClass("px-6", "py-6");
+  });
+
   it("refreshes monitoring data automatically without a full page reload", async () => {
     vi.useFakeTimers();
     try {
@@ -310,5 +333,13 @@ describe("LiveMonitoring", () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+
+  it("defines an unstable connection filter that matches backend statuses", () => {
+    expect(CANDIDATE_CONNECTION_FILTER_OPTIONS).toContainEqual({
+      value: "unstable",
+      label: "Unstable",
+    });
+    expect(CANDIDATE_CONNECTION_FILTER_OPTIONS.some((option) => option.value === "intermittent")).toBe(false);
   });
 });

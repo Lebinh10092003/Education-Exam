@@ -23,6 +23,7 @@ import { StatCard } from "../components/StatCard";
 import { StatusBadge } from "../components/StatusBadge";
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
 import { Button } from "../components/ui/button";
+import { clampPercentage } from "../components/ui/utils";
 import { apiRequest } from "../lib/http";
 import { useAsyncList } from "../hooks/useAsyncList";
 
@@ -241,34 +242,43 @@ export function Dashboard() {
               </thead>
               <tbody>
                 {data?.recent_exams.map((exam) => (
-                  <tr key={exam.id} className="border-b border-gray-100">
-                    <td className="px-4 py-3">
-                      <Link className="font-medium text-gray-900 hover:text-blue-600" to={`/exams/${exam.id}/edit`}>
-                        {exam.name}
-                      </Link>
-                    </td>
-                    <td className="px-4 py-3 text-sm text-gray-600">{exam.subject}</td>
-                    <td className="px-4 py-3">
-                      <StatusBadge status={exam.status} />
-                    </td>
-                    <td className="px-4 py-3 text-sm text-gray-900">{exam.candidates}</td>
-                    <td className="px-4 py-3">
-                      <div className="flex items-center gap-2">
-                        <div className="h-2 max-w-[120px] flex-1 rounded-full bg-gray-200">
-                          <div
-                            className="h-2 rounded-full bg-blue-600"
-                            style={{
-                              width: `${exam.candidates > 0 ? (exam.completed / exam.candidates) * 100 : 0}%`,
-                            }}
-                          />
-                        </div>
-                        <span className="text-xs text-gray-600">
-                          {exam.completed}/{exam.candidates}
-                        </span>
-                      </div>
-                    </td>
-                    <td className="px-4 py-3 text-sm text-gray-600">{exam.time_left}</td>
-                  </tr>
+                  (() => {
+                    const completionPercentage =
+                      exam.candidates > 0
+                        ? clampPercentage((exam.completed / exam.candidates) * 100)
+                        : 0;
+
+                    return (
+                      <tr key={exam.id} className="border-b border-gray-100">
+                        <td className="px-4 py-3">
+                          <Link className="font-medium text-gray-900 hover:text-blue-600" to={`/exams/${exam.id}/edit`}>
+                            {exam.name}
+                          </Link>
+                        </td>
+                        <td className="px-4 py-3 text-sm text-gray-600">{exam.subject}</td>
+                        <td className="px-4 py-3">
+                          <StatusBadge status={exam.status} />
+                        </td>
+                        <td className="px-4 py-3 text-sm text-gray-900">{exam.candidates}</td>
+                        <td className="px-4 py-3">
+                          <div className="flex items-center gap-2">
+                            <div className="h-2 max-w-[120px] flex-1 overflow-hidden rounded-full bg-gray-200">
+                              <div
+                                className="h-2 rounded-full bg-blue-600"
+                                style={{
+                                  width: `${completionPercentage}%`,
+                                }}
+                              />
+                            </div>
+                            <span className="text-xs text-gray-600">
+                              {exam.completed}/{exam.candidates}
+                            </span>
+                          </div>
+                        </td>
+                        <td className="px-4 py-3 text-sm text-gray-600">{exam.time_left}</td>
+                      </tr>
+                    );
+                  })()
                 ))}
                 {!dashboard.isLoading && !data?.recent_exams.length ? (
                   <tr>

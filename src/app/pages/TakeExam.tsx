@@ -101,6 +101,16 @@ interface SubmissionSummary {
   manual_grading_required: boolean;
 }
 
+type ConnectionStatus = "stable" | "offline" | "unstable";
+
+type NavigatorConnectionInfo = {
+  effectiveType?: string;
+  rtt?: number;
+};
+
+const HEARTBEAT_INTERVAL_MS = 20_000;
+const DEGRADED_CONNECTION_RTT_MS = 1_500;
+
 const formatTime = (seconds: number) => {
   const clampedSeconds = Math.max(0, seconds);
   const hours = Math.floor(clampedSeconds / 3600);
@@ -122,6 +132,30 @@ const assignPreviewStream = (
   element.srcObject = stream;
 };
 
+const getNavigatorConnectionInfo = () =>
+  (navigator as Navigator & { connection?: NavigatorConnectionInfo }).connection;
+
+const getCandidateConnectionStatus = (failedHeartbeatCount: number): ConnectionStatus => {
+  if (!navigator.onLine) {
+    return "offline";
+  }
+
+  if (failedHeartbeatCount > 0) {
+    return "unstable";
+  }
+
+  const connectionInfo = getNavigatorConnectionInfo();
+  if (
+    connectionInfo?.effectiveType === "slow-2g"
+    || connectionInfo?.effectiveType === "2g"
+    || (typeof connectionInfo?.rtt === "number" && connectionInfo.rtt >= DEGRADED_CONNECTION_RTT_MS)
+  ) {
+    return "unstable";
+  }
+
+  return "stable";
+};
+
 export function TakeExam() {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -139,13 +173,14 @@ export function TakeExam() {
   const [proctoringReady, setProctoringReady] = useState(false);
   const [isProctoringSetupPending, setIsProctoringSetupPending] = useState(false);
   const [localPreviewStream, setLocalPreviewStream] = useState<MediaStream | null>(null);
-  const [connectionStatus, setConnectionStatus] = useState<"stable" | "offline" | "unstable">(
+  const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>(
     navigator.onLine ? "stable" : "offline",
   );
   const dirtyEssayQuestionIdsRef = useRef<Set<number>>(new Set());
   const latestQuestionIndexRef = useRef(0);
   const requestQueueRef = useRef(Promise.resolve());
   const heartbeatPendingRef = useRef(false);
+  const heartbeatFailureCountRef = useRef(0);
   const autosavePendingRef = useRef(false);
   const capabilityRegisteredSessionIdRef = useRef<number | null>(null);
   const captureResourcesRef = useRef<ProctoringCaptureResources | null>(null);
@@ -544,6 +579,7 @@ export function TakeExam() {
           });
           setLastSavedAt(response.created_at);
         } catch {
+          heartbeatFailureCountRef.current = Math.max(heartbeatFailureCountRef.current, 1);
           setConnectionStatus("unstable");
         } finally {
           autosavePendingRef.current = false;
@@ -572,19 +608,31 @@ export function TakeExam() {
         return;
       }
 
+      const nextStatus = getCandidateConnectionStatus(heartbeatFailureCountRef.current);
+      if (nextStatus === "offline") {
+        setConnectionStatus("offline");
+        return;
+      }
+
       heartbeatPendingRef.current = true;
-      const nextStatus = navigator.onLine ? "stable" : "offline";
-      setConnectionStatus(nextStatus);
+      const estimatedLatencyMs = getNavigatorConnectionInfo()?.rtt;
       void enqueueSessionMutation(async () => {
         try {
           await apiRequest(`/api/v1/proctoring/sessions/${session.id}/heartbeats/`, {
             method: "POST",
             body: {
               connection_status: nextStatus,
+              latency_ms:
+                typeof estimatedLatencyMs === "number" && Number.isFinite(estimatedLatencyMs)
+                  ? Math.round(Math.max(estimatedLatencyMs, 0))
+                  : undefined,
               payload: { current_question_index: latestQuestionIndexRef.current },
             },
           });
+          heartbeatFailureCountRef.current = 0;
+          setConnectionStatus(nextStatus);
         } catch {
+          heartbeatFailureCountRef.current += 1;
           setConnectionStatus("unstable");
         } finally {
           heartbeatPendingRef.current = false;
@@ -604,14 +652,14 @@ export function TakeExam() {
       }
     };
 
-    const handleOnline = () => setConnectionStatus("stable");
+    const handleOnline = () => setConnectionStatus("unstable");
     const handleOffline = () => setConnectionStatus("offline");
 
     sendHeartbeat();
 
     const heartbeatInterval = window.setInterval(() => {
       sendHeartbeat();
-    }, 20000);
+    }, HEARTBEAT_INTERVAL_MS);
 
     document.addEventListener("visibilitychange", handleVisibilityChange);
     document.addEventListener("fullscreenchange", handleFullscreenChange);

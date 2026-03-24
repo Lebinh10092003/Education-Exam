@@ -69,6 +69,12 @@ const examStudentCsvTemplate = [
   "Tran Thi Hoa,15/01/2004,12A1,012345678902,hoa@student.local,0901234568,SMOKE-SCHOOL",
 ].join("\n");
 
+const groupMembershipCsvTemplate = [
+  "full_name,email,phone_number,student_class,cccd,date_of_birth,school_code",
+  "Le Van Binh,,0901234567,12,012345678901,24/08/2003,SMOKE-SCHOOL",
+  "Tran Thi Hoa,hoa@student.local,0901234568,12A1,012345678902,15/01/2004,SMOKE-SCHOOL",
+].join("\n");
+
 export const questionImportTemplate: ImportTemplateDefinition = {
   title: "Question Import Template",
   description: "Use backend-compatible CSV or JSON rows so the question import endpoint can create revisioned questions directly.",
@@ -146,6 +152,29 @@ export const examStudentImportTemplate: ImportTemplateDefinition = {
       ],
       sample: examStudentCsvTemplate,
       downloadContent: examStudentCsvTemplate,
+    },
+  ],
+};
+
+export const groupMembershipImportTemplate: ImportTemplateDefinition = {
+  title: "Group Members Import Template",
+  description: "Import candidates or students into a specific group. The backend can match existing users by email or CCCD, or create new candidate accounts when needed.",
+  footerNote:
+    "Each row must include either email or CCCD. Use DD/MM/YYYY for date_of_birth, and school_code only when the member should belong to a specific school.",
+  formats: [
+    {
+      key: "csv",
+      label: "CSV",
+      fileName: "group-members-import-template.csv",
+      mimeType: "text/csv;charset=utf-8",
+      requiredFields: ["full_name", "student_class", "email or cccd"],
+      mappingNotes: [
+        "Provide email, CCCD, or both. At least one identifier is required so the backend can match or create the account.",
+        "date_of_birth must use DD/MM/YYYY, for example 24/08/2003.",
+        "If school_code matches an existing school, the imported profile will be linked to that school.",
+      ],
+      sample: groupMembershipCsvTemplate,
+      downloadContent: groupMembershipCsvTemplate,
     },
   ],
 };

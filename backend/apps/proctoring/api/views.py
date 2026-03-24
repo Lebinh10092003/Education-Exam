@@ -2,6 +2,7 @@ from drf_spectacular.types import OpenApiTypes
 from django.http import HttpResponse
 from django.shortcuts import get_object_or_404
 from drf_spectacular.utils import extend_schema
+from rest_framework import generics
 from rest_framework import mixins, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.parsers import FormParser, MultiPartParser
@@ -28,10 +29,12 @@ from ..services import (
     resolve_violation_case,
     update_media_status,
 )
-from .querysets import build_violation_case_queryset
+from .querysets import build_exam_monitoring_hub_queryset, build_exam_monitoring_hub_summary, build_violation_case_queryset
 from .serializers import (
     ClientCapabilitySerializer,
     ClientCapabilityWriteSerializer,
+    ExamMonitoringHubItemSerializer,
+    ExamMonitoringHubListResponseSerializer,
     ExamMonitoringSnapshotSerializer,
     MediaProviderTokenSerializer,
     ProctorEvidenceCreateSerializer,
@@ -193,6 +196,38 @@ class ExamMonitoringSnapshotView(APIView):
         payload = build_exam_monitoring_snapshot(exam=exam)
         serializer = ExamMonitoringSnapshotSerializer(payload)
         return Response(serializer.data)
+
+
+class ExamMonitoringHubListView(generics.ListAPIView):
+    permission_classes = [IsAuthenticated, HasAPIPermissionCode]
+    permission_code = "proctoring.view"
+    serializer_class = ExamMonitoringHubItemSerializer
+
+    @extend_schema(responses={status.HTTP_200_OK: ExamMonitoringHubListResponseSerializer})
+    def get(self, request, *args, **kwargs):
+        queryset = self.filter_queryset(self.get_queryset())
+        summary = build_exam_monitoring_hub_summary(queryset)
+        page = self.paginate_queryset(queryset)
+        if page is not None:
+            serializer = self.get_serializer(page, many=True)
+            response = self.get_paginated_response(serializer.data)
+            response.data["summary"] = summary
+            return response
+
+        serializer = self.get_serializer(queryset, many=True)
+        return Response(
+            {
+                "count": len(serializer.data),
+                "next": None,
+                "previous": None,
+                "results": serializer.data,
+                "summary": summary,
+            }
+        )
+
+    def get_queryset(self):
+        assert_admin_monitoring_access(user=self.request.user)
+        return build_exam_monitoring_hub_queryset(self.request)
 
 
 class ViolationCaseExportView(APIView):

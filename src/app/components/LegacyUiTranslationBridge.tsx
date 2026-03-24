@@ -5,6 +5,7 @@ import { translateLegacyUiText } from "../i18n/legacyUiFallback";
 
 const ATTRIBUTE_NAMES = ["placeholder", "title", "aria-label"] as const;
 const SKIP_TAG_NAMES = new Set(["SCRIPT", "STYLE", "TEXTAREA", "PRE", "CODE"]);
+const IGNORE_SELECTOR = "[data-legacy-i18n-ignore='true']";
 
 type AttributeName = (typeof ATTRIBUTE_NAMES)[number];
 
@@ -21,9 +22,12 @@ export function LegacyUiTranslationBridge() {
     const translate = (value: string) =>
       translateLegacyUiText(currentLanguageRef.current, value);
 
+    const isIgnoredElement = (element: Element | null) =>
+      Boolean(element?.closest(IGNORE_SELECTOR));
+
     const processTextNode = (node: Text) => {
       const parent = node.parentElement;
-      if (!parent || SKIP_TAG_NAMES.has(parent.tagName) || parent.closest("[data-legacy-i18n-ignore='true']")) {
+      if (!parent || SKIP_TAG_NAMES.has(parent.tagName) || isIgnoredElement(parent)) {
         return;
       }
 
@@ -39,6 +43,10 @@ export function LegacyUiTranslationBridge() {
     };
 
     const processElementAttributes = (element: Element) => {
+      if (isIgnoredElement(element)) {
+        return;
+      }
+
       const storedAttributes = attributeOriginalsRef.current.get(element) ?? {};
 
       for (const attributeName of ATTRIBUTE_NAMES) {
@@ -66,6 +74,10 @@ export function LegacyUiTranslationBridge() {
       }
 
       const element = node as Element;
+      if (isIgnoredElement(element)) {
+        return;
+      }
+
       processElementAttributes(element);
 
       const walker = document.createTreeWalker(element, NodeFilter.SHOW_TEXT);
@@ -119,6 +131,10 @@ export function LegacyUiTranslationBridge() {
         }
 
         if (mutation.type === "attributes" && mutation.target instanceof Element) {
+          if (isIgnoredElement(mutation.target)) {
+            continue;
+          }
+
           const attributeName = mutation.attributeName as AttributeName | null;
           if (attributeName && ATTRIBUTE_NAMES.includes(attributeName)) {
             const currentValue = mutation.target.getAttribute(attributeName);

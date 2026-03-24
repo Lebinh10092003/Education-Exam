@@ -1,7 +1,9 @@
 import { useMemo, useRef, useState, type ChangeEvent } from "react";
 import { notify } from "../lib/notify";
-import { Download, Eye, FileText, Plus, Search, Trash2, Upload } from "lucide-react";
+import { Download, Eye, ExternalLink, FileText, Plus, Search, Trash2, Upload } from "lucide-react";
+import { useTranslation } from "react-i18next";
 
+import { MaterialPreviewPanel } from "../components/materials/MaterialPreviewPanel";
 import { PageHeader } from "../components/PageHeader";
 import { Card, CardContent } from "../components/ui/card";
 import { Button } from "../components/ui/button";
@@ -26,6 +28,7 @@ import { Label } from "../components/ui/label";
 import { Badge } from "../components/ui/badge";
 import { Textarea } from "../components/ui/textarea";
 import { apiRequest, type PaginatedResponse } from "../lib/http";
+import { resolveMaterialFileUrl } from "../lib/materialPreview";
 import { useAsyncList } from "../hooks/useAsyncList";
 import { useDebouncedValue } from "../hooks/useDebouncedValue";
 import { useMutationState } from "../hooks/useMutationState";
@@ -87,11 +90,13 @@ const formatDate = (value: string) =>
   new Intl.DateTimeFormat("en-GB", { dateStyle: "medium", timeStyle: "short" }).format(new Date(value));
 
 export function MaterialsLibrary() {
+  const { t } = useTranslation(["common"]);
   const [searchQuery, setSearchQuery] = useState("");
   const [subjectFilter, setSubjectFilter] = useState("all");
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [formState, setFormState] = useState<MaterialFormState>(buildDefaultFormState());
   const [selectedMaterial, setSelectedMaterial] = useState<MaterialRecord | null>(null);
+  const [selectedMaterialPreviewUrl, setSelectedMaterialPreviewUrl] = useState("");
   const debouncedSearch = useDebouncedValue(searchQuery, 300);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const mutation = useMutationState();
@@ -123,25 +128,73 @@ export function MaterialsLibrary() {
     }
   };
 
-  const openMaterial = async (material: MaterialRecord) => {
-    try {
-      const payload = await apiRequest<{ file_url: string; download_count: number }>(
-        `/api/v1/materials/${material.id}/download/`,
-      );
-      materialsList.setData((previous) => {
-        if (!previous) {
-          return previous;
-        }
-        return {
-          ...previous,
-          results: previous.results.map((item) =>
-            item.id === material.id ? { ...item, download_count: payload.download_count } : item,
-          ),
-        };
+  const syncMaterialAccess = async (material: MaterialRecord) => {
+    const payload = await apiRequest<{ file_url: string; download_count: number }>(
+      `/api/v1/materials/${material.id}/download/`,
+    );
+
+    materialsList.setData((previous) => {
+      if (!previous) {
+        return previous;
+      }
+      return {
+        ...previous,
+        results: previous.results.map((item) =>
+          item.id === material.id
+            ? { ...item, file_url: payload.file_url || item.file_url, download_count: payload.download_count }
+            : item,
+        ),
+      };
+    });
+
+    setSelectedMaterial((current) =>
+      current?.id === material.id
+        ? {
+            ...current,
+            file_url: payload.file_url || current.file_url,
+            download_count: payload.download_count,
+          }
+        : current,
+    );
+
+    return resolveMaterialFileUrl(payload.file_url || material.file_url);
+  };
+
+  const openMaterialPreview = (material: MaterialRecord) => {
+    setSelectedMaterial(material);
+    setSelectedMaterialPreviewUrl(resolveMaterialFileUrl(material.file_url));
+
+    void syncMaterialAccess(material)
+      .then((resolvedUrl) => {
+        setSelectedMaterialPreviewUrl(resolvedUrl);
+      })
+      .catch((error) => {
+        const message = error instanceof Error ? error.message : "Unable to open material.";
+        notify.error(message);
       });
-      window.open(payload.file_url, "_blank", "noopener,noreferrer");
+  };
+
+  const openMaterialInNewTab = async (material: MaterialRecord) => {
+    try {
+      const resolvedUrl = await syncMaterialAccess(material);
+      window.open(resolvedUrl, "_blank", "noopener,noreferrer");
     } catch (error) {
       const message = error instanceof Error ? error.message : "Unable to open material.";
+      notify.error(message);
+    }
+  };
+
+  const downloadMaterial = async (material: MaterialRecord) => {
+    try {
+      const resolvedUrl = await syncMaterialAccess(material);
+      const anchor = document.createElement("a");
+      anchor.href = resolvedUrl;
+      anchor.download = material.file_name;
+      document.body.appendChild(anchor);
+      anchor.click();
+      document.body.removeChild(anchor);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unable to download material.";
       notify.error(message);
     }
   };
@@ -225,7 +278,7 @@ export function MaterialsLibrary() {
             <DialogTrigger asChild>
               <Button>
                 <Plus className="w-4 h-4 mr-2" />
-                Upload Material
+                {t("common:materials.uploadMaterial")}
               </Button>
             </DialogTrigger>
             <DialogContent className="max-w-lg">
@@ -299,10 +352,10 @@ export function MaterialsLibrary() {
               </div>
               <DialogFooter>
                 <Button variant="outline" onClick={() => setIsCreateDialogOpen(false)}>
-                  Cancel
+                  {t("common:actions.cancel")}
                 </Button>
                 <Button onClick={() => void saveMaterial()} disabled={mutation.isSubmitting}>
-                  {mutation.isSubmitting ? "Uploading..." : "Upload"}
+                  {mutation.isSubmitting ? "Uploading..." : t("common:actions.upload")}
                 </Button>
               </DialogFooter>
             </DialogContent>
@@ -371,7 +424,7 @@ export function MaterialsLibrary() {
                         <div>
                           <button
                             className="font-medium text-gray-900 hover:text-blue-600"
-                            onClick={() => setSelectedMaterial(material)}
+                            onClick={() => openMaterialPreview(material)}
                             type="button"
                           >
                             {material.title}
@@ -393,10 +446,10 @@ export function MaterialsLibrary() {
                     <td className="py-4 px-4 text-sm text-gray-600">{material.download_count}</td>
                     <td className="py-4 px-4">
                       <div className="flex gap-2">
-                        <Button size="sm" variant="ghost" onClick={() => setSelectedMaterial(material)}>
+                        <Button size="sm" variant="ghost" onClick={() => openMaterialPreview(material)}>
                           <Eye className="w-4 h-4" />
                         </Button>
-                        <Button size="sm" variant="ghost" onClick={() => void openMaterial(material)}>
+                        <Button size="sm" variant="ghost" onClick={() => void downloadMaterial(material)}>
                           <Download className="w-4 h-4" />
                         </Button>
                         <Button size="sm" variant="ghost" onClick={() => void deleteMaterial(material)}>
@@ -419,8 +472,16 @@ export function MaterialsLibrary() {
         </CardContent>
       </Card>
 
-      <Dialog open={selectedMaterial !== null} onOpenChange={(open) => !open && setSelectedMaterial(null)}>
-        <DialogContent className="max-w-lg">
+      <Dialog
+        open={selectedMaterial !== null}
+        onOpenChange={(open) => {
+          if (!open) {
+            setSelectedMaterial(null);
+            setSelectedMaterialPreviewUrl("");
+          }
+        }}
+      >
+        <DialogContent className="max-w-6xl sm:max-w-6xl">
           <DialogHeader>
             <DialogTitle>{selectedMaterial?.title}</DialogTitle>
             <DialogDescription>
@@ -428,41 +489,69 @@ export function MaterialsLibrary() {
             </DialogDescription>
           </DialogHeader>
           {selectedMaterial ? (
-            <div className="space-y-4 py-2">
-              <div className="rounded-lg border border-gray-200 bg-gray-50 p-4 text-sm text-gray-700">
-                {selectedMaterial.description || "No description provided."}
-              </div>
-              <div className="grid grid-cols-2 gap-3 text-sm">
-                <div>
-                  <p className="text-gray-500">File</p>
-                  <p className="font-medium text-gray-900">{selectedMaterial.file_name}</p>
+            <div className="grid gap-6 py-2 lg:grid-cols-[minmax(0,1.6fr),320px]">
+              <MaterialPreviewPanel
+                file_name={selectedMaterial.file_name}
+                file_url={selectedMaterialPreviewUrl || selectedMaterial.file_url}
+                mime_type={selectedMaterial.mime_type}
+                title={selectedMaterial.title}
+              />
+              <div className="space-y-4">
+                <div className="rounded-2xl border border-gray-200 bg-gray-50 p-4 text-sm text-gray-700">
+                  {selectedMaterial.description || "No description provided."}
                 </div>
-                <div>
-                  <p className="text-gray-500">Size</p>
-                  <p className="font-medium text-gray-900">{formatFileSize(selectedMaterial.file_size)}</p>
+                <div className="grid grid-cols-2 gap-3 text-sm">
+                  <div className="rounded-xl border border-gray-200 bg-white p-3">
+                    <p className="text-gray-500">File</p>
+                    <p className="font-medium text-gray-900">{selectedMaterial.file_name}</p>
+                  </div>
+                  <div className="rounded-xl border border-gray-200 bg-white p-3">
+                    <p className="text-gray-500">Size</p>
+                    <p className="font-medium text-gray-900">{formatFileSize(selectedMaterial.file_size)}</p>
+                  </div>
+                  <div className="rounded-xl border border-gray-200 bg-white p-3">
+                    <p className="text-gray-500">Downloads</p>
+                    <p className="font-medium text-gray-900">{selectedMaterial.download_count}</p>
+                  </div>
+                  <div className="rounded-xl border border-gray-200 bg-white p-3">
+                    <p className="text-gray-500">Uploaded By</p>
+                    <p className="font-medium text-gray-900">
+                      {selectedMaterial.uploaded_by.full_name || selectedMaterial.uploaded_by.email || "-"}
+                    </p>
+                  </div>
                 </div>
-                <div>
-                  <p className="text-gray-500">Downloads</p>
-                  <p className="font-medium text-gray-900">{selectedMaterial.download_count}</p>
-                </div>
-                <div>
-                  <p className="text-gray-500">Uploaded By</p>
-                  <p className="font-medium text-gray-900">
-                    {selectedMaterial.uploaded_by.full_name || selectedMaterial.uploaded_by.email || "-"}
-                  </p>
+                <div className="rounded-2xl border border-gray-200 bg-white p-4 text-sm">
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="text-gray-500">Type</span>
+                    <Badge variant="outline">
+                      {selectedMaterial.mime_type || selectedMaterial.file_name.split(".").at(-1)?.toUpperCase() || "FILE"}
+                    </Badge>
+                  </div>
                 </div>
               </div>
             </div>
           ) : null}
           <DialogFooter>
-            <Button variant="outline" onClick={() => setSelectedMaterial(null)}>
-              Close
+            <Button
+              variant="outline"
+              onClick={() => {
+                setSelectedMaterial(null);
+                setSelectedMaterialPreviewUrl("");
+              }}
+            >
+              {t("common:actions.close")}
             </Button>
             {selectedMaterial ? (
-              <Button onClick={() => void openMaterial(selectedMaterial)}>
-                <Eye className="w-4 h-4 mr-2" />
-                Open File
-              </Button>
+              <>
+                <Button variant="outline" onClick={() => void downloadMaterial(selectedMaterial)}>
+                  <Download className="w-4 h-4 mr-2" />
+                  {t("common:actions.download")}
+                </Button>
+                <Button onClick={() => void openMaterialInNewTab(selectedMaterial)}>
+                  <ExternalLink className="w-4 h-4 mr-2" />
+                  {t("common:actions.openInNewTab")}
+                </Button>
+              </>
             ) : null}
           </DialogFooter>
         </DialogContent>

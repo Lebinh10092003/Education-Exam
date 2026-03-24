@@ -29,6 +29,14 @@ import { apiRequest, type PaginatedResponse } from "../lib/http";
 import { useAsyncList } from "../hooks/useAsyncList";
 import { useDebouncedValue } from "../hooks/useDebouncedValue";
 import { useMutationState } from "../hooks/useMutationState";
+import { cn } from "../components/ui/utils";
+import {
+  DEFAULT_SUBJECT_COLOR,
+  generateSubjectCode,
+  getSubjectColorPresentation,
+  normalizeSubjectColorValue,
+  normalizeSubjectCodeInput,
+} from "./subjectManagementUtils";
 
 interface SubjectRecord {
   id: number;
@@ -52,20 +60,12 @@ interface SubjectFormState {
 }
 
 const PAGE_SIZE = 20;
-const COLOR_OPTIONS = [
-  "bg-blue-600",
-  "bg-emerald-600",
-  "bg-amber-500",
-  "bg-rose-600",
-  "bg-indigo-600",
-  "bg-slate-700",
-];
 
 const EMPTY_SUBJECT_FORM: SubjectFormState = {
   name: "",
   code: "",
   description: "",
-  color: COLOR_OPTIONS[0],
+  color: DEFAULT_SUBJECT_COLOR,
   is_active: true,
 };
 
@@ -73,7 +73,7 @@ const toSubjectFormState = (subject: SubjectRecord): SubjectFormState => ({
   name: subject.name,
   code: subject.code,
   description: subject.description,
-  color: subject.color,
+  color: normalizeSubjectColorValue(subject.color),
   is_active: subject.is_active,
 });
 
@@ -84,6 +84,7 @@ export function SubjectManagement() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingSubject, setEditingSubject] = useState<SubjectRecord | null>(null);
   const [formState, setFormState] = useState<SubjectFormState>(EMPTY_SUBJECT_FORM);
+  const [isCodeManuallyEdited, setIsCodeManuallyEdited] = useState(false);
 
   const debouncedSearch = useDebouncedValue(searchQuery, 350);
   const mutation = useMutationState();
@@ -105,16 +106,21 @@ export function SubjectManagement() {
   }, [debouncedSearch, activeFilter]);
 
   const subjects = subjectsList.data?.results ?? [];
+  const existingSubjectCodes = subjects.map((subject) => subject.code);
 
   const openCreateDialog = () => {
     setEditingSubject(null);
     setFormState(EMPTY_SUBJECT_FORM);
+    setIsCodeManuallyEdited(false);
     setIsDialogOpen(true);
   };
 
   const openEditDialog = (subject: SubjectRecord) => {
     setEditingSubject(subject);
     setFormState(toSubjectFormState(subject));
+    setIsCodeManuallyEdited(
+      normalizeSubjectCodeInput(subject.code) !== generateSubjectCode(subject.name, existingSubjectCodes, subject.code),
+    );
     setIsDialogOpen(true);
   };
 
@@ -123,12 +129,17 @@ export function SubjectManagement() {
     if (!nextOpen) {
       setEditingSubject(null);
       setFormState(EMPTY_SUBJECT_FORM);
+      setIsCodeManuallyEdited(false);
       mutation.setError(null);
     }
   };
 
   const saveSubject = async () => {
-    if (!formState.name.trim() || !formState.code.trim()) {
+    const resolvedCode =
+      normalizeSubjectCodeInput(formState.code) ||
+      generateSubjectCode(formState.name, existingSubjectCodes, editingSubject?.code ?? "");
+
+    if (!formState.name.trim() || !resolvedCode) {
       notify.error("Subject name and code are required.");
       return;
     }
@@ -136,9 +147,9 @@ export function SubjectManagement() {
     await mutation.run(async () => {
       const payload = {
         name: formState.name.trim(),
-        code: formState.code.trim().toUpperCase(),
+        code: resolvedCode,
         description: formState.description.trim(),
-        color: formState.color,
+        color: normalizeSubjectColorValue(formState.color),
         is_active: formState.is_active,
       };
 
@@ -158,6 +169,57 @@ export function SubjectManagement() {
       closeDialog(false);
       notify.success(editingSubject ? "Subject updated." : "Subject created.");
     });
+  };
+
+  const handleSubjectNameChange = (name: string) => {
+    setFormState((previous) => ({
+      ...previous,
+      name,
+      code: isCodeManuallyEdited
+        ? previous.code
+        : generateSubjectCode(name, existingSubjectCodes, editingSubject?.code ?? ""),
+    }));
+  };
+
+  const handleSubjectCodeChange = (value: string) => {
+    const normalizedCode = normalizeSubjectCodeInput(value);
+    setIsCodeManuallyEdited(normalizedCode.length > 0);
+    setFormState((previous) => ({
+      ...previous,
+      code: normalizedCode,
+    }));
+  };
+
+  const resetSubjectCode = () => {
+    setIsCodeManuallyEdited(false);
+    setFormState((previous) => ({
+      ...previous,
+      code: generateSubjectCode(previous.name, existingSubjectCodes, editingSubject?.code ?? ""),
+    }));
+  };
+
+  const handleSubjectColorChange = (value: string) => {
+    setFormState((previous) => ({
+      ...previous,
+      color: normalizeSubjectColorValue(value),
+    }));
+  };
+
+  const renderSubjectIcon = (color: string, className: string) => {
+    const presentation = getSubjectColorPresentation(color);
+
+    return (
+      <div
+        className={cn(
+          "flex items-center justify-center rounded-lg shadow-sm",
+          presentation.containerClassName,
+          className,
+        )}
+        style={presentation.containerStyle}
+      >
+        <BookOpen className="h-5 w-5" style={presentation.iconStyle} />
+      </div>
+    );
   };
 
   const deleteSubject = async (subject: SubjectRecord) => {
@@ -240,9 +302,7 @@ export function SubjectManagement() {
               subjects.map((subject) => (
                 <div key={subject.id} className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
                   <div className="flex items-start gap-3">
-                    <div className={`mt-0.5 flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-lg ${subject.color}`}>
-                      <BookOpen className="h-5 w-5 text-white" />
-                    </div>
+                    {renderSubjectIcon(subject.color, "mt-0.5 h-11 w-11 flex-shrink-0")}
                     <div className="min-w-0 flex-1">
                       <div className="flex flex-wrap items-center justify-between gap-2">
                         <div className="min-w-0">
@@ -336,11 +396,7 @@ export function SubjectManagement() {
                     >
                       <td className="py-4 px-4">
                         <div className="flex items-center gap-3">
-                          <div
-                            className={`w-10 h-10 ${subject.color} rounded-lg flex items-center justify-center`}
-                          >
-                            <BookOpen className="w-5 h-5 text-white" />
-                          </div>
+                          {renderSubjectIcon(subject.color, "h-10 w-10")}
                           <div>
                             <p className="font-medium text-gray-900">{subject.name}</p>
                             <p className="text-xs text-gray-500 mt-1">
@@ -434,23 +490,27 @@ export function SubjectManagement() {
                 id="subject-name"
                 className="mt-2"
                 value={formState.name}
-                onChange={(event) =>
-                  setFormState((previous) => ({ ...previous, name: event.target.value }))
-                }
+                onChange={(event) => handleSubjectNameChange(event.target.value)}
                 placeholder="e.g., Mathematics"
               />
             </div>
             <div>
-              <Label htmlFor="subject-code">Subject Code</Label>
+              <div className="flex items-center justify-between gap-3">
+                <Label htmlFor="subject-code">Subject Code</Label>
+                <Button type="button" variant="ghost" size="sm" onClick={resetSubjectCode}>
+                  Auto-generate
+                </Button>
+              </div>
               <Input
                 id="subject-code"
                 className="mt-2"
                 value={formState.code}
-                onChange={(event) =>
-                  setFormState((previous) => ({ ...previous, code: event.target.value }))
-                }
-                placeholder="e.g., MATH101"
+                onChange={(event) => handleSubjectCodeChange(event.target.value)}
+                placeholder="e.g., TCC or IMO"
               />
+              <p className="mt-2 text-xs text-gray-500">
+                Generated from the subject name using ASCII uppercase initials. Edit this field to override it.
+              </p>
             </div>
             <div>
               <Label htmlFor="subject-desc">Description</Label>
@@ -470,25 +530,22 @@ export function SubjectManagement() {
             </div>
             <div>
               <Label>Color Theme</Label>
-              <div className="flex gap-2 mt-2">
-                {COLOR_OPTIONS.map((color) => (
-                  <button
-                    key={color}
-                    type="button"
-                    className={`w-8 h-8 rounded-lg ${color} ring-offset-2 transition ${
-                      formState.color === color
-                        ? "ring-2 ring-gray-700"
-                        : "hover:ring-2 hover:ring-gray-300"
-                    }`}
-                    onClick={() =>
-                      setFormState((previous) => ({
-                        ...previous,
-                        color,
-                      }))
-                    }
-                  />
-                ))}
+              <div className="mt-2 flex items-center gap-3">
+                <Input
+                  aria-label="Subject color"
+                  type="color"
+                  className="h-11 w-16 cursor-pointer p-1"
+                  value={normalizeSubjectColorValue(formState.color)}
+                  onChange={(event) => handleSubjectColorChange(event.target.value)}
+                />
+                <Input
+                  readOnly
+                  value={normalizeSubjectColorValue(formState.color)}
+                  className="font-mono uppercase"
+                />
+                {renderSubjectIcon(formState.color, "h-11 w-11 flex-shrink-0")}
               </div>
+              <p className="mt-2 text-xs text-gray-500">Choose any RGB color. The picker supports the full 24-bit range.</p>
             </div>
             <label className="flex items-center gap-2 cursor-pointer">
               <Checkbox

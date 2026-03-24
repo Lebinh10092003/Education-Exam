@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Download, Edit, Lock, Plus, Search, Trash2, Unlock } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import { notify } from "../lib/notify";
 
 import { PageHeader } from "../components/PageHeader";
@@ -32,6 +33,7 @@ import { useAsyncList } from "../hooks/useAsyncList";
 import { useDebouncedValue } from "../hooks/useDebouncedValue";
 import { useMutationState } from "../hooks/useMutationState";
 import { useAuth } from "../auth/useAuth";
+import { getUserAccessActions, type UserAccessAction, type UserAccessStatus } from "./userManagementAccess";
 
 interface SchoolOption {
   id: number;
@@ -51,7 +53,7 @@ interface UserRecord {
   id: number;
   email: string;
   full_name: string;
-  status: "active" | "locked" | "pending";
+  status: UserAccessStatus;
   is_active: boolean;
   is_staff: boolean;
   phone_number: string;
@@ -65,7 +67,7 @@ interface UserFormState {
   email: string;
   password: string;
   phone_number: string;
-  status: "active" | "locked" | "pending";
+  status: UserAccessStatus;
   is_active: boolean;
   is_staff: boolean;
   school_id: string;
@@ -115,6 +117,7 @@ const toUserFormState = (user: UserRecord): UserFormState => ({
 });
 
 export function UserManagement() {
+  const { t } = useTranslation(["common"]);
   const { profile } = useAuth();
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedUsers, setSelectedUsers] = useState<number[]>([]);
@@ -294,7 +297,7 @@ export function UserManagement() {
     });
   };
 
-  const toggleLock = async (user: UserRecord) => {
+  const changeUserAccess = async (user: UserRecord, action: UserAccessAction) => {
     if (user.id === currentUserId) {
       await notify.error("You cannot lock your own account.", {
         title: "Action blocked",
@@ -303,7 +306,6 @@ export function UserManagement() {
       return;
     }
 
-    const action = user.status === "locked" ? "unlock" : "lock";
     const confirmed = await notify.confirm({
       title: action === "lock" ? "Lock this user?" : "Unlock this user?",
       text:
@@ -418,11 +420,11 @@ export function UserManagement() {
           <div className="flex gap-2">
             <Button variant="outline" onClick={() => setIsImportDialogOpen(true)}>
               <Download className="w-4 h-4 mr-2" />
-              Import CSV
+              {t("common:actions.importCsv")}
             </Button>
             <Button onClick={openCreateDialog}>
               <Plus className="w-4 h-4 mr-2" />
-              Add User
+              {t("common:actions.addUser")}
             </Button>
           </div>
         }
@@ -564,24 +566,27 @@ export function UserManagement() {
                           <Edit className="mr-2 h-4 w-4" />
                           Edit
                         </Button>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => void toggleLock(user)}
-                          disabled={userMutation.isSubmitting || user.id === currentUserId}
-                        >
-                          {user.status === "locked" ? (
-                            <>
-                              <Unlock className="mr-2 h-4 w-4 text-green-600" />
-                              Unlock
-                            </>
-                          ) : (
-                            <>
-                              <Lock className="mr-2 h-4 w-4 text-amber-600" />
-                              Lock
-                            </>
-                          )}
-                        </Button>
+                        {getUserAccessActions(user.status).map((action) => (
+                          <Button
+                            key={action}
+                            size="sm"
+                            variant="outline"
+                            onClick={() => void changeUserAccess(user, action)}
+                            disabled={userMutation.isSubmitting || user.id === currentUserId}
+                          >
+                            {action === "unlock" ? (
+                              <>
+                                <Unlock className="mr-2 h-4 w-4 text-green-600" />
+                                Unlock
+                              </>
+                            ) : (
+                              <>
+                                <Lock className="mr-2 h-4 w-4 text-amber-600" />
+                                Lock
+                              </>
+                            )}
+                          </Button>
+                        ))}
                         <Button
                           size="sm"
                           variant="outline"
@@ -688,18 +693,21 @@ export function UserManagement() {
                           <Button size="sm" variant="ghost" onClick={() => openEditDialog(user)}>
                             <Edit className="w-4 h-4" />
                           </Button>
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            onClick={() => void toggleLock(user)}
-                            disabled={userMutation.isSubmitting || user.id === currentUserId}
-                          >
-                            {user.status === "locked" ? (
-                              <Unlock className="w-4 h-4 text-green-600" />
-                            ) : (
-                              <Lock className="w-4 h-4 text-amber-600" />
-                            )}
-                          </Button>
+                          {getUserAccessActions(user.status).map((action) => (
+                            <Button
+                              key={action}
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => void changeUserAccess(user, action)}
+                              disabled={userMutation.isSubmitting || user.id === currentUserId}
+                            >
+                              {action === "unlock" ? (
+                                <Unlock className="w-4 h-4 text-green-600" />
+                              ) : (
+                                <Lock className="w-4 h-4 text-amber-600" />
+                              )}
+                            </Button>
+                          ))}
                           <Button
                             size="sm"
                             variant="ghost"

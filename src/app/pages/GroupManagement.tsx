@@ -3,6 +3,7 @@ import { Edit, Plus, Search, Trash2, UserPlus, Users } from "lucide-react";
 import { notify } from "../lib/notify";
 
 import { PageHeader } from "../components/PageHeader";
+import { ImportTemplateActions } from "../components/imports/ImportTemplateActions";
 import { Badge } from "../components/ui/badge";
 import { Button } from "../components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
@@ -26,6 +27,7 @@ import {
 } from "../components/ui/select";
 import { Textarea } from "../components/ui/textarea";
 import { apiRequest, type PaginatedResponse } from "../lib/http";
+import { groupMembershipImportTemplate } from "../lib/importTemplates";
 import { useAsyncList } from "../hooks/useAsyncList";
 import { useDebouncedValue } from "../hooks/useDebouncedValue";
 import { useMutationState } from "../hooks/useMutationState";
@@ -602,8 +604,8 @@ export function GroupManagement() {
       </Dialog>
 
       <Dialog open={Boolean(membersDialogGroup)} onOpenChange={closeMembersDialog}>
-        <DialogContent className="max-w-3xl">
-          <DialogHeader>
+        <DialogContent className="flex max-h-[min(92dvh,56rem)] sm:max-w-5xl flex-col overflow-hidden p-0">
+          <DialogHeader className="shrink-0 border-b border-gray-200 px-4 py-4 pr-12 sm:px-6 sm:py-5">
             <DialogTitle>
               Add Members to {membersDialogGroup?.name ?? "Group"}
             </DialogTitle>
@@ -611,15 +613,30 @@ export function GroupManagement() {
               Search candidate or student accounts, or import them from CSV, then add them to this group.
             </DialogDescription>
           </DialogHeader>
-          <div className="grid gap-6 py-4 lg:grid-cols-[1.2fr,0.8fr]">
-            <div className="space-y-4">
+          <div className="flex-1 overflow-hidden px-4 py-4 sm:px-6 sm:py-5">
+            <div className="grid h-full min-h-0 gap-6 lg:grid-cols-[minmax(0,1.2fr),minmax(18rem,0.8fr)]">
+            <div className="flex min-h-0 flex-col space-y-4">
               <div className="rounded-lg border border-dashed border-blue-200 bg-blue-50/60 p-4">
                 <div className="flex flex-col gap-3">
-                  <div>
-                    <h3 className="text-sm font-semibold text-gray-900">Import Members from CSV</h3>
-                    <p className="mt-1 text-xs text-gray-600">
-                      Supported columns: <code>full_name,email,phone_number,student_class,cccd,date_of_birth,school_code</code>
-                    </p>
+                  <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                    <div className="min-w-0">
+                      <h3 className="text-sm font-semibold text-gray-900">Import Members from CSV</h3>
+                      <p className="mt-1 text-xs text-gray-600">
+                        Supported columns:{" "}
+                        <code className="whitespace-normal break-all">
+                          full_name,email,phone_number,student_class,cccd,date_of_birth,school_code
+                        </code>
+                      </p>
+                      <p className="mt-2 text-xs text-gray-500">
+                        Preview the expected CSV structure or download a starter template before importing.
+                      </p>
+                    </div>
+                    <div className="shrink-0">
+                      <ImportTemplateActions
+                        template={groupMembershipImportTemplate}
+                        selectedFormat="csv"
+                      />
+                    </div>
                   </div>
                   <Input
                     key={importInputKey}
@@ -627,7 +644,7 @@ export function GroupManagement() {
                     accept=".csv,text/csv"
                     onChange={(event) => setImportFile(event.target.files?.[0] ?? null)}
                   />
-                  <div className="flex items-center justify-between gap-3">
+                  <div className="flex flex-wrap items-center justify-between gap-3">
                     <p className="text-xs text-gray-500">
                       {importFile ? importFile.name : "No CSV file selected."}
                     </p>
@@ -681,7 +698,8 @@ export function GroupManagement() {
                 />
               </div>
 
-              <div className="border rounded-lg max-h-80 overflow-y-auto divide-y">
+              <div className="min-h-0 flex-1 overflow-hidden rounded-lg border">
+              <div className="h-full overflow-y-auto divide-y">
                 {candidateSearchResults.isLoading ? (
                   <div className="p-4 text-sm text-gray-500">Loading candidate list...</div>
                 ) : availableCandidates.length === 0 ? (
@@ -716,13 +734,15 @@ export function GroupManagement() {
                 )}
               </div>
             </div>
+            </div>
 
-            <div className="rounded-lg border border-gray-200 p-4">
+            <div className="flex min-h-0 flex-col rounded-lg border border-gray-200 p-4">
               <div className="flex items-center justify-between gap-3">
                 <h3 className="text-sm font-semibold text-gray-900">Current Members</h3>
                 <Badge variant="outline">{memberships.length}</Badge>
               </div>
-              <div className="mt-4 space-y-3 max-h-72 overflow-y-auto">
+              <div className="mt-4 min-h-[14rem] flex-1 overflow-y-auto pr-1">
+                <div className="space-y-3">
                 {membershipsList.isLoading ? (
                   <p className="text-sm text-gray-500">Loading members...</p>
                 ) : memberships.length === 0 ? (
@@ -740,10 +760,12 @@ export function GroupManagement() {
                     </div>
                   ))
                 )}
+                </div>
               </div>
             </div>
           </div>
-          <DialogFooter>
+          </div>
+          <DialogFooter className="shrink-0 border-t border-gray-200 px-4 py-4 sm:px-6">
             <Button variant="outline" onClick={() => closeMembersDialog(false)}>
               Close
             </Button>

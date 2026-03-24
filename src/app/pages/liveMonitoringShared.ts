@@ -113,6 +113,12 @@ export const MONITORING_TABS: MonitoringWorkspaceTab[] = [
 export const ALERTS_PAGE_SIZE = 8;
 export const CANDIDATES_PAGE_SIZE = 8;
 export const HISTORY_PAGE_SIZE = 10;
+export const CANDIDATE_CONNECTION_FILTER_OPTIONS = [
+  { value: "all", label: "All connections" },
+  { value: "stable", label: "Stable" },
+  { value: "unstable", label: "Unstable" },
+  { value: "offline", label: "Offline" },
+] as const;
 
 export const formatDate = (value: string | null) =>
   value
@@ -256,4 +262,3 @@ export const parseMonitoringTab = (value: string | null): MonitoringWorkspaceTab
   }
   return "overview";
 };
-

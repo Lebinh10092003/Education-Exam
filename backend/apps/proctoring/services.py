@@ -10,6 +10,7 @@ from django.utils import timezone
 from rest_framework.exceptions import PermissionDenied, ValidationError
 
 from apps.exam_authoring.models import Exam, ExamAssignment
+from apps.exam_delivery.models import ExamSession
 from apps.notifications.models import Notification
 from apps.notifications.services import create_notifications_for_permission
 from apps.platform_core.audit import record_audit_event
@@ -122,6 +123,50 @@ def _latest_session_by_candidate(exam):
     for session in sessions:
         latest.setdefault(session.candidate_id, session)
     return latest
+
+
+def _get_connection_timeout(setting_name, default_value):
+    raw_value = getattr(settings, setting_name, default_value)
+    try:
+        return max(int(raw_value), 0)
+    except (TypeError, ValueError):
+        return default_value
+
+
+def _resolve_session_connection_status(*, session, last_heartbeat, now):
+    if last_heartbeat is None:
+        return SessionHeartbeat.ConnectionStatus.OFFLINE
+
+    if session.status != ExamSession.Status.IN_PROGRESS:
+        return SessionHeartbeat.ConnectionStatus.OFFLINE
+
+    if last_heartbeat.connection_status == SessionHeartbeat.ConnectionStatus.OFFLINE:
+        return SessionHeartbeat.ConnectionStatus.OFFLINE
+
+    unstable_after_seconds = _get_connection_timeout("PROCTORING_HEARTBEAT_UNSTABLE_AFTER_SECONDS", 45)
+    offline_after_seconds = max(
+        unstable_after_seconds,
+        _get_connection_timeout("PROCTORING_HEARTBEAT_OFFLINE_AFTER_SECONDS", 90),
+    )
+    heartbeat_age = now - last_heartbeat.recorded_at
+
+    if heartbeat_age >= timezone.timedelta(seconds=offline_after_seconds):
+        return SessionHeartbeat.ConnectionStatus.OFFLINE
+
+    if (
+        last_heartbeat.connection_status == SessionHeartbeat.ConnectionStatus.UNSTABLE
+        or heartbeat_age >= timezone.timedelta(seconds=unstable_after_seconds)
+    ):
+        return SessionHeartbeat.ConnectionStatus.UNSTABLE
+
+    return last_heartbeat.connection_status
+
+
+def _sync_session_status_for_monitoring(*, session, now):
+    if session.status == ExamSession.Status.IN_PROGRESS and session.expires_at <= now:
+        session.status = ExamSession.Status.EXPIRED
+        session.save(update_fields=["status", "updated_at"])
+    return session.status
 
 
 @transaction.atomic
@@ -321,6 +366,7 @@ def build_exam_monitoring_snapshot(*, exam):
     assigned_candidates = list(_assigned_candidates_for_exam(exam))
     latest_sessions = _latest_session_by_candidate(exam)
     candidate_statuses = []
+    now = timezone.now()
 
     for candidate in assigned_candidates:
         session = latest_sessions.get(candidate.id)
@@ -352,9 +398,15 @@ def build_exam_monitoring_snapshot(*, exam):
         total_questions = session.questions.count()
         answered_count = session.questions.filter(answer__is_answered=True).count()
         progress_percentage = int((answered_count / total_questions) * 100) if total_questions else 0
-        last_heartbeat = session.heartbeats.order_by("-recorded_at").first()
+        session_status = _sync_session_status_for_monitoring(session=session, now=now)
+        last_heartbeat = next(iter(session.heartbeats.all()), None)
         media_state = getattr(session, "proctoring_media_state", None)
-        end_time = session.submitted_at or timezone.now()
+        end_time = session.submitted_at or now
+        connection_status = _resolve_session_connection_status(
+            session=session,
+            last_heartbeat=last_heartbeat,
+            now=now,
+        )
         candidate_statuses.append(
             {
                 "session_id": session.id,
@@ -363,12 +415,12 @@ def build_exam_monitoring_snapshot(*, exam):
                     "email": candidate.email,
                     "full_name": candidate.full_name,
                 },
-                "status": session.status,
+                "status": session_status,
                 "progress_percentage": progress_percentage,
                 "questions_answered": answered_count,
                 "total_questions": total_questions,
                 "time_elapsed_minutes": max(0, int((end_time - session.started_at).total_seconds() // 60)),
-                "connection_status": last_heartbeat.connection_status if last_heartbeat else "offline",
+                "connection_status": connection_status,
                 "last_activity_at": session.last_activity_at.isoformat() if session.last_activity_at else None,
                 "media": {
                     "webcam_publish_status": (

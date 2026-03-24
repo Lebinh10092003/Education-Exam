@@ -63,6 +63,7 @@ describe("route configuration", () => {
     expect(matchRoutes(routeConfig, "/exam-periods")).toBeTruthy();
     expect(matchRoutes(routeConfig, "/exam-rooms")).toBeTruthy();
     expect(matchRoutes(routeConfig, "/roles-permissions")).toBeTruthy();
+    expect(matchRoutes(routeConfig, "/exams/monitoring")?.at(-1)?.route.path).toBe("exams/monitoring");
     expect(matchRoutes(routeConfig, "/exams/42")).toBeTruthy();
     expect(matchRoutes(routeConfig, "/exams/42/monitor")).toBeTruthy();
   });
@@ -103,6 +104,9 @@ describe("protected layouts", () => {
     );
 
     expect(await screen.findAllByText("Tổng quan")).not.toHaveLength(0);
+    expect(screen.getAllByText("Quản lý kỳ thi")).not.toHaveLength(0);
+    expect(screen.queryByText("Danh sách kỳ thi")).not.toBeInTheDocument();
+    expect(screen.queryByText("Giám sát trực tiếp")).not.toBeInTheDocument();
   });
 
   it("renders the shared candidate shell for authenticated candidates", async () => {

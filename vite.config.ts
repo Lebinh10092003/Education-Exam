@@ -3,6 +3,23 @@ import path from 'path'
 import tailwindcss from '@tailwindcss/vite'
 import react from '@vitejs/plugin-react'
 
+const belongsToPackage = (id: string, pkg: string) =>
+  id.includes(`/node_modules/${pkg}/`) || id.includes(`\\node_modules\\${pkg}\\`)
+
+const isDocPreviewDependency = (id: string) =>
+  [
+    'mammoth',
+    'jszip',
+    '@xmldom/xmldom',
+    'xmlbuilder',
+    'dingbat-to-unicode',
+    'base64-js',
+    'lop',
+    'path-is-absolute',
+    'underscore',
+    'bluebird',
+  ].some((pkg) => belongsToPackage(id, pkg))
+
 export default defineConfig({
   plugins: [
     // The React and Tailwind plugins are both required for Make, even if
@@ -19,6 +36,10 @@ export default defineConfig({
   server: {
     proxy: {
       "/api": {
+        target: "http://127.0.0.1:8000",
+        changeOrigin: true,
+      },
+      "/media": {
         target: "http://127.0.0.1:8000",
         changeOrigin: true,
       },
@@ -55,6 +76,9 @@ export default defineConfig({
           }
           if (id.includes('lucide-react')) {
             return 'vendor-icons'
+          }
+          if (isDocPreviewDependency(id)) {
+            return 'vendor-doc-preview'
           }
           return 'vendor'
         },

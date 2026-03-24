@@ -26,6 +26,7 @@ De chay dung du an hien tai sau khi clone, local can:
 - SQLite local cho database
 - Redis local cho websocket va realtime monitoring
 - LiveKit local cho webcam live proctoring
+- Celery worker va Celery beat neu muon evidence proctoring tu dong bi don sau khi het han
 
 PostgreSQL va MinIO hien khong bat buoc de chay local.
 
@@ -62,6 +63,7 @@ $envContent = $envContent -replace '^PROCTORING_MEDIA_API_SECRET=.*', 'PROCTORIN
 $envContent = $envContent -replace '^PROCTORING_MEDIA_ROOM_PREFIX=.*', 'PROCTORING_MEDIA_ROOM_PREFIX=eduexam-'
 $envContent = $envContent -replace '^PROCTORING_MEDIA_TOKEN_TTL_SECONDS=.*', 'PROCTORING_MEDIA_TOKEN_TTL_SECONDS=900'
 $envContent = $envContent -replace '^PROCTORING_EVIDENCE_RETENTION_DAYS=.*', 'PROCTORING_EVIDENCE_RETENTION_DAYS=15'
+$envContent = $envContent -replace '^PROCTORING_EVIDENCE_CLEANUP_INTERVAL_SECONDS=.*', 'PROCTORING_EVIDENCE_CLEANUP_INTERVAL_SECONDS=3600'
 $envContent | Set-Content .env
 
 if (-not (Select-String -Path .env -Pattern '^DATABASE_URL=' -Quiet)) { Add-Content .env "DATABASE_URL=sqlite:///$dbPath" }
@@ -76,6 +78,7 @@ if (-not (Select-String -Path .env -Pattern '^PROCTORING_MEDIA_API_SECRET=' -Qui
 if (-not (Select-String -Path .env -Pattern '^PROCTORING_MEDIA_ROOM_PREFIX=' -Quiet)) { Add-Content .env 'PROCTORING_MEDIA_ROOM_PREFIX=eduexam-' }
 if (-not (Select-String -Path .env -Pattern '^PROCTORING_MEDIA_TOKEN_TTL_SECONDS=' -Quiet)) { Add-Content .env 'PROCTORING_MEDIA_TOKEN_TTL_SECONDS=900' }
 if (-not (Select-String -Path .env -Pattern '^PROCTORING_EVIDENCE_RETENTION_DAYS=' -Quiet)) { Add-Content .env 'PROCTORING_EVIDENCE_RETENTION_DAYS=15' }
+if (-not (Select-String -Path .env -Pattern '^PROCTORING_EVIDENCE_CLEANUP_INTERVAL_SECONDS=' -Quiet)) { Add-Content .env 'PROCTORING_EVIDENCE_CLEANUP_INTERVAL_SECONDS=3600' }
 
 docker compose up -d redis livekit
 
@@ -97,6 +100,28 @@ Frontend:
 ```powershell
 cd Education-Exam
 npm.cmd run dev
+```
+
+Celery worker:
+
+```powershell
+cd Education-Exam\backend
+.\.venv\Scripts\celery.exe -A config worker -l info --pool=solo
+```
+
+Celery beat:
+
+```powershell
+cd Education-Exam\backend
+.\.venv\Scripts\celery.exe -A config beat -l info
+```
+
+Neu worker va beat dang chay, evidence proctoring het han se duoc don dinh ky theo `PROCTORING_EVIDENCE_CLEANUP_INTERVAL_SECONDS`.
+Neu can chay tay ngay lap tuc:
+
+```powershell
+cd Education-Exam\backend
+.\.venv\Scripts\python.exe manage.py cleanup_expired_proctor_evidence
 ```
 
 Truy cap:
@@ -174,6 +199,7 @@ $envContent = $envContent -replace '^PROCTORING_MEDIA_API_SECRET=.*', 'PROCTORIN
 $envContent = $envContent -replace '^PROCTORING_MEDIA_ROOM_PREFIX=.*', 'PROCTORING_MEDIA_ROOM_PREFIX=eduexam-'
 $envContent = $envContent -replace '^PROCTORING_MEDIA_TOKEN_TTL_SECONDS=.*', 'PROCTORING_MEDIA_TOKEN_TTL_SECONDS=900'
 $envContent = $envContent -replace '^PROCTORING_EVIDENCE_RETENTION_DAYS=.*', 'PROCTORING_EVIDENCE_RETENTION_DAYS=15'
+$envContent = $envContent -replace '^PROCTORING_EVIDENCE_CLEANUP_INTERVAL_SECONDS=.*', 'PROCTORING_EVIDENCE_CLEANUP_INTERVAL_SECONDS=3600'
 $envContent | Set-Content .env
 
 if (-not (Select-String -Path .env -Pattern '^DATABASE_URL=' -Quiet)) { Add-Content .env "DATABASE_URL=sqlite:///$dbPath" }
@@ -188,6 +214,7 @@ if (-not (Select-String -Path .env -Pattern '^PROCTORING_MEDIA_API_SECRET=' -Qui
 if (-not (Select-String -Path .env -Pattern '^PROCTORING_MEDIA_ROOM_PREFIX=' -Quiet)) { Add-Content .env 'PROCTORING_MEDIA_ROOM_PREFIX=eduexam-' }
 if (-not (Select-String -Path .env -Pattern '^PROCTORING_MEDIA_TOKEN_TTL_SECONDS=' -Quiet)) { Add-Content .env 'PROCTORING_MEDIA_TOKEN_TTL_SECONDS=900' }
 if (-not (Select-String -Path .env -Pattern '^PROCTORING_EVIDENCE_RETENTION_DAYS=' -Quiet)) { Add-Content .env 'PROCTORING_EVIDENCE_RETENTION_DAYS=15' }
+if (-not (Select-String -Path .env -Pattern '^PROCTORING_EVIDENCE_CLEANUP_INTERVAL_SECONDS=' -Quiet)) { Add-Content .env 'PROCTORING_EVIDENCE_CLEANUP_INTERVAL_SECONDS=3600' }
 
 docker compose up -d redis livekit
 

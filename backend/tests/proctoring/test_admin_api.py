@@ -8,6 +8,161 @@ from .utils import build_active_session
 
 
 @pytest.mark.django_db
+def test_admin_can_fetch_exam_monitoring_hub(api_client, admin_token, subject, admin_user, candidate_user):
+    from apps.identity.models import User
+    from apps.proctoring.services import record_proctor_event
+
+    exam, session = build_active_session(
+        subject=subject,
+        admin_user=admin_user,
+        candidate_user=candidate_user,
+        exam_name="Calculus Monitoring",
+    )
+    exam.enable_proctoring = True
+    exam.status = "open"
+    exam.save(update_fields=["enable_proctoring", "status", "updated_at"])
+
+    quiet_candidate = User.objects.create_user(
+        username="quietcandidate",
+        email="quietcandidate@example.com",
+        password="admin123456",
+        full_name="Quiet Candidate",
+        status="active",
+    )
+    quiet_exam, _ = build_active_session(
+        subject=subject,
+        admin_user=admin_user,
+        candidate_user=quiet_candidate,
+        exam_name="Quiet Monitoring",
+    )
+    quiet_exam.enable_proctoring = True
+    quiet_exam.status = "paused"
+    quiet_exam.save(update_fields=["enable_proctoring", "status", "updated_at"])
+
+    record_proctor_event(
+        session=session,
+        event_type="tab_switch",
+        severity="warning",
+        metadata={"message": "Candidate switched tabs."},
+        reported_by=candidate_user,
+    )
+    record_proctor_event(
+        session=session,
+        event_type="fullscreen_exit",
+        severity="critical",
+        metadata={"message": "Candidate exited fullscreen."},
+        reported_by=candidate_user,
+    )
+
+    api_client.credentials(HTTP_AUTHORIZATION=f"Bearer {admin_token}")
+    response = api_client.get("/api/v1/proctoring/exams/monitoring/")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["count"] == 2
+    assert payload["summary"] == {
+        "exam_count": 2,
+        "total_candidates": 2,
+        "in_progress_sessions": 2,
+        "alert_count": 2,
+        "critical_exam_count": 1,
+    }
+    first_result = payload["results"][0]
+    assert first_result["name"] == "Calculus Monitoring"
+    assert first_result["total_candidates"] == 1
+    assert first_result["in_progress_sessions"] == 1
+    assert first_result["alert_count"] == 2
+    assert first_result["critical_alert_count"] == 1
+    assert first_result["highest_alert_severity"] == "critical"
+
+
+@pytest.mark.django_db
+def test_exam_monitoring_hub_supports_filters(api_client, admin_token, subject, admin_user, candidate_user):
+    from apps.identity.models import User
+    from apps.proctoring.services import record_proctor_event
+
+    critical_exam, critical_session = build_active_session(
+        subject=subject,
+        admin_user=admin_user,
+        candidate_user=candidate_user,
+        exam_name="Physics Critical Room",
+    )
+    critical_exam.enable_proctoring = True
+    critical_exam.status = "open"
+    critical_exam.save(update_fields=["enable_proctoring", "status", "updated_at"])
+    record_proctor_event(
+        session=critical_session,
+        event_type="fullscreen_exit",
+        severity="critical",
+        metadata={"message": "Critical alert."},
+        reported_by=candidate_user,
+    )
+
+    quiet_candidate = User.objects.create_user(
+        username="searchcandidate",
+        email="searchcandidate@example.com",
+        password="admin123456",
+        full_name="Search Candidate",
+        status="active",
+    )
+    quiet_exam, _ = build_active_session(
+        subject=subject,
+        admin_user=admin_user,
+        candidate_user=quiet_candidate,
+        exam_name="Chemistry Quiet Room",
+    )
+    quiet_exam.enable_proctoring = True
+    quiet_exam.status = "paused"
+    quiet_exam.save(update_fields=["enable_proctoring", "status", "updated_at"])
+
+    warning_candidate = User.objects.create_user(
+        username="warningcandidate",
+        email="warningcandidate@example.com",
+        password="admin123456",
+        full_name="Warning Candidate",
+        status="active",
+    )
+    warning_exam, warning_session = build_active_session(
+        subject=subject,
+        admin_user=admin_user,
+        candidate_user=warning_candidate,
+        exam_name="Biology Warning Room",
+    )
+    warning_exam.enable_proctoring = True
+    warning_exam.status = "open"
+    warning_exam.save(update_fields=["enable_proctoring", "status", "updated_at"])
+    record_proctor_event(
+        session=warning_session,
+        event_type="tab_switch",
+        severity="warning",
+        metadata={"message": "Warning alert."},
+        reported_by=warning_candidate,
+    )
+
+    api_client.credentials(HTTP_AUTHORIZATION=f"Bearer {admin_token}")
+
+    critical_response = api_client.get("/api/v1/proctoring/exams/monitoring/", {"severity": "critical"})
+    assert critical_response.status_code == 200
+    assert critical_response.json()["count"] == 1
+    assert critical_response.json()["results"][0]["name"] == "Physics Critical Room"
+
+    warning_response = api_client.get("/api/v1/proctoring/exams/monitoring/", {"severity": "warning"})
+    assert warning_response.status_code == 200
+    assert warning_response.json()["count"] == 1
+    assert warning_response.json()["results"][0]["name"] == "Biology Warning Room"
+
+    quiet_response = api_client.get("/api/v1/proctoring/exams/monitoring/", {"severity": "quiet", "status": "paused"})
+    assert quiet_response.status_code == 200
+    assert quiet_response.json()["count"] == 1
+    assert quiet_response.json()["results"][0]["name"] == "Chemistry Quiet Room"
+
+    search_response = api_client.get("/api/v1/proctoring/exams/monitoring/", {"search": "physics"})
+    assert search_response.status_code == 200
+    assert search_response.json()["count"] == 1
+    assert search_response.json()["results"][0]["name"] == "Physics Critical Room"
+
+
+@pytest.mark.django_db
 def test_admin_can_fetch_exam_monitoring_snapshot(api_client, admin_token, subject, admin_user, candidate_user):
     from apps.proctoring.services import record_heartbeat, update_media_status
 

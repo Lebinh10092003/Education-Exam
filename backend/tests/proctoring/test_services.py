@@ -1,4 +1,6 @@
 import pytest
+from django.conf import settings
+from django.utils import timezone
 
 from .utils import build_active_session
 
@@ -108,6 +110,107 @@ def test_build_exam_monitoring_snapshot_returns_candidate_statuses_and_alerts(su
     assert snapshot["in_progress"] == 1
     assert snapshot["candidate_statuses"][0]["candidate"]["email"] == candidate_user.email
     assert snapshot["alerts"][0]["event_type"] == "tab_switch"
+
+
+@pytest.mark.django_db
+def test_build_exam_monitoring_snapshot_derives_connection_status_from_stale_heartbeats(
+    subject,
+    admin_user,
+    candidate_user,
+):
+    from apps.proctoring.models import SessionHeartbeat
+    from apps.proctoring.services import build_exam_monitoring_snapshot, record_heartbeat
+
+    exam, session = build_active_session(
+        subject=subject,
+        admin_user=admin_user,
+        candidate_user=candidate_user,
+    )
+    heartbeat = record_heartbeat(
+        session=session,
+        connection_status="stable",
+        latency_ms=120,
+        payload={"source": "test"},
+        reported_by=candidate_user,
+    )
+
+    SessionHeartbeat.objects.filter(pk=heartbeat.pk).update(
+        recorded_at=timezone.now() - timezone.timedelta(seconds=settings.PROCTORING_HEARTBEAT_UNSTABLE_AFTER_SECONDS + 1)
+    )
+    unstable_snapshot = build_exam_monitoring_snapshot(exam=exam)
+    assert unstable_snapshot["candidate_statuses"][0]["connection_status"] == "unstable"
+
+    SessionHeartbeat.objects.filter(pk=heartbeat.pk).update(
+        recorded_at=timezone.now() - timezone.timedelta(seconds=settings.PROCTORING_HEARTBEAT_OFFLINE_AFTER_SECONDS + 1)
+    )
+    offline_snapshot = build_exam_monitoring_snapshot(exam=exam)
+    assert offline_snapshot["candidate_statuses"][0]["connection_status"] == "offline"
+
+
+@pytest.mark.django_db
+def test_build_exam_monitoring_snapshot_expires_stale_in_progress_session_for_monitoring(
+    subject,
+    admin_user,
+    candidate_user,
+):
+    from apps.exam_delivery.models import ExamSession
+    from apps.proctoring.services import build_exam_monitoring_snapshot, record_heartbeat
+
+    exam, session = build_active_session(
+        subject=subject,
+        admin_user=admin_user,
+        candidate_user=candidate_user,
+    )
+    ExamSession.objects.filter(pk=session.pk).update(
+        status=ExamSession.Status.IN_PROGRESS,
+        expires_at=timezone.now() - timezone.timedelta(minutes=1),
+    )
+    record_heartbeat(
+        session=session,
+        connection_status="stable",
+        latency_ms=120,
+        payload={"source": "test"},
+        reported_by=candidate_user,
+    )
+
+    snapshot = build_exam_monitoring_snapshot(exam=exam)
+    session.refresh_from_db()
+
+    assert session.status == ExamSession.Status.EXPIRED
+    assert snapshot["candidate_statuses"][0]["status"] == "expired"
+    assert snapshot["candidate_statuses"][0]["connection_status"] == "offline"
+
+
+@pytest.mark.django_db
+def test_build_exam_monitoring_snapshot_reports_non_active_sessions_as_offline(
+    subject,
+    admin_user,
+    candidate_user,
+):
+    from apps.exam_delivery.models import ExamSession
+    from apps.proctoring.services import build_exam_monitoring_snapshot, record_heartbeat
+
+    exam, session = build_active_session(
+        subject=subject,
+        admin_user=admin_user,
+        candidate_user=candidate_user,
+    )
+    ExamSession.objects.filter(pk=session.pk).update(
+        status=ExamSession.Status.SUBMITTED,
+        submitted_at=timezone.now(),
+    )
+    record_heartbeat(
+        session=session,
+        connection_status="stable",
+        latency_ms=120,
+        payload={"source": "test"},
+        reported_by=candidate_user,
+    )
+
+    snapshot = build_exam_monitoring_snapshot(exam=exam)
+
+    assert snapshot["candidate_statuses"][0]["status"] == "submitted"
+    assert snapshot["candidate_statuses"][0]["connection_status"] == "offline"
 
 
 @pytest.mark.django_db

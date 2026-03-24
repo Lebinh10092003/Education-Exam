@@ -33,6 +33,7 @@ const GroupManagementRoute = lazyRoute(() => import("./pages/GroupManagement"), 
 const SubjectManagementRoute = lazyRoute(() => import("./pages/SubjectManagement"), "SubjectManagement");
 const QuestionBankRoute = lazyRoute(() => import("./pages/QuestionBank"), "QuestionBank");
 const ExamManagementRoute = lazyRoute(() => import("./pages/ExamManagement"), "ExamManagement");
+const ExamMonitoringHubRoute = lazyRoute(() => import("./pages/ExamMonitoringHub"), "ExamMonitoringHub");
 const ExamCreationWizardRoute = lazyRoute(() => import("./pages/ExamCreationWizard"), "ExamCreationWizard");
 const ExamAssignmentRoute = lazyRoute(() => import("./pages/ExamAssignment"), "ExamAssignment");
 const ExamDetailRoute = lazyRoute(() => import("./pages/ExamDetail"), "ExamDetail");
@@ -91,6 +92,7 @@ export const routeConfig = [
       { path: "question-bank", Component: QuestionBankRoute },
       { path: "exams", Component: ExamManagementRoute },
       { path: "exams/create", Component: ExamCreationWizardRoute },
+      { path: "exams/monitoring", Component: ExamMonitoringHubRoute },
       { path: "exams/:id", Component: ExamDetailRoute },
       { path: "exams/:id/edit", Component: ExamCreationWizardRoute },
       { path: "exams/:id/assign", Component: ExamAssignmentRoute },

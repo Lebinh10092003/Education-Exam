@@ -18,4 +18,10 @@ describe("translateLegacyUiText", () => {
     expect(translateLegacyUiText("en", "Dashboard")).toBe("Dashboard");
     expect(translateLegacyUiText("en", "Page 2")).toBe("Page 2");
   });
+
+  it("restores translated Vietnamese legacy text back to English", () => {
+    expect(translateLegacyUiText("en", "Tổng quan")).toBe("Dashboard");
+    expect(translateLegacyUiText("en", "Trang 2")).toBe("Page 2");
+    expect(translateLegacyUiText("en", "Lượt làm 1/3")).toBe("Attempts 1/3");
+  });
 });
