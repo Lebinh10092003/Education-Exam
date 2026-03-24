@@ -25,16 +25,30 @@ describe("LegacyUiTranslationBridge", () => {
         <LegacyUiTranslationBridge />
         <LanguageSwitcher />
         <div>Dashboard</div>
+        <div>Name</div>
+        <div>Create Period</div>
+        <div>Created 24 Mar 2026</div>
+        <div>Used by 2 exam(s)</div>
+        <div>Showing 1-1 of 1 proctored exams</div>
       </>,
     );
 
     expect(screen.getByText("Dashboard")).toBeInTheDocument();
+    expect(screen.getByText("Name")).toBeInTheDocument();
+    expect(screen.getByText("Showing 1-1 of 1 proctored exams")).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: /EN/i }));
     await user.click(await screen.findByRole("menuitemradio", { name: /Ti.ng Vi.t/i }));
 
     await waitFor(() => {
       expect(screen.getByText(translateLegacyUiText("vi", "Dashboard"))).toBeInTheDocument();
+      expect(screen.getByText(translateLegacyUiText("vi", "Name"))).toBeInTheDocument();
+      expect(screen.getByText(translateLegacyUiText("vi", "Create Period"))).toBeInTheDocument();
+      expect(screen.getByText(translateLegacyUiText("vi", "Created 24 Mar 2026"))).toBeInTheDocument();
+      expect(screen.getByText(translateLegacyUiText("vi", "Used by 2 exam(s)"))).toBeInTheDocument();
+      expect(
+        screen.getByText(translateLegacyUiText("vi", "Showing 1-1 of 1 proctored exams")),
+      ).toBeInTheDocument();
     });
 
     await user.click(screen.getByRole("button", { name: /EN/i }));
@@ -42,6 +56,11 @@ describe("LegacyUiTranslationBridge", () => {
 
     await waitFor(() => {
       expect(screen.getByText("Dashboard")).toBeInTheDocument();
+      expect(screen.getByText("Name")).toBeInTheDocument();
+      expect(screen.getByText("Create Period")).toBeInTheDocument();
+      expect(screen.getByText("Created 24 Mar 2026")).toBeInTheDocument();
+      expect(screen.getByText("Used by 2 exam(s)")).toBeInTheDocument();
+      expect(screen.getByText("Showing 1-1 of 1 proctored exams")).toBeInTheDocument();
     });
   });
 
