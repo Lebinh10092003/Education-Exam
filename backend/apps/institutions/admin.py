@@ -12,9 +12,9 @@ class SchoolAdmin(admin.ModelAdmin):
 
 @admin.register(CandidateGroup)
 class CandidateGroupAdmin(admin.ModelAdmin):
-    list_display = ("name", "school", "is_active", "created_at")
-    search_fields = ("name", "description", "school__name", "school__code")
-    list_filter = ("is_active", "school")
+    list_display = ("name", "is_active", "created_at")
+    search_fields = ("name", "description")
+    list_filter = ("is_active",)
 
 
 @admin.register(GroupMembership)

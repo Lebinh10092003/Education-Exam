@@ -20,13 +20,6 @@ class School(TimeStampedModel):
 class CandidateGroup(TimeStampedModel):
     name = models.CharField(max_length=255)
     description = models.TextField(blank=True)
-    school = models.ForeignKey(
-        School,
-        null=True,
-        blank=True,
-        on_delete=models.SET_NULL,
-        related_name="groups",
-    )
     is_active = models.BooleanField(default=True)
 
     class Meta:

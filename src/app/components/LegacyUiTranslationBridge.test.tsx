@@ -28,8 +28,11 @@ describe("LegacyUiTranslationBridge", () => {
         <div>Name</div>
         <div>Create Period</div>
         <div>Created 24 Mar 2026</div>
+        <div>Updated 24 Mar 2026, 21:06</div>
+        <div>24 Mar 2026, 21:06</div>
         <div>Used by 2 exam(s)</div>
         <div>Showing 1-1 of 1 proctored exams</div>
+        <div>Pause Exam</div>
       </>,
     );
 
@@ -45,10 +48,13 @@ describe("LegacyUiTranslationBridge", () => {
       expect(screen.getByText(translateLegacyUiText("vi", "Name"))).toBeInTheDocument();
       expect(screen.getByText(translateLegacyUiText("vi", "Create Period"))).toBeInTheDocument();
       expect(screen.getByText(translateLegacyUiText("vi", "Created 24 Mar 2026"))).toBeInTheDocument();
+      expect(screen.getByText(translateLegacyUiText("vi", "Updated 24 Mar 2026, 21:06"))).toBeInTheDocument();
+      expect(screen.getByText(translateLegacyUiText("vi", "24 Mar 2026, 21:06"))).toBeInTheDocument();
       expect(screen.getByText(translateLegacyUiText("vi", "Used by 2 exam(s)"))).toBeInTheDocument();
       expect(
         screen.getByText(translateLegacyUiText("vi", "Showing 1-1 of 1 proctored exams")),
       ).toBeInTheDocument();
+      expect(screen.getByText(translateLegacyUiText("vi", "Pause Exam"))).toBeInTheDocument();
     });
 
     await user.click(screen.getByRole("button", { name: /EN/i }));
@@ -59,8 +65,11 @@ describe("LegacyUiTranslationBridge", () => {
       expect(screen.getByText("Name")).toBeInTheDocument();
       expect(screen.getByText("Create Period")).toBeInTheDocument();
       expect(screen.getByText("Created 24 Mar 2026")).toBeInTheDocument();
+      expect(screen.getByText("Updated 24 Mar 2026, 21:06")).toBeInTheDocument();
+      expect(screen.getByText("24 Mar 2026, 21:06")).toBeInTheDocument();
       expect(screen.getByText("Used by 2 exam(s)")).toBeInTheDocument();
       expect(screen.getByText("Showing 1-1 of 1 proctored exams")).toBeInTheDocument();
+      expect(screen.getByText("Pause Exam")).toBeInTheDocument();
     });
   });
 

@@ -5,6 +5,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import { AuthContext, type AuthProfile, getDefaultRouteForProfile } from "./auth/AuthContext";
 import { ProtectedAdminLayout, ProtectedCandidateLayout } from "./components/auth/ProtectedRoute";
+import i18n from "./i18n";
 import { ExamMonitorRedirectRoute, routeConfig } from "./routes";
 
 type AuthContextValue = NonNullable<ContextType<typeof AuthContext>>;
@@ -60,8 +61,6 @@ describe("route configuration", () => {
     expect(matchRoutes(routeConfig, "/manual-grading")).toBeTruthy();
     expect(matchRoutes(routeConfig, "/notifications")).toBeTruthy();
     expect(matchRoutes(routeConfig, "/audit")).toBeTruthy();
-    expect(matchRoutes(routeConfig, "/exam-periods")).toBeTruthy();
-    expect(matchRoutes(routeConfig, "/exam-rooms")).toBeTruthy();
     expect(matchRoutes(routeConfig, "/roles-permissions")).toBeTruthy();
     expect(matchRoutes(routeConfig, "/exams/monitoring")?.at(-1)?.route.path).toBe("exams/monitoring");
     expect(matchRoutes(routeConfig, "/exams/42")).toBeTruthy();
@@ -89,6 +88,8 @@ describe("route configuration", () => {
 
 describe("protected layouts", () => {
   it("renders the admin shell for authenticated admin users", async () => {
+    await i18n.changeLanguage("vi");
+
     render(
       <AuthContext.Provider
         value={buildAuthValue({
@@ -103,13 +104,15 @@ describe("protected layouts", () => {
       </AuthContext.Provider>,
     );
 
-    expect(await screen.findAllByText("Tổng quan")).not.toHaveLength(0);
-    expect(screen.getAllByText("Quản lý kỳ thi")).not.toHaveLength(0);
-    expect(screen.queryByText("Danh sách kỳ thi")).not.toBeInTheDocument();
-    expect(screen.queryByText("Giám sát trực tiếp")).not.toBeInTheDocument();
+    expect(await screen.findAllByText(i18n.t("admin.dashboard", { ns: "navigation" }))).not.toHaveLength(0);
+    expect(screen.getAllByText(i18n.t("admin.exams", { ns: "navigation" }))).not.toHaveLength(0);
+    expect(screen.queryByText(i18n.t("admin.examList", { ns: "navigation" }))).not.toBeInTheDocument();
+    expect(screen.queryByText(i18n.t("admin.liveMonitoring", { ns: "navigation" }))).not.toBeInTheDocument();
   });
 
   it("renders the shared candidate shell for authenticated candidates", async () => {
+    await i18n.changeLanguage("en");
+
     render(
       <AuthContext.Provider
         value={buildAuthValue({
@@ -124,8 +127,8 @@ describe("protected layouts", () => {
       </AuthContext.Provider>,
     );
 
-    expect(await screen.findAllByText("Student Portal")).not.toHaveLength(0);
-    expect(screen.getAllByText("My Exams")).not.toHaveLength(0);
+    expect(await screen.findAllByText(i18n.t("candidate.portal", { ns: "navigation" }))).not.toHaveLength(0);
+    expect(screen.getAllByText(i18n.t("candidate.exams", { ns: "navigation" }))).not.toHaveLength(0);
   });
 
   it("redirects legacy exam monitoring routes to the canonical detail query route", async () => {

@@ -24,6 +24,7 @@ const examRecord = {
   id: 7,
   name: "Mathematics Final Exam",
   description: "End of term assessment",
+  mode: "exam" as const,
   status: "open" as const,
   duration_minutes: 90,
   passing_score: 60,
@@ -36,19 +37,6 @@ const examRecord = {
     name: "Mathematics",
     code: "MATH101",
     color: "#2563eb",
-  },
-  period: {
-    id: 21,
-    name: "Spring 2026",
-    start_date: "2026-03-01",
-    end_date: "2026-03-31",
-  },
-  room: {
-    id: 31,
-    name: "Room A",
-    location: "Building 1",
-    capacity: 40,
-    features: ["Projector"],
   },
   current_version: {
     id: 41,

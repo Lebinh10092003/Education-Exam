@@ -18,13 +18,6 @@ import {
 } from "../components/ui/dialog";
 import { Input } from "../components/ui/input";
 import { Label } from "../components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "../components/ui/select";
 import { Textarea } from "../components/ui/textarea";
 import { apiRequest, type PaginatedResponse } from "../lib/http";
 import { groupMembershipImportTemplate } from "../lib/importTemplates";
@@ -32,18 +25,10 @@ import { useAsyncList } from "../hooks/useAsyncList";
 import { useDebouncedValue } from "../hooks/useDebouncedValue";
 import { useMutationState } from "../hooks/useMutationState";
 
-interface SchoolOption {
-  id: number;
-  name: string;
-  code: string;
-}
-
 interface GroupRecord {
   id: number;
   name: string;
   description: string;
-  school_id?: number | null;
-  school_name: string | null;
   is_active: boolean;
   member_count: number;
   exams_count: number;
@@ -84,14 +69,12 @@ interface GroupMembershipImportSummary {
 interface GroupFormState {
   name: string;
   description: string;
-  school_id: string;
   is_active: boolean;
 }
 
 const EMPTY_GROUP_FORM: GroupFormState = {
   name: "",
   description: "",
-  school_id: "none",
   is_active: true,
 };
 
@@ -112,13 +95,11 @@ const formatDate = (value: string) => {
 const toGroupFormState = (group: GroupRecord): GroupFormState => ({
   name: group.name,
   description: group.description,
-  school_id: group.school_id ? String(group.school_id) : "none",
   is_active: group.is_active,
 });
 
 export function GroupManagement() {
   const [searchQuery, setSearchQuery] = useState("");
-  const [schoolFilter, setSchoolFilter] = useState("all");
   const [page, setPage] = useState(1);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingGroup, setEditingGroup] = useState<GroupRecord | null>(null);
@@ -141,15 +122,9 @@ export function GroupManagement() {
         query: {
           page,
           search: debouncedSearch || undefined,
-          school: schoolFilter !== "all" ? schoolFilter : undefined,
         },
       }),
-    [page, debouncedSearch, schoolFilter],
-  );
-
-  const schoolsList = useAsyncList(
-    async () => apiRequest<PaginatedResponse<SchoolOption>>("/api/v1/schools/"),
-    [],
+    [page, debouncedSearch],
   );
 
   const membershipsList = useAsyncList(
@@ -192,10 +167,9 @@ export function GroupManagement() {
 
   useEffect(() => {
     setPage(1);
-  }, [debouncedSearch, schoolFilter]);
+  }, [debouncedSearch]);
 
   const groups = groupsList.data?.results ?? [];
-  const schools = schoolsList.data?.results ?? [];
   const memberships = membershipsList.data?.results ?? [];
   const existingMemberIds = new Set(memberships.map((membership) => membership.user_id));
 
@@ -255,7 +229,6 @@ export function GroupManagement() {
       const payload = {
         name: formState.name.trim(),
         description: formState.description.trim(),
-        school_id: formState.school_id === "none" ? null : Number(formState.school_id),
         is_active: formState.is_active,
       };
 
@@ -369,7 +342,7 @@ export function GroupManagement() {
     <div>
       <PageHeader
         title="Candidate Group Management"
-        description="Create groups, assign schools, and add candidates with live backend data."
+        description="Create reusable candidate groups and add candidates with live backend data."
         action={
           <Button onClick={openCreateDialog}>
             <Plus className="w-4 h-4 mr-2" />
@@ -388,24 +361,11 @@ export function GroupManagement() {
             className="pl-10"
           />
         </div>
-        <Select value={schoolFilter} onValueChange={setSchoolFilter}>
-          <SelectTrigger className="w-full lg:w-[240px]">
-            <SelectValue placeholder="Filter by school" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Schools</SelectItem>
-            {schools.map((school) => (
-              <SelectItem key={school.id} value={String(school.id)}>
-                {school.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
       </div>
 
-      {(groupsList.error || schoolsList.error || membershipsList.error || mutation.error) && (
+      {(groupsList.error || membershipsList.error || mutation.error) && (
         <div className="mb-6 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-          {groupsList.error || schoolsList.error || membershipsList.error || mutation.error}
+          {groupsList.error || membershipsList.error || mutation.error}
         </div>
       )}
 
@@ -454,9 +414,6 @@ export function GroupManagement() {
                   </Badge>
                   <Badge variant="outline" className="bg-green-50">
                     {group.exams_count} exams
-                  </Badge>
-                  <Badge variant="outline">
-                    {group.school_name ?? "No school"}
                   </Badge>
                 </div>
 
@@ -537,27 +494,6 @@ export function GroupManagement() {
               />
             </div>
             <div>
-              <Label htmlFor="group-school">School</Label>
-              <Select
-                value={formState.school_id}
-                onValueChange={(value) =>
-                  setFormState((previous) => ({ ...previous, school_id: value }))
-                }
-              >
-                <SelectTrigger className="mt-2">
-                  <SelectValue placeholder="Select school" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">No school</SelectItem>
-                  {schools.map((school) => (
-                    <SelectItem key={school.id} value={String(school.id)}>
-                      {school.name} ({school.code})
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
               <Label htmlFor="group-description">Description</Label>
               <Textarea
                 id="group-description"
@@ -613,9 +549,9 @@ export function GroupManagement() {
               Search candidate or student accounts, or import them from CSV, then add them to this group.
             </DialogDescription>
           </DialogHeader>
-          <div className="flex-1 overflow-hidden px-4 py-4 sm:px-6 sm:py-5">
+          <div className="min-h-0 flex-1 overflow-hidden px-4 py-4 sm:px-6 sm:py-5">
             <div className="grid h-full min-h-0 gap-6 lg:grid-cols-[minmax(0,1.2fr),minmax(18rem,0.8fr)]">
-            <div className="flex min-h-0 flex-col space-y-4">
+            <div className="flex min-h-0 flex-col gap-4">
               <div className="rounded-lg border border-dashed border-blue-200 bg-blue-50/60 p-4">
                 <div className="flex flex-col gap-3">
                   <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
@@ -698,42 +634,42 @@ export function GroupManagement() {
                 />
               </div>
 
-              <div className="min-h-0 flex-1 overflow-hidden rounded-lg border">
-              <div className="h-full overflow-y-auto divide-y">
-                {candidateSearchResults.isLoading ? (
-                  <div className="p-4 text-sm text-gray-500">Loading candidate list...</div>
-                ) : availableCandidates.length === 0 ? (
-                  <div className="p-4 text-sm text-gray-500">
-                    No available candidates found for this search.
-                  </div>
-                ) : (
-                  availableCandidates.map((candidate) => (
-                    <label
-                      key={candidate.id}
-                      className="flex items-start gap-3 p-3 hover:bg-gray-50 cursor-pointer"
-                    >
-                      <Checkbox
-                        checked={selectedCandidateIds.includes(candidate.id)}
-                        onCheckedChange={() => toggleCandidateSelection(candidate.id)}
-                      />
-                      <div>
-                        <p className="text-sm font-medium text-gray-900">
-                          {candidate.full_name}
-                        </p>
-                        <p className="text-xs text-gray-500">{candidate.email}</p>
-                        <div className="mt-2 flex flex-wrap gap-2">
-                          {candidate.roles.map((role) => (
-                            <Badge key={role.id} variant="outline">
-                              {role.name}
-                            </Badge>
-                          ))}
+              <div className="min-h-[14rem] flex-1 overflow-y-auto rounded-lg border">
+                <div className="divide-y">
+                  {candidateSearchResults.isLoading ? (
+                    <div className="p-4 text-sm text-gray-500">Loading candidate list...</div>
+                  ) : availableCandidates.length === 0 ? (
+                    <div className="p-4 text-sm text-gray-500">
+                      No available candidates found for this search.
+                    </div>
+                  ) : (
+                    availableCandidates.map((candidate) => (
+                      <label
+                        key={candidate.id}
+                        className="flex cursor-pointer items-start gap-3 p-3 hover:bg-gray-50"
+                      >
+                        <Checkbox
+                          checked={selectedCandidateIds.includes(candidate.id)}
+                          onCheckedChange={() => toggleCandidateSelection(candidate.id)}
+                        />
+                        <div>
+                          <p className="text-sm font-medium text-gray-900">
+                            {candidate.full_name}
+                          </p>
+                          <p className="text-xs text-gray-500">{candidate.email}</p>
+                          <div className="mt-2 flex flex-wrap gap-2">
+                            {candidate.roles.map((role) => (
+                              <Badge key={role.id} variant="outline">
+                                {role.name}
+                              </Badge>
+                            ))}
+                          </div>
                         </div>
-                      </div>
-                    </label>
-                  ))
-                )}
+                      </label>
+                    ))
+                  )}
+                </div>
               </div>
-            </div>
             </div>
 
             <div className="flex min-h-0 flex-col rounded-lg border border-gray-200 p-4">

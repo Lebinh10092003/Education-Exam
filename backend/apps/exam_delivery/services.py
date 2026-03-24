@@ -29,6 +29,8 @@ def _candidate_has_access(*, exam, candidate):
 def _assert_candidate_can_start(*, exam, candidate, now):
     if not _candidate_has_access(exam=exam, candidate=candidate):
         raise PermissionDenied(t(vi="Bạn chưa được phân vào bài thi này.", en="You are not assigned to this exam."))
+    if exam.mode != Exam.Mode.EXAM:
+        raise ValidationError(t(vi="Mục này không phải bài thi để làm bài.", en="This item is not a deliverable exam."))
     if exam.current_version_id is None:
         raise ValidationError(t(vi="Bài thi này chưa có phiên bản có thể phân phối.", en="This exam does not have a deliverable version."))
     if exam.status not in {Exam.Status.SCHEDULED, Exam.Status.OPEN}:

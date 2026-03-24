@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import { Edit, Plus, Search, Shield, Trash2 } from "lucide-react";
+import { useTranslation } from "react-i18next";
 
 import { PageHeader } from "../components/PageHeader";
 import { Badge } from "../components/ui/badge";
@@ -19,6 +20,11 @@ import { Label } from "../components/ui/label";
 import { ScrollArea } from "../components/ui/scroll-area";
 import { apiRequest, type PaginatedResponse } from "../lib/http";
 import { notify } from "../lib/notify";
+import {
+  getPermissionDescription,
+  getPermissionModuleLabel,
+  normalizePermissionLocale,
+} from "../lib/permissionI18n";
 import { useAsyncList } from "../hooks/useAsyncList";
 import { useDebouncedValue } from "../hooks/useDebouncedValue";
 import { useMutationState } from "../hooks/useMutationState";
@@ -74,6 +80,7 @@ const toRoleFormState = (role: RoleRecord): RoleFormState => ({
 });
 
 export function RolesPermissions() {
+  const { i18n } = useTranslation();
   const [searchQuery, setSearchQuery] = useState("");
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingRole, setEditingRole] = useState<RoleRecord | null>(null);
@@ -93,6 +100,7 @@ export function RolesPermissions() {
 
   const roles = rolesList.data?.results ?? [];
   const permissions = permissionsList.data?.results ?? [];
+  const permissionLocale = normalizePermissionLocale(i18n.language ?? i18n.resolvedLanguage);
 
   const filteredRoles = useMemo(() => {
     if (!debouncedSearch) {
@@ -368,14 +376,14 @@ export function RolesPermissions() {
                       .map(([module, modulePermissions]) => (
                         <div key={module}>
                           <h3 className="mb-3 text-sm font-semibold uppercase tracking-wide text-gray-500">
-                            {module.replaceAll("_", " ")}
+                            {getPermissionModuleLabel(module, permissionLocale)}
                           </h3>
                           <div className="space-y-3">
                             {modulePermissions.map((permission) => (
                               <div key={permission.id} className="rounded-lg border border-gray-200 p-3">
                                 <p className="text-sm font-medium text-gray-900">{permission.code}</p>
                                 <p className="mt-1 text-xs text-gray-500">
-                                  {permission.description || `${permission.action} access for ${permission.module}.`}
+                                  {getPermissionDescription(permission, permissionLocale)}
                                 </p>
                               </div>
                             ))}
@@ -461,7 +469,7 @@ export function RolesPermissions() {
                     .map(([module, modulePermissions]) => (
                       <div key={module}>
                         <h3 className="mb-3 text-sm font-semibold uppercase tracking-wide text-gray-500">
-                          {module.replaceAll("_", " ")}
+                          {getPermissionModuleLabel(module, permissionLocale)}
                         </h3>
                         <div className="space-y-3">
                           {modulePermissions.map((permission) => (
@@ -476,7 +484,7 @@ export function RolesPermissions() {
                               <div>
                                 <p className="text-sm font-medium text-gray-900">{permission.code}</p>
                                 <p className="text-xs text-gray-500">
-                                  {permission.description || `${permission.action} access for ${permission.module}.`}
+                                  {getPermissionDescription(permission, permissionLocale)}
                                 </p>
                               </div>
                             </label>

@@ -12,7 +12,7 @@ def _build_candidate_result(*, subject, admin_user, candidate_user, publish, suf
     from apps.question_bank.services import create_question
 
     school = School.objects.create(name=f"Result School {candidate_user.id}-{suffix}", code=f"RS-{candidate_user.id}-{suffix}")
-    group = CandidateGroup.objects.create(name=f"Result Group {candidate_user.id}-{suffix}", school=school)
+    group = CandidateGroup.objects.create(name=f"Result Group {candidate_user.id}-{suffix}")
     GroupMembership.objects.create(group=group, user=candidate_user)
     question = create_question(
         subject=subject,

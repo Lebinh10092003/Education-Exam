@@ -23,7 +23,6 @@ def test_authenticated_admin_can_create_group_and_membership(
         {
             "name": "Computer Science - Year 1",
             "description": "First year computer science students",
-            "school_id": school.id,
             "is_active": True,
         },
         format="json",

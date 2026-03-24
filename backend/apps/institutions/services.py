@@ -67,14 +67,14 @@ def _get_candidate_role():
     return role
 
 
-def _resolve_school(*, group, school_code):
+def _resolve_school(school_code):
     normalized_code = (school_code or "").strip()
     if normalized_code:
         school = School.objects.filter(code__iexact=normalized_code).first()
         if school is None:
             raise ValueError(f"Unknown school_code: {normalized_code}")
         return school
-    return group.school
+    return None
 
 
 def _resolve_existing_user(*, email, cccd):
@@ -165,11 +165,12 @@ def _import_group_member_row(*, group, row, candidate_role):
     phone_number = (row.get("phone_number") or "").strip()
     student_class = (row.get("student_class") or "").strip()
     date_of_birth = _parse_optional_date(row.get("date_of_birth"))
-    school = _resolve_school(group=group, school_code=row.get("school_code"))
+    explicit_school = _resolve_school(row.get("school_code"))
 
     user, profile = _resolve_existing_user(email=email, cccd=cccd)
 
     if user is not None:
+        resolved_school = explicit_school if explicit_school is not None else getattr(profile, "school", None)
         changed = False
         if full_name != user.full_name:
             user.full_name = full_name
@@ -189,7 +190,7 @@ def _import_group_member_row(*, group, row, candidate_role):
             date_of_birth=date_of_birth,
             student_class=student_class,
             phone_number=phone_number,
-            school=school,
+            school=resolved_school,
         ) or changed
         changed = _ensure_candidate_role(user=user, role=candidate_role) or changed
 
@@ -235,7 +236,7 @@ def _import_group_member_row(*, group, row, candidate_role):
         date_of_birth=date_of_birth,
         student_class=student_class,
         phone_number=phone_number,
-        school=school,
+        school=explicit_school,
     )
     _ensure_candidate_role(user=user, role=candidate_role)
     GroupMembership.objects.get_or_create(group=group, user=user, defaults={"is_active": True})

@@ -7,8 +7,6 @@ const navigation = {
     questionBank: "Question Bank",
     exams: "Exam Management",
     examList: "Exam List",
-    examPeriods: "Exam Periods",
-    examRooms: "Exam Rooms",
     liveMonitoring: "Live Monitoring",
     manualGrading: "Manual Grading",
     materials: "Materials Library",

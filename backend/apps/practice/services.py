@@ -1,11 +1,14 @@
 import random
 from datetime import timedelta
 from decimal import Decimal, ROUND_HALF_UP
+from math import ceil
 
+from django.conf import settings
 from django.db import transaction
 from django.utils import timezone
 from rest_framework.exceptions import PermissionDenied, ValidationError
 
+from apps.exam_delivery.access import get_accessible_subject_queryset
 from apps.platform_core.i18n import t
 from apps.question_bank.models import Question
 
@@ -13,7 +16,7 @@ from .models import PracticeAutosaveSnapshot, PracticeSession, PracticeSessionQu
 
 UNSET = object()
 OBJECTIVE_TYPES = [Question.Type.MULTIPLE_CHOICE, Question.Type.TRUE_FALSE]
-DIFFICULTY_LEVELS = [Question.Difficulty.EASY, Question.Difficulty.MEDIUM, Question.Difficulty.HARD]
+PRACTICE_TARGET_QUESTION_COUNT = 30
 
 
 def _expire_if_needed(session, *, now):
@@ -37,43 +40,22 @@ def _assert_session_is_active(session):
     return now
 
 
-def _validate_difficulty_counts(difficulty_counts):
-    normalized = {}
-    total = 0
-    for difficulty in DIFFICULTY_LEVELS:
-        value = int(difficulty_counts.get(difficulty, 0))
-        if value < 0:
-            raise ValidationError(
-                t(vi="Số lượng câu hỏi không được âm.", en="Question counts must not be negative.")
-            )
-        normalized[difficulty] = value
-        total += value
-    if total <= 0:
-        raise ValidationError(
-            t(vi="Phải chọn ít nhất một câu hỏi luyện tập.", en="At least one practice question is required.")
-        )
-    return normalized, total
-
-
-def _pick_question_ids(*, subject, difficulty, count):
-    eligible_ids = list(
+def _eligible_objective_question_ids(*, subject):
+    return list(
         Question.objects.filter(
             subject=subject,
-            difficulty=difficulty,
             question_type__in=OBJECTIVE_TYPES,
             current_revision__isnull=False,
         ).values_list("id", flat=True)
     )
-    if len(eligible_ids) < count:
+
+
+def _derive_duration_minutes(question_count):
+    if question_count <= 0:
         raise ValidationError(
-            t(
-                vi="Ngân hàng câu hỏi không đủ để tạo đề luyện tập theo cấu hình đã chọn.",
-                en="Not enough practice questions are available for the requested configuration.",
-            )
+            t(vi="Phải có ít nhất một câu hỏi luyện tập.", en="At least one practice question is required.")
         )
-    if count == 0:
-        return []
-    return random.sample(eligible_ids, count)
+    return max(10, ceil(question_count * 1.5))
 
 
 def _build_snapshot(question):
@@ -95,18 +77,39 @@ def _build_snapshot(question):
     }
 
 
+def get_active_practice_session(*, candidate, subject):
+    now = timezone.now()
+    session = (
+        PracticeSession.objects.filter(
+            candidate=candidate,
+            subject=subject,
+            status=PracticeSession.Status.IN_PROGRESS,
+        )
+        .order_by("-created_at")
+        .first()
+    )
+    if session is None:
+        return None
+    if _expire_if_needed(session, now=now):
+        return None
+    return session
+
+
 @transaction.atomic
-def create_practice_session(*, candidate, subject, duration_minutes, difficulty_counts):
-    if duration_minutes <= 0:
+def create_practice_session(*, candidate, subject):
+    selected_ids = _eligible_objective_question_ids(subject=subject)
+    if not selected_ids:
         raise ValidationError(
-            t(vi="Thời lượng luyện tập phải lớn hơn 0.", en="Practice duration must be greater than 0.")
+            t(
+                vi="Môn học này chưa có câu hỏi trắc nghiệm để tạo bài luyện tập.",
+                en="No objective questions are available for this subject yet.",
+            )
         )
 
-    normalized_counts, total = _validate_difficulty_counts(difficulty_counts)
-    selected_ids = []
-    for difficulty, count in normalized_counts.items():
-        selected_ids.extend(_pick_question_ids(subject=subject, difficulty=difficulty, count=count))
     random.shuffle(selected_ids)
+    selected_ids = selected_ids[:PRACTICE_TARGET_QUESTION_COUNT]
+    total = len(selected_ids)
+    duration_minutes = _derive_duration_minutes(total)
 
     questions = {
         question.id: question
@@ -206,6 +209,7 @@ def submit_practice_session(*, session):
     now = timezone.now()
     session.status = PracticeSession.Status.SUBMITTED
     session.submitted_at = now
+    session.details_retention_until = now + timedelta(days=settings.PRACTICE_DETAILS_RETENTION_DAYS)
     session.last_activity_at = now
     session.correct_count = correct_count
     session.total_count = total_count
@@ -214,6 +218,7 @@ def submit_practice_session(*, session):
         update_fields=[
             "status",
             "submitted_at",
+            "details_retention_until",
             "last_activity_at",
             "correct_count",
             "total_count",
@@ -240,3 +245,7 @@ def assert_user_can_access_practice_session(*, user, session):
         raise PermissionDenied(
             t(vi="Bạn không có quyền truy cập phiên luyện tập này.", en="You do not have access to this practice session.")
         )
+
+
+def user_has_practice_subject_access(*, user, subject):
+    return get_accessible_subject_queryset(user=user).filter(pk=subject.pk).exists()

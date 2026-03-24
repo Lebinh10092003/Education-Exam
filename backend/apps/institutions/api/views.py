@@ -52,7 +52,7 @@ class CandidateGroupViewSet(viewsets.ModelViewSet):
     }
 
     def get_queryset(self):
-        queryset = CandidateGroup.objects.select_related("school").annotate(
+        queryset = CandidateGroup.objects.annotate(
             member_count=Count("memberships", filter=Q(memberships__is_active=True), distinct=True),
             exams_count=Count("exam_assignments__exam", distinct=True),
         )
@@ -61,11 +61,7 @@ class CandidateGroupViewSet(viewsets.ModelViewSet):
             queryset = queryset.filter(
                 Q(name__icontains=search)
                 | Q(description__icontains=search)
-                | Q(school__name__icontains=search)
             )
-        school_id = self.request.query_params.get("school")
-        if school_id:
-            queryset = queryset.filter(school_id=school_id)
         is_active = self.request.query_params.get("is_active")
         if is_active in {"true", "false"}:
             queryset = queryset.filter(is_active=is_active == "true")

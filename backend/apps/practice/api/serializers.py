@@ -136,14 +136,6 @@ class PracticeSessionHistorySerializer(serializers.ModelSerializer):
 
 class PracticeSessionCreateSerializer(serializers.Serializer):
     subject_id = serializers.IntegerField()
-    duration_minutes = serializers.IntegerField(min_value=5, max_value=180)
-    difficulty_counts = serializers.DictField(child=serializers.IntegerField(min_value=0))
-
-    def validate(self, attrs):
-        total = sum(int(attrs["difficulty_counts"].get(key, 0)) for key in ("easy", "medium", "hard"))
-        if total <= 0:
-            raise serializers.ValidationError("At least one practice question is required.")
-        return attrs
 
 
 class PracticeSessionAnswerWriteSerializer(serializers.Serializer):
@@ -226,6 +218,8 @@ class PracticeReviewSerializer(serializers.Serializer):
     started_at = serializers.DateTimeField()
     submitted_at = serializers.DateTimeField(allow_null=True)
     duration_minutes = serializers.IntegerField()
+    details_available = serializers.BooleanField()
+    details_retention_until = serializers.DateTimeField(allow_null=True)
+    details_purged_at = serializers.DateTimeField(allow_null=True)
     summary = PracticeReviewSummarySerializer()
-    questions = PracticeReviewQuestionSerializer(many=True)
 

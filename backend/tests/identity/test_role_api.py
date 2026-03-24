@@ -35,9 +35,5 @@ def test_seed_command_creates_permission_modules_for_updated_ui():
         "notifications.manage",
         "audit.view",
         "audit.manage",
-        "exam_periods.view",
-        "exam_periods.manage",
-        "exam_rooms.view",
-        "exam_rooms.manage",
     ):
         assert Permission.objects.filter(code=code).exists()

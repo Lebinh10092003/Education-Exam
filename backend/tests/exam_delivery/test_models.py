@@ -9,7 +9,7 @@ def test_exam_session_attempt_number_increments_per_candidate_and_exam(subject, 
     from apps.institutions.models import CandidateGroup, GroupMembership, School
 
     school = School.objects.create(name="School A", code="SCHA")
-    group = CandidateGroup.objects.create(name="Computer Science - Year 1", school=school)
+    group = CandidateGroup.objects.create(name="Computer Science - Year 1")
     GroupMembership.objects.create(group=group, user=candidate_user)
     exam = create_exam(
         name="Mathematics Final Exam",
@@ -48,7 +48,7 @@ def test_submission_is_unique_per_session(subject, admin_user, candidate_user):
     from apps.institutions.models import CandidateGroup, GroupMembership, School
 
     school = School.objects.create(name="School A", code="SCHA")
-    group = CandidateGroup.objects.create(name="Computer Science - Year 1", school=school)
+    group = CandidateGroup.objects.create(name="Computer Science - Year 1")
     GroupMembership.objects.create(group=group, user=candidate_user)
     exam = create_exam(
         name="Mathematics Final Exam",

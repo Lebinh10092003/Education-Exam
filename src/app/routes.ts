@@ -41,8 +41,6 @@ const ManualGradingRoute = lazyRoute(() => import("./pages/ManualGrading"), "Man
 const RolesPermissionsRoute = lazyRoute(() => import("./pages/RolesPermissions"), "RolesPermissions");
 const NotificationCenterRoute = lazyRoute(() => import("./pages/NotificationCenter"), "NotificationCenter");
 const AuditCenterRoute = lazyRoute(() => import("./pages/AuditCenter"), "AuditCenter");
-const ExamPeriodsRoute = lazyRoute(() => import("./pages/ExamPeriods"), "ExamPeriods");
-const ExamRoomsRoute = lazyRoute(() => import("./pages/ExamRooms"), "ExamRooms");
 const CandidateDashboardRoute = lazyRoute(() => import("./pages/CandidateDashboard"), "CandidateDashboard");
 const MyExamsRoute = lazyRoute(() => import("./pages/MyExams"), "MyExams");
 const ExamInstructionsRoute = lazyRoute(() => import("./pages/ExamInstructions"), "ExamInstructions");
@@ -97,8 +95,6 @@ export const routeConfig = [
       { path: "exams/:id/edit", Component: ExamCreationWizardRoute },
       { path: "exams/:id/assign", Component: ExamAssignmentRoute },
       { path: "exams/:id/monitor", Component: ExamMonitorRedirectRoute },
-      { path: "exam-periods", Component: ExamPeriodsRoute },
-      { path: "exam-rooms", Component: ExamRoomsRoute },
       { path: "manual-grading", Component: ManualGradingRoute },
       { path: "materials", Component: MaterialsLibraryRoute },
       { path: "results", Component: ResultsReportsRoute },

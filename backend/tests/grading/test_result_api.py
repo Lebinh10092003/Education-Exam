@@ -12,7 +12,7 @@ def _build_finalized_result(*, subject, admin_user, candidate_user, score_key="A
     from apps.question_bank.services import create_question
 
     school = School.objects.create(name=f"School {candidate_user.id}", code=f"SCH{candidate_user.id}")
-    group = CandidateGroup.objects.create(name=f"Candidate Group {candidate_user.id}", school=school)
+    group = CandidateGroup.objects.create(name=f"Candidate Group {candidate_user.id}")
     GroupMembership.objects.create(group=group, user=candidate_user)
     objective_question = create_question(
         subject=subject,

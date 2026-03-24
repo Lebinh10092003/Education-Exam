@@ -11,7 +11,7 @@ def test_manual_grading_task_is_unique_per_session_question(subject, admin_user,
     from apps.question_bank.services import create_question
 
     school = School.objects.create(name="School A", code="SCHA")
-    group = CandidateGroup.objects.create(name="Computer Science - Year 1", school=school)
+    group = CandidateGroup.objects.create(name="Computer Science - Year 1")
     GroupMembership.objects.create(group=group, user=candidate_user)
     essay_question = create_question(
         subject=subject,
@@ -59,7 +59,7 @@ def test_result_is_unique_per_session(subject, admin_user, candidate_user):
     from apps.question_bank.services import create_question
 
     school = School.objects.create(name="School A", code="SCHA")
-    group = CandidateGroup.objects.create(name="Computer Science - Year 1", school=school)
+    group = CandidateGroup.objects.create(name="Computer Science - Year 1")
     GroupMembership.objects.create(group=group, user=candidate_user)
     objective_question = create_question(
         subject=subject,

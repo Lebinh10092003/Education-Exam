@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from .models import Exam, ExamAssignment, ExamItem, ExamPeriod, ExamRandomRule, ExamRoom, ExamScheduleWindow, ExamVersion
+from .models import Exam, ExamAssignment, ExamItem, ExamRandomRule, ExamScheduleWindow, ExamVersion
 
 
 class ExamItemInline(admin.TabularInline):
@@ -21,10 +21,10 @@ class ExamVersionInline(admin.TabularInline):
 
 @admin.register(Exam)
 class ExamAdmin(admin.ModelAdmin):
-    list_display = ("name", "subject", "status", "duration_minutes", "max_attempts", "created_at")
-    list_filter = ("status", "subject", "shuffle_questions", "enable_proctoring")
+    list_display = ("name", "mode", "subject", "status", "duration_minutes", "max_attempts", "created_at")
+    list_filter = ("mode", "status", "subject", "shuffle_questions", "enable_proctoring")
     search_fields = ("name", "subject__name", "subject__code")
-    autocomplete_fields = ("subject", "created_by", "updated_by", "current_version", "period", "room")
+    autocomplete_fields = ("subject", "created_by", "updated_by", "current_version")
     inlines = [ExamVersionInline]
 
 
@@ -41,22 +41,9 @@ class ExamScheduleWindowAdmin(admin.ModelAdmin):
     list_display = ("exam", "opens_at", "closes_at")
     autocomplete_fields = ("exam",)
 
-
-@admin.register(ExamPeriod)
-class ExamPeriodAdmin(admin.ModelAdmin):
-    list_display = ("name", "start_date", "end_date", "created_at")
-    search_fields = ("name", "description")
-
-
-@admin.register(ExamRoom)
-class ExamRoomAdmin(admin.ModelAdmin):
-    list_display = ("name", "location", "capacity", "created_at")
-    search_fields = ("name", "location")
-
-
 @admin.register(ExamAssignment)
 class ExamAssignmentAdmin(admin.ModelAdmin):
     list_display = ("exam", "group", "user", "assigned_by", "created_at")
-    list_filter = ("group__school",)
+    list_filter = ("group",)
     search_fields = ("exam__name", "group__name", "user__email")
     autocomplete_fields = ("exam", "group", "user", "assigned_by")

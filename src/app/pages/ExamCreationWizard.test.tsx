@@ -9,13 +9,14 @@ const mockNavigate = vi.fn();
 const mockApiRequest = vi.fn();
 const mockNotifyError = vi.fn();
 const mockNotifySuccess = vi.fn();
+let mockExamId = "1";
 
 vi.mock("react-router", async () => {
   const actual = await vi.importActual<typeof import("react-router")>("react-router");
   return {
     ...actual,
     useNavigate: () => mockNavigate,
-    useParams: () => ({ id: "1" }),
+    useParams: () => ({ id: mockExamId }),
   };
 });
 
@@ -41,9 +42,8 @@ const subject = {
 const examRecord = {
   id: 1,
   name: "Algebra Midterm",
+  mode: "exam" as const,
   subject,
-  period: null,
-  room: null,
   description: "Quarterly algebra exam",
   status: "draft" as const,
   duration_minutes: 60,
@@ -72,6 +72,7 @@ const examRecord = {
     assigned_group_ids: [],
   },
 };
+let currentExamRecord: typeof examRecord;
 
 const buildQuestionRecord = (id: number, questionText: string) => ({
   id,
@@ -96,6 +97,8 @@ describe("ExamCreationWizard question import", () => {
   });
 
   beforeEach(() => {
+    mockExamId = "1";
+    currentExamRecord = examRecord;
     mockNavigate.mockReset();
     mockApiRequest.mockReset();
     mockNotifyError.mockReset();
@@ -110,16 +113,8 @@ describe("ExamCreationWizard question import", () => {
         return buildPaginated([]);
       }
 
-      if (path === "/api/v1/exam-periods/") {
-        return buildPaginated([]);
-      }
-
-      if (path === "/api/v1/exam-rooms/") {
-        return buildPaginated([]);
-      }
-
       if (path === "/api/v1/exams/1/") {
-        return examRecord;
+        return currentExamRecord;
       }
 
       if (path === "/api/v1/questions/") {
@@ -143,6 +138,18 @@ describe("ExamCreationWizard question import", () => {
           created_question_ids: [101, 102],
           errors: [],
           created_at: "2026-03-23T08:30:00Z",
+        };
+      }
+
+      if (path === "/api/v1/exams/1/student-import/") {
+        return {
+          total_rows: 2,
+          created_users: 1,
+          updated_users: 0,
+          assigned_users: 2,
+          skipped_rows: 0,
+          failed_rows: 0,
+          errors: [],
         };
       }
 
@@ -238,5 +245,64 @@ describe("ExamCreationWizard question import", () => {
     expect(
       mockApiRequest.mock.calls.some(([path]) => path === "/api/v1/question-imports/"),
     ).toBe(false);
+  });
+
+  it("switches to class-specific guidance when editing a class record", async () => {
+    const user = userEvent.setup();
+    currentExamRecord = {
+      ...examRecord,
+      mode: "class",
+      name: "IMO Learning Class",
+    };
+
+    render(
+      <MemoryRouter>
+        <ExamCreationWizard />
+      </MemoryRouter>,
+    );
+
+    expect(await screen.findByDisplayValue("IMO Learning Class")).toBeInTheDocument();
+    expect(screen.getByText("Edit Class")).toBeInTheDocument();
+
+    const nextButtons = screen.getAllByRole("button", { name: /^next$/i });
+    const nextButton = nextButtons.find((button) => !button.hasAttribute("disabled")) ?? nextButtons[0];
+    await user.click(nextButton);
+
+    expect(await screen.findByText(/Each practice attempt will request up to 30 random objective questions/i)).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: /^next$/i }));
+
+    expect(await screen.findByText(/Class mode does not require a fixed schedule window or proctoring setup/i)).toBeInTheDocument();
+    expect(screen.getByText("Enroll Groups")).toBeInTheDocument();
+    expect(screen.getByText("Import Students Directly To This Class")).toBeInTheDocument();
+
+    const fileInput = document.querySelector('#class-student-import-file');
+    expect(fileInput).not.toBeNull();
+
+    const file = new File(
+      [
+        [
+          "full_name,date_of_birth,student_class,cccd,email",
+          "Le Van Binh,24/08/2003,12,123456789012,binh@example.com",
+          "Tran Thi Ha,15/07/2004,11,123456789013,ha@example.com",
+        ].join("\n"),
+      ],
+      "students.csv",
+      { type: "text/csv" },
+    );
+
+    await user.upload(fileInput as HTMLInputElement, file);
+    await user.click(screen.getByRole("button", { name: /^import students$/i }));
+
+    await waitFor(() => {
+      expect(
+        screen.getAllByText((_, node) => node?.textContent?.includes("Processed 2 row(s) with 0 skipped.") ?? false)
+          .length,
+      ).toBeGreaterThan(0);
+    });
+
+    expect(
+      mockApiRequest.mock.calls.some(([path]) => path === "/api/v1/exams/1/student-import/"),
+    ).toBe(true);
   });
 });

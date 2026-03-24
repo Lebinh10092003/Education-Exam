@@ -10,7 +10,7 @@ def _build_candidate_exam(*, subject, admin_user, candidate_user, assigned=True,
     from apps.question_bank.services import create_question
 
     school = School.objects.create(name="School A", code=f"SCH-{candidate_user.id or 'X'}")
-    group = CandidateGroup.objects.create(name=f"Candidate Group {candidate_user.id or 1}", school=school)
+    group = CandidateGroup.objects.create(name=f"Candidate Group {candidate_user.id or 1}")
     if assigned:
         GroupMembership.objects.create(group=group, user=candidate_user)
     question = create_question(
@@ -44,6 +44,35 @@ def test_candidate_can_list_assigned_exams(api_client, candidate_user, subject, 
     from rest_framework_simplejwt.tokens import RefreshToken
 
     _build_candidate_exam(subject=subject, admin_user=admin_user, candidate_user=candidate_user)
+    token = str(RefreshToken.for_user(candidate_user).access_token)
+    api_client.credentials(HTTP_AUTHORIZATION=f"Bearer {token}")
+
+    response = api_client.get("/api/v1/my-exams/")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["count"] == 1
+    assert payload["results"][0]["name"] == "Mathematics Final Exam"
+
+
+@pytest.mark.django_db
+def test_candidate_exam_list_hides_assigned_class_records(api_client, candidate_user, subject, admin_user):
+    from apps.exam_authoring.services import create_exam
+    from rest_framework_simplejwt.tokens import RefreshToken
+
+    _build_candidate_exam(subject=subject, admin_user=admin_user, candidate_user=candidate_user)
+    create_exam(
+        name="Mathematics Learning Class",
+        mode="class",
+        subject=subject,
+        created_by=admin_user,
+        status="draft",
+        duration_minutes=45,
+        passing_score=0,
+        max_attempts=1,
+        user_ids=[candidate_user.id],
+    )
+
     token = str(RefreshToken.for_user(candidate_user).access_token)
     api_client.credentials(HTTP_AUTHORIZATION=f"Bearer {token}")
 

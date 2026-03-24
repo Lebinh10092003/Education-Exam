@@ -57,13 +57,6 @@ class GroupMembershipImportSummarySerializer(serializers.Serializer):
 
 
 class CandidateGroupSerializer(serializers.ModelSerializer):
-    school_id = serializers.PrimaryKeyRelatedField(
-        queryset=School.objects.all(),
-        source="school",
-        allow_null=True,
-        required=False,
-    )
-    school_name = serializers.CharField(source="school.name", read_only=True)
     member_count = serializers.IntegerField(read_only=True)
     exams_count = serializers.IntegerField(read_only=True)
 
@@ -73,8 +66,6 @@ class CandidateGroupSerializer(serializers.ModelSerializer):
             "id",
             "name",
             "description",
-            "school_id",
-            "school_name",
             "is_active",
             "member_count",
             "exams_count",
@@ -83,7 +74,6 @@ class CandidateGroupSerializer(serializers.ModelSerializer):
         )
         read_only_fields = (
             "id",
-            "school_name",
             "member_count",
             "exams_count",
             "created_at",

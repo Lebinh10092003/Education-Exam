@@ -15,6 +15,7 @@ import {
 import { Download, Eye, Search, TrendingUp } from "lucide-react";
 
 import { PageHeader } from "../components/PageHeader";
+import { StatusBadge } from "../components/StatusBadge";
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
@@ -25,7 +26,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "../components/ui/select";
-import { Badge } from "../components/ui/badge";
 import {
   Dialog,
   DialogContent,
@@ -159,7 +159,10 @@ export function ResultsReports() {
   );
   const summary = useAsyncList(() => apiRequest<ResultSummary>("/api/v1/results/summary/"), []);
   const exams = useAsyncList(
-    () => apiRequest<PaginatedResponse<ExamOption>>("/api/v1/exams/", { query: { page_size: 100 } }),
+    () =>
+      apiRequest<PaginatedResponse<ExamOption>>("/api/v1/exams/", {
+        query: { page_size: 100, mode: "exam" },
+      }),
     [],
   );
 
@@ -344,24 +347,8 @@ export function ResultsReports() {
                       <p className="text-xs text-gray-500">{result.exam.subject_name}</p>
                     </div>
                     <div className="flex flex-col gap-2">
-                      <Badge
-                        className={
-                          result.publish_state === "published"
-                            ? "bg-green-100 text-green-800 hover:bg-green-100"
-                            : "bg-gray-100 text-gray-700 hover:bg-gray-100"
-                        }
-                      >
-                        {result.publish_state}
-                      </Badge>
-                      <Badge
-                        className={
-                          result.workflow_status === "finalized"
-                            ? "bg-green-100 text-green-800 hover:bg-green-100"
-                            : "bg-yellow-100 text-yellow-800 hover:bg-yellow-100"
-                        }
-                      >
-                        {result.result_status}
-                      </Badge>
+                      <StatusBadge status={result.publish_state} />
+                      <StatusBadge status={result.result_status} />
                     </div>
                   </div>
 
@@ -462,26 +449,10 @@ export function ResultsReports() {
                         </div>
                       </td>
                       <td className="py-4 px-4">
-                        <Badge
-                          className={
-                            result.workflow_status === "finalized"
-                              ? "bg-green-100 text-green-800 hover:bg-green-100"
-                              : "bg-yellow-100 text-yellow-800 hover:bg-yellow-100"
-                          }
-                        >
-                          {result.result_status}
-                        </Badge>
+                        <StatusBadge status={result.result_status} />
                       </td>
                       <td className="py-4 px-4">
-                        <Badge
-                          className={
-                            result.publish_state === "published"
-                              ? "bg-green-100 text-green-800 hover:bg-green-100"
-                              : "bg-gray-100 text-gray-700 hover:bg-gray-100"
-                          }
-                        >
-                          {result.publish_state}
-                        </Badge>
+                        <StatusBadge status={result.publish_state} />
                       </td>
                       <td className="py-4 px-4 text-sm text-gray-600">{formatDate(result.completed_date)}</td>
                       <td className="py-4 px-4 text-sm text-gray-600">{formatDuration(result.time_taken_minutes)}</td>

@@ -18,7 +18,7 @@ def _build_assigned_exam(
     from apps.question_bank.services import create_question
 
     school = School.objects.create(name="School A", code=f"SCH{candidate_user.id or 'X'}")
-    group = CandidateGroup.objects.create(name=f"Computer Science - Year {candidate_user.id or 1}", school=school)
+    group = CandidateGroup.objects.create(name=f"Computer Science - Year {candidate_user.id or 1}")
     GroupMembership.objects.create(group=group, user=candidate_user)
     objective_question = create_question(
         subject=subject,

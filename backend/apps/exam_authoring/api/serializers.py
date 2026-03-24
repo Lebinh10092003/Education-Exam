@@ -1,4 +1,3 @@
-from django.utils import timezone
 from drf_spectacular.types import OpenApiTypes
 from drf_spectacular.utils import extend_schema_field
 from rest_framework import serializers
@@ -7,7 +6,7 @@ from apps.academics.models import Subject
 from apps.platform_core.i18n import t
 from apps.question_bank.models import Question, QuestionTag
 
-from ..models import Exam, ExamItem, ExamPeriod, ExamRandomRule, ExamRoom, ExamScheduleWindow, ExamVersion
+from ..models import Exam, ExamItem, ExamRandomRule, ExamScheduleWindow, ExamVersion
 from ..services import UNSET, build_exam_assignment_summary, create_exam, revise_exam
 
 
@@ -21,65 +20,6 @@ class ExamScheduleWindowSerializer(serializers.ModelSerializer):
     class Meta:
         model = ExamScheduleWindow
         fields = ("opens_at", "closes_at")
-
-
-class ExamPeriodSerializer(serializers.ModelSerializer):
-    exams_count = serializers.IntegerField(read_only=True)
-    status = serializers.SerializerMethodField()
-
-    class Meta:
-        model = ExamPeriod
-        fields = (
-            "id",
-            "name",
-            "description",
-            "start_date",
-            "end_date",
-            "status",
-            "exams_count",
-            "created_at",
-            "updated_at",
-        )
-        read_only_fields = ("id", "status", "exams_count", "created_at", "updated_at")
-
-    @extend_schema_field(OpenApiTypes.STR)
-    def get_status(self, obj):
-        today = timezone.localdate()
-        if obj.end_date < today:
-            return "closed"
-        if obj.start_date > today:
-            return "upcoming"
-        return "open"
-
-
-class ExamRoomSerializer(serializers.ModelSerializer):
-    exams_count = serializers.IntegerField(read_only=True)
-
-    class Meta:
-        model = ExamRoom
-        fields = (
-            "id",
-            "name",
-            "location",
-            "capacity",
-            "features",
-            "exams_count",
-            "created_at",
-            "updated_at",
-        )
-        read_only_fields = ("id", "exams_count", "created_at", "updated_at")
-
-
-class ExamPeriodSummarySerializer(serializers.ModelSerializer):
-    class Meta:
-        model = ExamPeriod
-        fields = ("id", "name", "start_date", "end_date")
-
-
-class ExamRoomSummarySerializer(serializers.ModelSerializer):
-    class Meta:
-        model = ExamRoom
-        fields = ("id", "name", "location", "capacity", "features")
 
 
 class ExamQuestionRevisionSummarySerializer(serializers.Serializer):
@@ -142,8 +82,6 @@ class ExamDeliverySummarySerializer(serializers.Serializer):
 
 class ExamReadSerializer(serializers.ModelSerializer):
     subject = ExamSubjectSerializer(read_only=True)
-    period = ExamPeriodSummarySerializer(read_only=True)
-    room = ExamRoomSummarySerializer(read_only=True)
     current_version = ExamVersionSerializer(read_only=True)
     schedule_window = ExamScheduleWindowSerializer(read_only=True)
     assignment_summary = serializers.SerializerMethodField()
@@ -154,9 +92,8 @@ class ExamReadSerializer(serializers.ModelSerializer):
         fields = (
             "id",
             "name",
+            "mode",
             "subject",
-            "period",
-            "room",
             "description",
             "status",
             "duration_minutes",
@@ -195,9 +132,8 @@ class ExamRandomRuleInputSerializer(serializers.Serializer):
 
 class ExamWriteSerializer(serializers.Serializer):
     name = serializers.CharField(required=False)
+    mode = serializers.ChoiceField(choices=Exam.Mode.choices, required=False)
     subject_id = serializers.PrimaryKeyRelatedField(queryset=Subject.objects.all(), source="subject", required=False)
-    period_id = serializers.PrimaryKeyRelatedField(queryset=ExamPeriod.objects.all(), source="period", required=False, allow_null=True)
-    room_id = serializers.PrimaryKeyRelatedField(queryset=ExamRoom.objects.all(), source="room", required=False, allow_null=True)
     description = serializers.CharField(required=False, allow_blank=True)
     status = serializers.ChoiceField(choices=Exam.Status.choices, required=False)
     duration_minutes = serializers.IntegerField(required=False, min_value=1)
@@ -288,13 +224,12 @@ class ExamWriteSerializer(serializers.Serializer):
     def create(self, validated_data):
         return create_exam(
             name=validated_data["name"],
+            mode=validated_data.get("mode", Exam.Mode.EXAM),
             subject=validated_data["subject"],
             created_by=self.context["request"].user,
             request=self.context.get("request"),
             description=validated_data.get("description", ""),
             status=validated_data.get("status", Exam.Status.DRAFT),
-            period=validated_data.get("period"),
-            room=validated_data.get("room"),
             duration_minutes=validated_data["duration_minutes"],
             passing_score=validated_data["passing_score"],
             max_attempts=validated_data["max_attempts"],
@@ -315,9 +250,8 @@ class ExamWriteSerializer(serializers.Serializer):
             updated_by=self.context["request"].user,
             request=self.context.get("request"),
             name=validated_data["name"] if "name" in validated_data else UNSET,
+            mode=validated_data["mode"] if "mode" in validated_data else UNSET,
             subject=validated_data["subject"] if "subject" in validated_data else UNSET,
-            period=validated_data["period"] if "period" in validated_data else UNSET,
-            room=validated_data["room"] if "room" in validated_data else UNSET,
             description=validated_data["description"] if "description" in validated_data else UNSET,
             status=validated_data["status"] if "status" in validated_data else UNSET,
             duration_minutes=validated_data["duration_minutes"] if "duration_minutes" in validated_data else UNSET,
@@ -342,7 +276,6 @@ class ExamGroupAssignmentSerializer(serializers.Serializer):
     name = serializers.CharField()
     member_count = serializers.IntegerField()
     assigned = serializers.BooleanField()
-    school = serializers.DictField()
 
 
 class ExamGroupAssignmentSyncSerializer(serializers.Serializer):

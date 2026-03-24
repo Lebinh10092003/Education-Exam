@@ -86,7 +86,10 @@ export function ManualGrading() {
   const mutation = useMutationState();
 
   const examsList = useAsyncList(
-    () => apiRequest<PaginatedResponse<ExamOption>>("/api/v1/exams/", { query: { page_size: 100 } }),
+    () =>
+      apiRequest<PaginatedResponse<ExamOption>>("/api/v1/exams/", {
+        query: { page_size: 100, mode: "exam" },
+      }),
     [],
   );
 

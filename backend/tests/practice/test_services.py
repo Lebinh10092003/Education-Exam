@@ -41,8 +41,6 @@ def test_create_practice_session_snapshots_requested_objective_questions(candida
     session = create_practice_session(
         candidate=candidate_user,
         subject=subject,
-        duration_minutes=25,
-        difficulty_counts={"easy": 1, "medium": 0, "hard": 1},
     )
 
     assert session.questions.count() == 2
@@ -51,7 +49,26 @@ def test_create_practice_session_snapshots_requested_objective_questions(candida
 
 
 @pytest.mark.django_db
-def test_create_practice_session_rejects_when_bank_cannot_fill_request(candidate_user, subject):
+def test_create_practice_session_caps_question_count_at_thirty(candidate_user, subject, admin_user):
+    from apps.practice.services import PRACTICE_TARGET_QUESTION_COUNT, create_practice_session
+
+    for index in range(35):
+        _create_objective_question(
+            subject=subject,
+            admin_user=admin_user,
+            difficulty="easy",
+            question_text=f"Easy question {index}",
+        )
+
+    session = create_practice_session(candidate=candidate_user, subject=subject)
+
+    assert session.questions.count() == PRACTICE_TARGET_QUESTION_COUNT
+    assert session.question_count == PRACTICE_TARGET_QUESTION_COUNT
+    assert session.duration_minutes == 45
+
+
+@pytest.mark.django_db
+def test_create_practice_session_rejects_when_subject_has_no_objective_questions(candidate_user, subject):
     from rest_framework.exceptions import ValidationError
 
     from apps.practice.services import create_practice_session
@@ -60,8 +77,6 @@ def test_create_practice_session_rejects_when_bank_cannot_fill_request(candidate
         create_practice_session(
             candidate=candidate_user,
             subject=subject,
-            duration_minutes=20,
-            difficulty_counts={"easy": 3, "medium": 0, "hard": 0},
         )
 
 
@@ -79,8 +94,6 @@ def test_submit_practice_session_computes_correct_count_and_percentage(candidate
     session = create_practice_session(
         candidate=candidate_user,
         subject=subject,
-        duration_minutes=15,
-        difficulty_counts={"easy": 1, "medium": 0, "hard": 0},
     )
 
     question = session.questions.first()

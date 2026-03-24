@@ -1,12 +1,10 @@
 import { useMemo, useState } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router";
 import {
-  CalendarRange,
   Clock,
   Copy,
   Eye,
   FileText,
-  MapPin,
   Play,
   Settings2,
   Trash2,
@@ -28,6 +26,7 @@ import { useMutationState } from "../hooks/useMutationState";
 interface ExamDetailRecord {
   id: number;
   name: string;
+  mode: "exam" | "class";
   description: string;
   status: "draft" | "scheduled" | "open" | "paused" | "closed" | "archived";
   duration_minutes: number;
@@ -42,19 +41,6 @@ interface ExamDetailRecord {
     code: string;
     color: string;
   };
-  period: {
-    id: number;
-    name: string;
-    start_date: string;
-    end_date: string;
-  } | null;
-  room: {
-    id: number;
-    name: string;
-    location: string;
-    capacity: number;
-    features: string[];
-  } | null;
   current_version: {
     id: number;
     version_number: number;
@@ -119,6 +105,10 @@ const formatDateTime = (value: string | null) => {
 };
 
 const formatBoolean = (value: boolean) => (value ? "Enabled" : "Disabled");
+const examModeBadgeClassNames = {
+  exam: "border-blue-200 bg-blue-50 text-blue-700",
+  class: "border-emerald-200 bg-emerald-50 text-emerald-700",
+} as const;
 
 type ExamTab = "details" | "assignments" | "questions" | "rules" | "monitoring";
 
@@ -142,11 +132,17 @@ export function ExamDetail() {
   );
 
   const exam = examDetail.data;
-  const activeTab: ExamTab = exam?.enable_proctoring && requestedMonitoringTab ? "monitoring" : currentTab;
+  const isClass = exam?.mode === "class";
+  const activeTab: ExamTab =
+    exam && exam.mode === "exam" && exam.enable_proctoring && requestedMonitoringTab
+      ? "monitoring"
+      : currentTab;
   const stats = useMemo(() => {
     if (!exam) {
       return {
         assigned: 0,
+        directUsers: 0,
+        groups: 0,
         completed: 0,
         inProgress: 0,
         notStarted: 0,
@@ -154,11 +150,13 @@ export function ExamDetail() {
     }
 
     const assigned = exam.assignment_summary.total_candidates;
+    const directUsers = exam.assignment_summary.user_count;
+    const groups = exam.assignment_summary.group_count;
     const completed = exam.delivery_summary.submitted_sessions;
     const inProgress = exam.delivery_summary.in_progress_sessions;
     const notStarted = Math.max(assigned - completed - inProgress, 0);
 
-    return { assigned, completed, inProgress, notStarted };
+    return { assigned, directUsers, groups, completed, inProgress, notStarted };
   }, [exam]);
 
   const updateTab = (nextTab: ExamTab) => {
@@ -184,10 +182,10 @@ export function ExamDetail() {
           body: {},
         }),
       );
-      await notify.success("Exam cloned.");
+      await notify.success(isClass ? "Class cloned." : "Exam cloned.");
       navigate(`/exams/${created.id}`);
     } catch (error) {
-      const message = error instanceof Error ? error.message : "Unable to clone the exam.";
+      const message = error instanceof Error ? error.message : isClass ? "Unable to clone the class." : "Unable to clone the exam.";
       notify.error(message);
     }
   };
@@ -198,9 +196,9 @@ export function ExamDetail() {
     }
 
     const confirmed = await notify.confirm({
-      title: "Delete this exam?",
-      text: `Exam "${exam.name}" will be permanently removed.`,
-      confirmText: "Delete Exam",
+      title: isClass ? "Delete this class?" : "Delete this exam?",
+      text: `${isClass ? "Class" : "Exam"} "${exam.name}" will be permanently removed.`,
+      confirmText: isClass ? "Delete Class" : "Delete Exam",
       confirmButtonColor: "#dc2626",
     });
     if (!confirmed) {
@@ -213,10 +211,10 @@ export function ExamDetail() {
           method: "DELETE",
         }),
       );
-      await notify.success("Exam deleted.");
+      await notify.success(isClass ? "Class deleted." : "Exam deleted.");
       navigate("/exams");
     } catch (error) {
-      const message = error instanceof Error ? error.message : "Unable to delete the exam.";
+      const message = error instanceof Error ? error.message : isClass ? "Unable to delete the class." : "Unable to delete the exam.";
       notify.error(message);
     }
   };
@@ -243,25 +241,32 @@ export function ExamDetail() {
     <div>
       <PageHeader
         title={exam.name}
-        description={exam.description || "Live exam overview, assignment summary, and current question composition."}
+        description={
+          exam.description ||
+          (isClass
+            ? "Learning class overview, enrollment summary, and subject access scope."
+            : "Live exam overview, assignment summary, and current question composition.")
+        }
         action={
           <div className="flex flex-wrap gap-2">
             <Link to={`/exams/${exam.id}/assign`}>
               <Button variant="outline">
                 <Users className="mr-2 h-4 w-4" />
-                Assign Candidates
+                {isClass ? "Manage Enrollment" : "Assign Candidates"}
               </Button>
             </Link>
-            <Link to={`/exams/${exam.id}?tab=monitoring`}>
-              <Button variant="outline">
-                <Play className="mr-2 h-4 w-4" />
-                Live Monitor
-              </Button>
-            </Link>
+            {!isClass && exam.enable_proctoring ? (
+              <Link to={`/exams/${exam.id}?tab=monitoring`}>
+                <Button variant="outline">
+                  <Play className="mr-2 h-4 w-4" />
+                  Live Monitor
+                </Button>
+              </Link>
+            ) : null}
             <Link to={`/exams/${exam.id}/edit`}>
               <Button variant="outline">
                 <Settings2 className="mr-2 h-4 w-4" />
-                Edit Exam
+                {isClass ? "Edit Class" : "Edit Exam"}
               </Button>
             </Link>
           </div>
@@ -279,48 +284,65 @@ export function ExamDetail() {
           <CardHeader className="pb-3">
             <CardTitle className="flex items-center gap-2 text-base">
               <Users className="h-4 w-4 text-blue-600" />
-              Assigned
+              {isClass ? "Enrolled" : "Assigned"}
             </CardTitle>
           </CardHeader>
           <CardContent>
             <p className="text-3xl font-bold text-gray-900">{stats.assigned}</p>
-            <p className="mt-1 text-sm text-gray-600">Total assignment scope</p>
+            <p className="mt-1 text-sm text-gray-600">
+              {isClass ? "Total learners with access" : "Total assignment scope"}
+            </p>
           </CardContent>
         </Card>
         <Card>
           <CardHeader className="pb-3">
             <CardTitle className="flex items-center gap-2 text-base">
               <FileText className="h-4 w-4 text-green-600" />
-              Submitted
+              {isClass ? "Direct Users" : "Submitted"}
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-3xl font-bold text-gray-900">{stats.completed}</p>
-            <p className="mt-1 text-sm text-gray-600">Completed sessions</p>
+            <p className="text-3xl font-bold text-gray-900">{isClass ? stats.directUsers : stats.completed}</p>
+            <p className="mt-1 text-sm text-gray-600">
+              {isClass ? "Assigned without a group" : "Completed sessions"}
+            </p>
           </CardContent>
         </Card>
         <Card>
           <CardHeader className="pb-3">
             <CardTitle className="flex items-center gap-2 text-base">
               <Play className="h-4 w-4 text-amber-600" />
-              In Progress
+              {isClass ? "Groups" : "In Progress"}
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-3xl font-bold text-gray-900">{stats.inProgress}</p>
-            <p className="mt-1 text-sm text-gray-600">Active sessions now</p>
+            <p className="text-3xl font-bold text-gray-900">{isClass ? stats.groups : stats.inProgress}</p>
+            <p className="mt-1 text-sm text-gray-600">
+              {isClass ? "Assigned learning groups" : "Active sessions now"}
+            </p>
           </CardContent>
         </Card>
         <Card>
           <CardHeader className="pb-3">
             <CardTitle className="flex items-center gap-2 text-base">
               <Clock className="h-4 w-4 text-gray-600" />
-              Not Started
+              {isClass ? "Mode" : "Not Started"}
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-3xl font-bold text-gray-900">{stats.notStarted}</p>
-            <p className="mt-1 text-sm text-gray-600">Awaiting first session</p>
+            {isClass ? (
+              <>
+                <Badge variant="outline" className={examModeBadgeClassNames[exam.mode]}>
+                  Class
+                </Badge>
+                <p className="mt-3 text-sm text-gray-600">Materials and practice access only</p>
+              </>
+            ) : (
+              <>
+                <p className="text-3xl font-bold text-gray-900">{stats.notStarted}</p>
+                <p className="mt-1 text-sm text-gray-600">Awaiting first session</p>
+              </>
+            )}
           </CardContent>
         </Card>
       </div>
@@ -332,9 +354,9 @@ export function ExamDetail() {
               <TabsList>
                 <TabsTrigger value="details">Details</TabsTrigger>
                 <TabsTrigger value="assignments">Assignments</TabsTrigger>
-                <TabsTrigger value="questions">Questions</TabsTrigger>
-                <TabsTrigger value="rules">Random Rules</TabsTrigger>
-                {exam.enable_proctoring ? <TabsTrigger value="monitoring">Monitoring</TabsTrigger> : null}
+                {!isClass ? <TabsTrigger value="questions">Questions</TabsTrigger> : null}
+                {!isClass ? <TabsTrigger value="rules">Random Rules</TabsTrigger> : null}
+                {!isClass && exam.enable_proctoring ? <TabsTrigger value="monitoring">Monitoring</TabsTrigger> : null}
               </TabsList>
 
               <TabsContent value="details" className="space-y-6">
@@ -345,62 +367,44 @@ export function ExamDetail() {
                     <p className="text-xs text-gray-500">{exam.subject.code}</p>
                   </div>
                   <div className="rounded-lg border border-gray-200 p-4">
+                    <p className="text-sm text-gray-500">Mode</p>
+                    <div className="mt-2">
+                      <Badge variant="outline" className={examModeBadgeClassNames[exam.mode]}>
+                        {isClass ? "Class" : "Exam"}
+                      </Badge>
+                    </div>
+                  </div>
+                  <div className="rounded-lg border border-gray-200 p-4">
                     <p className="text-sm text-gray-500">Status</p>
                     <div className="mt-2">
                       <StatusBadge status={exam.status} />
                     </div>
                   </div>
                   <div className="rounded-lg border border-gray-200 p-4">
-                    <p className="text-sm text-gray-500">Schedule Opens</p>
+                    <p className="text-sm text-gray-500">{isClass ? "Access Starts" : "Schedule Opens"}</p>
                     <p className="mt-2 font-medium text-gray-900">
                       {formatDateTime(exam.schedule_window?.opens_at ?? null)}
                     </p>
                   </div>
                   <div className="rounded-lg border border-gray-200 p-4">
-                    <p className="text-sm text-gray-500">Schedule Closes</p>
+                    <p className="text-sm text-gray-500">{isClass ? "Access Ends" : "Schedule Closes"}</p>
                     <p className="mt-2 font-medium text-gray-900">
                       {formatDateTime(exam.schedule_window?.closes_at ?? null)}
                     </p>
                   </div>
                   <div className="rounded-lg border border-gray-200 p-4">
-                    <p className="text-sm text-gray-500">Duration</p>
-                    <p className="mt-2 font-medium text-gray-900">{exam.duration_minutes} minutes</p>
+                    <p className="text-sm text-gray-500">{isClass ? "Learning Access" : "Duration"}</p>
+                    <p className="mt-2 font-medium text-gray-900">
+                      {isClass ? "Subject materials and practice" : `${exam.duration_minutes} minutes`}
+                    </p>
                   </div>
                   <div className="rounded-lg border border-gray-200 p-4">
-                    <p className="text-sm text-gray-500">Exam Period</p>
-                    <div className="mt-2 flex items-start gap-2">
-                      <CalendarRange className="mt-0.5 h-4 w-4 text-blue-600" />
-                      <div>
-                        <p className="font-medium text-gray-900">{exam.period?.name ?? "Not assigned"}</p>
-                        {exam.period ? (
-                          <p className="text-xs text-gray-500">
-                            {exam.period.start_date} to {exam.period.end_date}
-                          </p>
-                        ) : null}
-                      </div>
-                    </div>
+                    <p className="text-sm text-gray-500">{isClass ? "Roster Type" : "Passing Score"}</p>
+                    <p className="mt-2 font-medium text-gray-900">{isClass ? "Learning roster" : `${exam.passing_score}%`}</p>
                   </div>
                   <div className="rounded-lg border border-gray-200 p-4">
-                    <p className="text-sm text-gray-500">Passing Score</p>
-                    <p className="mt-2 font-medium text-gray-900">{exam.passing_score}%</p>
-                  </div>
-                  <div className="rounded-lg border border-gray-200 p-4">
-                    <p className="text-sm text-gray-500">Max Attempts</p>
-                    <p className="mt-2 font-medium text-gray-900">{exam.max_attempts}</p>
-                  </div>
-                  <div className="rounded-lg border border-gray-200 p-4">
-                    <p className="text-sm text-gray-500">Exam Room</p>
-                    <div className="mt-2 flex items-start gap-2">
-                      <MapPin className="mt-0.5 h-4 w-4 text-green-600" />
-                      <div>
-                        <p className="font-medium text-gray-900">{exam.room?.name ?? "Not assigned"}</p>
-                        {exam.room ? (
-                          <p className="text-xs text-gray-500">
-                            {exam.room.location || "No location"} • Capacity {exam.room.capacity}
-                          </p>
-                        ) : null}
-                      </div>
-                    </div>
+                    <p className="text-sm text-gray-500">{isClass ? "Direct User Assignments" : "Max Attempts"}</p>
+                    <p className="mt-2 font-medium text-gray-900">{isClass ? exam.assignment_summary.user_count : exam.max_attempts}</p>
                   </div>
                   <div className="rounded-lg border border-gray-200 p-4">
                     <p className="text-sm text-gray-500">Current Version</p>
@@ -410,26 +414,34 @@ export function ExamDetail() {
                   </div>
                 </div>
 
-                <div className="grid gap-4 md:grid-cols-3">
-                  <div className="rounded-lg border border-gray-200 p-4">
-                    <p className="text-sm text-gray-500">Shuffle Questions</p>
-                    <p className="mt-2 font-medium text-gray-900">
-                      {formatBoolean(exam.shuffle_questions)}
-                    </p>
+                {isClass ? (
+                  <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-900">
+                    Assigned learners inherit subject materials and practice access from this class.
+                    Class records are not shown in the candidate exam delivery list and do not run
+                    live proctoring sessions.
                   </div>
-                  <div className="rounded-lg border border-gray-200 p-4">
-                    <p className="text-sm text-gray-500">Show Results Immediately</p>
-                    <p className="mt-2 font-medium text-gray-900">
-                      {formatBoolean(exam.show_results_immediately)}
-                    </p>
+                ) : (
+                  <div className="grid gap-4 md:grid-cols-3">
+                    <div className="rounded-lg border border-gray-200 p-4">
+                      <p className="text-sm text-gray-500">Shuffle Questions</p>
+                      <p className="mt-2 font-medium text-gray-900">
+                        {formatBoolean(exam.shuffle_questions)}
+                      </p>
+                    </div>
+                    <div className="rounded-lg border border-gray-200 p-4">
+                      <p className="text-sm text-gray-500">Show Results Immediately</p>
+                      <p className="mt-2 font-medium text-gray-900">
+                        {formatBoolean(exam.show_results_immediately)}
+                      </p>
+                    </div>
+                    <div className="rounded-lg border border-gray-200 p-4">
+                      <p className="text-sm text-gray-500">Proctoring</p>
+                      <p className="mt-2 font-medium text-gray-900">
+                        {formatBoolean(exam.enable_proctoring)}
+                      </p>
+                    </div>
                   </div>
-                  <div className="rounded-lg border border-gray-200 p-4">
-                    <p className="text-sm text-gray-500">Proctoring</p>
-                    <p className="mt-2 font-medium text-gray-900">
-                      {formatBoolean(exam.enable_proctoring)}
-                    </p>
-                  </div>
-                </div>
+                )}
               </TabsContent>
 
               <TabsContent value="assignments" className="space-y-4">
@@ -447,7 +459,7 @@ export function ExamDetail() {
                     </p>
                   </div>
                   <div className="rounded-lg border border-gray-200 p-4">
-                    <p className="text-sm text-gray-500">Total Candidates</p>
+                    <p className="text-sm text-gray-500">{isClass ? "Total Learners" : "Total Candidates"}</p>
                     <p className="mt-2 text-2xl font-semibold text-gray-900">
                       {exam.assignment_summary.total_candidates}
                     </p>
@@ -456,7 +468,7 @@ export function ExamDetail() {
 
                 {exam.assignment_summary.assigned_groups.length === 0 ? (
                   <div className="rounded-lg border border-dashed border-gray-300 px-4 py-8 text-center text-sm text-gray-500">
-                    No groups assigned yet.
+                    {isClass ? "No groups enrolled yet." : "No groups assigned yet."}
                   </div>
                 ) : (
                   <div className="space-y-3">
@@ -469,7 +481,7 @@ export function ExamDetail() {
                           <p className="font-medium text-gray-900">{group.name}</p>
                           <p className="text-sm text-gray-500">{group.member_count} members</p>
                         </div>
-                        <Badge variant="outline">Group #{group.id}</Badge>
+                        <Badge variant="outline">{isClass ? "Enrollment Group" : `Group #${group.id}`}</Badge>
                       </div>
                     ))}
                   </div>
@@ -527,7 +539,7 @@ export function ExamDetail() {
                 )}
               </TabsContent>
 
-              {exam.enable_proctoring ? (
+              {!isClass && exam.enable_proctoring ? (
                 <TabsContent value="monitoring" className="space-y-3">
                   <LiveMonitoring embedded examId={exam.id} />
                 </TabsContent>
@@ -544,15 +556,17 @@ export function ExamDetail() {
             <Link to={`/exams/${exam.id}/assign`} className="block">
               <Button variant="outline" className="w-full justify-start">
                 <Users className="mr-2 h-4 w-4" />
-                Manage Assignments
+                {isClass ? "Manage Enrollment" : "Manage Assignments"}
               </Button>
             </Link>
-            <Link to={`/exams/${exam.id}?tab=monitoring`} className="block">
-              <Button variant="outline" className="w-full justify-start">
-                <Eye className="mr-2 h-4 w-4" />
-                Monitor Delivery
-              </Button>
-            </Link>
+            {!isClass && exam.enable_proctoring ? (
+              <Link to={`/exams/${exam.id}?tab=monitoring`} className="block">
+                <Button variant="outline" className="w-full justify-start">
+                  <Eye className="mr-2 h-4 w-4" />
+                  Monitor Delivery
+                </Button>
+              </Link>
+            ) : null}
             <Button
               variant="outline"
               className="w-full justify-start"
@@ -560,7 +574,7 @@ export function ExamDetail() {
               disabled={mutation.isSubmitting}
             >
               <Copy className="mr-2 h-4 w-4" />
-              Clone Exam
+              {isClass ? "Clone Class" : "Clone Exam"}
             </Button>
             <Button
               variant="outline"
@@ -569,7 +583,7 @@ export function ExamDetail() {
               disabled={mutation.isSubmitting}
             >
               <Trash2 className="mr-2 h-4 w-4" />
-              Delete Exam
+              {isClass ? "Delete Class" : "Delete Exam"}
             </Button>
           </CardContent>
         </Card>

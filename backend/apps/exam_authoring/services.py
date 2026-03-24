@@ -541,6 +541,7 @@ def _build_current_composition(exam):
 def create_exam(
     *,
     name,
+    mode=Exam.Mode.EXAM,
     subject,
     created_by,
     description="",
@@ -551,8 +552,6 @@ def create_exam(
     shuffle_questions=False,
     show_results_immediately=False,
     enable_proctoring=False,
-    period=None,
-    room=None,
     opening_at=None,
     closing_at=None,
     manual_question_ids=None,
@@ -563,6 +562,7 @@ def create_exam(
 ):
     exam = Exam.objects.create(
         name=name,
+        mode=mode,
         subject=subject,
         description=description or "",
         status=status,
@@ -572,8 +572,6 @@ def create_exam(
         shuffle_questions=shuffle_questions,
         show_results_immediately=show_results_immediately,
         enable_proctoring=enable_proctoring,
-        period=period,
-        room=room,
         created_by=created_by,
         updated_by=created_by,
     )
@@ -613,6 +611,7 @@ def revise_exam(
     exam,
     updated_by,
     name=UNSET,
+    mode=UNSET,
     subject=UNSET,
     description=UNSET,
     status=UNSET,
@@ -622,8 +621,6 @@ def revise_exam(
     shuffle_questions=UNSET,
     show_results_immediately=UNSET,
     enable_proctoring=UNSET,
-    period=UNSET,
-    room=UNSET,
     opening_at=UNSET,
     closing_at=UNSET,
     manual_question_ids=UNSET,
@@ -637,6 +634,7 @@ def revise_exam(
 
     for field_name, value in (
         ("name", name),
+        ("mode", mode),
         ("subject", subject),
         ("description", description),
         ("status", status),
@@ -646,8 +644,6 @@ def revise_exam(
         ("shuffle_questions", shuffle_questions),
         ("show_results_immediately", show_results_immediately),
         ("enable_proctoring", enable_proctoring),
-        ("period", period),
-        ("room", room),
     ):
         if value is not UNSET:
             setattr(exam, field_name, value)
@@ -697,6 +693,7 @@ def revise_exam(
 def clone_exam(*, exam, created_by):
     cloned_exam = Exam.objects.create(
         name=f"{exam.name} (Copy)",
+        mode=exam.mode,
         subject=exam.subject,
         description=exam.description,
         status=Exam.Status.DRAFT,
@@ -706,8 +703,6 @@ def clone_exam(*, exam, created_by):
         shuffle_questions=exam.shuffle_questions,
         show_results_immediately=exam.show_results_immediately,
         enable_proctoring=exam.enable_proctoring,
-        period=exam.period,
-        room=exam.room,
         created_by=created_by,
         updated_by=created_by,
     )
@@ -759,7 +754,7 @@ def clone_exam(*, exam, created_by):
 def build_exam_assignment_summary(exam):
     group_assignments = list(
         exam.assignments.filter(group__isnull=False)
-        .select_related("group", "group__school")
+        .select_related("group")
         .annotate(
             member_count=Count(
                 "group__memberships",

@@ -15,7 +15,6 @@ def build_active_session(*, subject, admin_user, candidate_user, exam_name=None)
     )
     group = CandidateGroup.objects.create(
         name=f"Proctoring Group {candidate_user.id}",
-        school=school,
     )
     GroupMembership.objects.create(group=group, user=candidate_user)
     objective_question = create_question(

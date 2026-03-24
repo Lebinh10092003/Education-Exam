@@ -11,7 +11,7 @@ from django.core.files.base import ContentFile
 from django.utils import timezone
 
 from apps.academics.models import Subject
-from apps.exam_authoring.models import Exam, ExamPeriod, ExamRoom
+from apps.exam_authoring.models import Exam
 from apps.exam_authoring.services import create_exam
 from apps.exam_delivery.services import create_autosave_snapshot, save_session_answer, start_or_resume_session, submit_session
 from apps.grading.models import Result
@@ -46,8 +46,6 @@ class DemoSeedContext:
     groups: dict[str, CandidateGroup] = field(default_factory=dict)
     subjects: dict[str, Subject] = field(default_factory=dict)
     questions: dict[str, Question] = field(default_factory=dict)
-    periods: dict[str, ExamPeriod] = field(default_factory=dict)
-    rooms: dict[str, ExamRoom] = field(default_factory=dict)
     exams: dict[str, Exam] = field(default_factory=dict)
     materials: dict[str, Material] = field(default_factory=dict)
     sessions: dict[str, object] = field(default_factory=dict)
@@ -62,7 +60,6 @@ def seed_full_demo_data():
     _seed_institutions(context)
     _seed_subjects(context)
     _seed_question_bank(context)
-    _seed_periods_and_rooms(context)
     _seed_exams(context)
     _seed_materials(context)
     _seed_sessions_results_and_proctoring(context)
@@ -249,17 +246,14 @@ def _seed_institutions(context: DemoSeedContext):
     context.groups["north_10a"] = CandidateGroup.objects.create(
         name="North Valley - Grade 10A",
         description="Main mathematics practice group.",
-        school=context.schools["north"],
     )
     context.groups["north_10b"] = CandidateGroup.objects.create(
         name="North Valley - Grade 10B",
         description="Secondary science group.",
-        school=context.schools["north"],
     )
     context.groups["south_11a"] = CandidateGroup.objects.create(
         name="South City - Grade 11A",
         description="Senior literature and biology candidates.",
-        school=context.schools["south"],
     )
     context.groups["retake"] = CandidateGroup.objects.create(
         name="Cross-School Retake Group",
@@ -530,43 +524,6 @@ def _seed_question_bank(context: DemoSeedContext):
         ],
         correct_option_keys=["A"],
     )
-
-
-def _seed_periods_and_rooms(context: DemoSeedContext):
-    today = context.now.date()
-    context.periods["midterm"] = ExamPeriod.objects.create(
-        name="Spring Midterm 2026",
-        description="Main midterm period for current demo data.",
-        start_date=today - timedelta(days=7),
-        end_date=today + timedelta(days=14),
-    )
-    context.periods["practice"] = ExamPeriod.objects.create(
-        name="Practice Window 2026",
-        description="Practice and mock exam period.",
-        start_date=today - timedelta(days=3),
-        end_date=today + timedelta(days=30),
-    )
-
-    context.rooms["lab_a"] = ExamRoom.objects.create(
-        name="Computer Lab A",
-        location="Building A - Floor 2",
-        capacity=40,
-        features=["desktop", "webcam", "headset"],
-    )
-    context.rooms["hall_b"] = ExamRoom.objects.create(
-        name="Assessment Hall B",
-        location="Building B - Floor 1",
-        capacity=80,
-        features=["projector", "stable_network"],
-    )
-    context.rooms["remote"] = ExamRoom.objects.create(
-        name="Remote Candidate Pool",
-        location="Online",
-        capacity=200,
-        features=["browser_lock", "screen_capture"],
-    )
-
-
 def _seed_exams(context: DemoSeedContext):
     now = context.now
     examiner1 = context.users["examiner1"]
@@ -583,8 +540,6 @@ def _seed_exams(context: DemoSeedContext):
         shuffle_questions=True,
         show_results_immediately=False,
         enable_proctoring=True,
-        period=context.periods["practice"],
-        room=context.rooms["lab_a"],
         opening_at=now - timedelta(days=1),
         closing_at=now + timedelta(days=3),
         manual_question_ids=[
@@ -614,8 +569,6 @@ def _seed_exams(context: DemoSeedContext):
         shuffle_questions=False,
         show_results_immediately=False,
         enable_proctoring=False,
-        period=context.periods["midterm"],
-        room=context.rooms["hall_b"],
         opening_at=now - timedelta(hours=12),
         closing_at=now + timedelta(days=2),
         manual_question_ids=[
@@ -637,8 +590,6 @@ def _seed_exams(context: DemoSeedContext):
         shuffle_questions=False,
         show_results_immediately=True,
         enable_proctoring=False,
-        period=context.periods["midterm"],
-        room=context.rooms["hall_b"],
         opening_at=now + timedelta(days=1),
         closing_at=now + timedelta(days=2),
         manual_question_ids=[
@@ -662,8 +613,6 @@ def _seed_exams(context: DemoSeedContext):
         shuffle_questions=False,
         show_results_immediately=True,
         enable_proctoring=False,
-        period=context.periods["practice"],
-        room=context.rooms["remote"],
         opening_at=now - timedelta(days=2),
         closing_at=now + timedelta(days=1),
         manual_question_ids=[
@@ -674,21 +623,16 @@ def _seed_exams(context: DemoSeedContext):
         group_ids=[context.groups["south_11a"].id],
     )
 
-    context.exams["ops_draft"] = create_exam(
-        name="Operations Sandbox Draft",
+    context.exams["physics_class"] = create_exam(
+        name="Physics Learning Class",
+        mode=Exam.Mode.CLASS,
         subject=context.subjects["physics"],
         created_by=examiner1,
-        description="Draft-only sandbox exam for route coverage.",
+        description="Draft learning container that unlocks subject materials and practice access.",
         status=Exam.Status.DRAFT,
-        duration_minutes=30,
-        passing_score=50,
-        max_attempts=1,
         shuffle_questions=False,
         show_results_immediately=False,
         enable_proctoring=False,
-        period=context.periods["practice"],
-        room=context.rooms["remote"],
-        manual_question_ids=[context.questions["physics_force"].id],
         group_ids=[context.groups["retake"].id],
     )
 

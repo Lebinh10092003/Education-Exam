@@ -253,9 +253,33 @@ const VI_EXACT_TRANSLATIONS: Record<string, string> = {
   "Create New Exam": "Tạo kỳ thi mới",
   "Edit Exam": "Sửa kỳ thi",
   "Assign Exam": "Phân công kỳ thi",
+  "Create Exam / Class": "Tạo kỳ thi / lớp học",
+  "All Modes": "Tất cả loại",
+  Mode: "Loại",
+  Class: "Lớp học",
+  "Edit Class": "Sửa lớp học",
+  "View Class": "Xem lớp học",
+  "Assign Class": "Phân công lớp học",
+  Enroll: "Ghi danh",
+  Enrollment: "Ghi danh",
+  "Manage Enrollment": "Quản lý ghi danh",
+  "Save Enrollment": "Lưu ghi danh",
+  "Learning access only": "Chỉ cấp quyền học tập",
+  Access: "Truy cập",
+  "Learning container": "Lớp học",
+  "No delivery window": "Không có khung thi",
+  "Load class enrollment targets": "Tải đối tượng ghi danh lớp học",
+  "Loading class enrollment groups...": "Đang tải các nhóm ghi danh lớp học...",
+  "Import Students Directly To This Class": "Import học sinh trực tiếp vào lớp học này",
   "Live exam overview, assignment summary, and current question composition.": "Tổng quan kỳ thi trực tiếp, tóm tắt phân công và cấu trúc câu hỏi hiện tại.",
+  "Learning class overview, enrollment summary, and subject access scope.": "Tổng quan lớp học, tóm tắt ghi danh và phạm vi truy cập môn học.",
   "Basic Info": "Thông tin cơ bản",
+  "Basic Class Information": "Thông tin lớp học cơ bản",
   "Exam details": "Chi tiết kỳ thi",
+  "Class details": "Chi tiết lớp học",
+  "Learning Access": "Quyền truy cập học tập",
+  "How practice is unlocked": "Cơ chế mở luyện tập",
+  "Assign learner groups": "Gán nhóm người học",
   Questions: "Câu hỏi",
   "Select questions": "Chọn câu hỏi",
   Assignment: "Phân công",
@@ -311,6 +335,7 @@ const VI_EXACT_TRANSLATIONS: Record<string, string> = {
   "Manage subjects, codes, colors, and availability using the backend API.": "Quản lý môn học, mã, màu sắc và trạng thái hoạt động bằng API backend.",
   "Manage revisioned questions, answer keys, and imports using the backend.": "Quản lý câu hỏi theo phiên bản, đáp án và import bằng backend.",
   "Create groups, assign schools, and add candidates with live backend data.": "Tạo nhóm, gán trường và thêm thí sinh bằng dữ liệu backend trực tiếp.",
+  "Create reusable candidate groups and add candidates with live backend data.": "Tạo các nhóm thí sinh dùng lại và thêm thí sinh bằng dữ liệu backend trực tiếp.",
   "Follow the steps to define exam details, question composition, and assignments.": "Thực hiện theo từng bước để thiết lập thông tin kỳ thi, cấu trúc câu hỏi và phân công.",
   "Create, schedule, assign, and monitor exams with live backend data.": "Tạo, lên lịch, phân công và giám sát kỳ thi bằng dữ liệu backend trực tiếp.",
   "Review subjective answers and submit grades using the live grading task API.": "Rà soát câu trả lời tự luận và gửi điểm bằng API chấm trực tiếp.",
@@ -623,6 +648,152 @@ const EXTRA_VI_EXACT_TRANSLATIONS: Record<string, string> = {
   "Candidate exited fullscreen mode.": "Thí sinh đã thoát chế độ toàn màn hình.",
   "Candidate exited fullscreen during a protected exam.":
     "Thí sinh đã thoát chế độ toàn màn hình trong một kỳ thi được bảo vệ.",
+  "Candidate switched away from the exam tab once.":
+    "Thí sinh đã chuyển sang tab khác khỏi bài thi một lần.",
+  "Candidate switched away from the exam tab.":
+    "Thí sinh đã chuyển sang tab khác khỏi bài thi.",
+  Easy: "Dễ",
+  Medium: "Trung bình",
+  Hard: "Khó",
+  Group: "Nhóm",
+  "Create Group": "Tạo nhóm",
+  "Create group": "Tạo nhóm",
+  "Delete this group?": "Xóa nhóm này?",
+  "Delete Group": "Xóa nhóm",
+  "Loading members...": "Đang tải thành viên...",
+  "Define the subject container and learner enrollment used to unlock materials and practice.":
+    "Thiết lập không gian môn học và ghi danh người học để mở tài liệu và luyện tập.",
+  "Class mode unlocks subject materials and random practice for assigned learners. It does not create a fixed deliverable exam paper.":
+    "Chế độ lớp học mở tài liệu môn học và bài luyện tập ngẫu nhiên cho người học được gán. Chế độ này không tạo ra một đề thi cố định để nộp.",
+  "Each practice attempt will request up to 30 random objective questions from the selected subject. If the question bank has fewer than 30 eligible questions, the backend will use the maximum available set.":
+    "Mỗi lượt luyện tập sẽ yêu cầu tối đa 30 câu hỏi trắc nghiệm ngẫu nhiên từ môn học đã chọn. Nếu ngân hàng câu hỏi có ít hơn 30 câu phù hợp, backend sẽ dùng tối đa số câu hiện có.",
+  "Question difficulty distribution is randomized by the backend from the current subject bank. No question composition needs to be configured for class mode here.":
+    "Phân bổ độ khó của câu hỏi sẽ được backend chọn ngẫu nhiên từ ngân hàng câu hỏi hiện tại của môn học. Không cần cấu hình cấu trúc câu hỏi cho chế độ lớp học tại đây.",
+  "Continue to the next step to enroll learner groups into this subject class.":
+    "Tiếp tục sang bước tiếp theo để ghi danh các nhóm người học vào lớp học môn này.",
+  "Class mode does not require a fixed schedule window or proctoring setup.":
+    "Chế độ lớp học không yêu cầu khung lịch cố định hay cấu hình giám sát.",
+  "Access is controlled by enrollment and the class status.":
+    "Quyền truy cập được kiểm soát bởi ghi danh và trạng thái lớp học.",
+  "Class mode does not require an exam room, schedule window, or proctoring setup. Access is controlled by enrollment and the class status.":
+    "Chế độ lớp học không yêu cầu phòng thi, khung lịch hay cấu hình giám sát. Quyền truy cập được kiểm soát bởi ghi danh và trạng thái lớp học.",
+  "Assign Candidates": "Gán thí sinh",
+  "Live Monitor": "Giám sát trực tiếp",
+  "Total assignment scope": "Tổng phạm vi phân công",
+  "Completed sessions": "Phiên đã hoàn thành",
+  "Active sessions now": "Phiên đang hoạt động",
+  "Awaiting first session": "Đang chờ phiên đầu tiên",
+  Details: "Chi tiết",
+  Assignments: "Phân công",
+  "Random Rules": "Luật ngẫu nhiên",
+  Monitoring: "Giám sát",
+  "Access Starts": "Bắt đầu truy cập",
+  "Access Ends": "Kết thúc truy cập",
+  "Schedule Opens": "Mở lịch",
+  "Schedule Closes": "Đóng lịch",
+  "Class Period": "Đợt học",
+  "Roster Type": "Loại danh sách",
+  "Direct User Assignments": "Gán người dùng trực tiếp",
+  "Class Room": "Phòng học",
+  "Learning roster": "Danh sách học tập",
+  "Current Version": "Phiên bản hiện tại",
+  "Assigned learners inherit subject materials and practice access from this class. Class records are not shown in the candidate exam delivery list and do not run live proctoring sessions.":
+    "Người học được gán sẽ kế thừa quyền truy cập tài liệu môn học và luyện tập từ lớp học này. Bản ghi lớp học không hiển thị trong danh sách làm bài thi của thí sinh và không chạy phiên giám sát trực tiếp.",
+  "Assigned Groups": "Nhóm đã gán",
+  "Total Learners": "Tổng người học",
+  "No groups enrolled yet.": "Chưa có nhóm nào được ghi danh.",
+  "No groups assigned yet.": "Chưa có nhóm nào được gán.",
+  "Enrollment Group": "Nhóm ghi danh",
+  "No question composition is available yet.": "Chưa có cấu trúc câu hỏi nào.",
+  "This exam does not use random selection rules.": "Kỳ thi này không dùng luật chọn ngẫu nhiên.",
+  "Quick Actions": "Thao tác nhanh",
+  "Manage Assignments": "Quản lý phân công",
+  "Monitor Delivery": "Giám sát quá trình thi",
+  "Clone Class": "Nhân bản lớp học",
+  "Clone Exam": "Nhân bản kỳ thi",
+  "Delete Class": "Xóa lớp học",
+  "Delete Exam": "Xóa kỳ thi",
+  "Materials and practice access only": "Chỉ truy cập tài liệu và luyện tập",
+  "Proctoring Workspace": "Không gian giám sát",
+  "Live operations for": "Vận hành trực tiếp cho",
+  ", grouped by overview, alerts, candidates, and violation history.":
+    ", được nhóm theo tổng quan, cảnh báo, thí sinh và lịch sử vi phạm.",
+  "this exam": "kỳ thi này",
+  "Pause Exam": "Tạm dừng kỳ thi",
+  "End Exam": "Kết thúc kỳ thi",
+  "This exam does not have proctoring enabled. Monitoring is only available for protected exams.":
+    "Kỳ thi này chưa bật giám sát. Chỉ các kỳ thi được bảo vệ mới có thể theo dõi giám sát.",
+  "Monitoring socket:": "Kết nối giám sát:",
+  connected: "đã kết nối",
+  connecting: "đang kết nối",
+  reconnecting: "đang kết nối lại",
+  Overview: "Tổng quan",
+  "Live Alerts": "Cảnh báo trực tiếp",
+  "Candidate Status": "Trạng thái thí sinh",
+  "Violation History": "Lịch sử vi phạm",
+  "Recent Live Alerts": "Cảnh báo trực tiếp gần đây",
+  "Open Alert Tab": "Mở tab cảnh báo",
+  "View Violation": "Xem vi phạm",
+  "No live alerts for this exam.": "Không có cảnh báo trực tiếp nào cho kỳ thi này.",
+  "Selected Webcam": "Webcam đã chọn",
+  "Waiting for session metadata": "Đang chờ metadata phiên",
+  "Connecting to webcam feed...": "Đang kết nối luồng webcam...",
+  "Waiting for webcam track...": "Đang chờ luồng webcam...",
+  "Close Webcam": "Đóng webcam",
+  "Open a candidate webcam from the Candidate Status tab to observe them live here.":
+    "Mở webcam của thí sinh từ tab Trạng thái thí sinh để theo dõi trực tiếp tại đây.",
+  "Search live alerts": "Tìm cảnh báo trực tiếp",
+  "Search by candidate, event, or message": "Tìm theo thí sinh, sự kiện hoặc nội dung",
+  "All severities": "Tất cả mức độ",
+  "Search candidates": "Tìm thí sinh",
+  "Search candidate name or email": "Tìm tên hoặc email thí sinh",
+  "All statuses": "Tất cả trạng thái",
+  "All connections": "Tất cả kết nối",
+  Stable: "Ổn định",
+  Unstable: "Không ổn định",
+  Offline: "Ngoại tuyến",
+  "All webcams": "Tất cả webcam",
+  "Live available": "Có thể xem trực tiếp",
+  "Not live": "Không trực tiếp",
+  "Webcam evidence": "Bằng chứng webcam",
+  "Screen evidence": "Bằng chứng màn hình",
+  "Webcam live available": "Webcam trực tiếp khả dụng",
+  "Webcam live failed": "Webcam trực tiếp thất bại",
+  "Webcam live stopped": "Webcam trực tiếp đã dừng",
+  "Webcam live unavailable": "Webcam trực tiếp không khả dụng",
+  "Screen evidence ready": "Bằng chứng màn hình đã sẵn sàng",
+  "Screen evidence revoked": "Bằng chứng màn hình đã bị thu hồi",
+  "Screen evidence failed": "Bằng chứng màn hình thất bại",
+  "Screen evidence unavailable": "Bằng chứng màn hình không khả dụng",
+  "Last webcam publish:": "Lần phát webcam gần nhất:",
+  "Open Webcam": "Mở webcam",
+  "No candidates matched the current filters.": "Không có thí sinh nào phù hợp với bộ lọc hiện tại.",
+  "Select a candidate with webcam live available to open a near real-time view.":
+    "Chọn một thí sinh có webcam trực tiếp khả dụng để mở chế độ xem gần thời gian thực.",
+  "Review, filter, resolve, and export violation cases for this protected exam.":
+    "Rà soát, lọc, xử lý và xuất các hồ sơ vi phạm cho kỳ thi được bảo vệ này.",
+  "Search violation history": "Tìm lịch sử vi phạm",
+  "Search candidate, title, or summary": "Tìm theo thí sinh, tiêu đề hoặc tóm tắt",
+  "Events:": "Sự kiện:",
+  "Evidence:": "Bằng chứng:",
+  "Resolved:": "Đã xử lý:",
+  "Resolved At": "Xử lý lúc",
+  "View Details": "Xem chi tiết",
+  Dismiss: "Bỏ qua",
+  Resolve: "Xử lý",
+  "No violation cases matched the current filters.":
+    "Không có hồ sơ vi phạm nào phù hợp với bộ lọc hiện tại.",
+  "Violation Detail": "Chi tiết vi phạm",
+  "Review evidence, notes, and current resolution state without leaving the monitoring workspace.":
+    "Rà soát bằng chứng, ghi chú và trạng thái xử lý hiện tại mà không rời khỏi không gian giám sát.",
+  "Violation history exported.": "Đã xuất lịch sử vi phạm.",
+  "Unable to export violation history.": "Không thể xuất lịch sử vi phạm.",
+  "Unable to open candidate webcam.": "Không thể mở webcam của thí sinh.",
+  "Exam id is required to open monitoring.": "Cần có id kỳ thi để mở giám sát.",
+  "No proctored exams matched the current filters.":
+    "Không có kỳ thi có giám sát nào phù hợp với bộ lọc hiện tại.",
+  "No proctored exams are available for live monitoring yet.":
+    "Hiện chưa có kỳ thi có giám sát nào sẵn sàng để theo dõi trực tiếp.",
   graded: "đã chấm",
   published: "đã công bố",
   finalized: "đã chốt",
@@ -638,6 +809,8 @@ const UNIT_TRANSLATIONS = {
   "event(s)": "sự kiện",
   exam: "kỳ thi",
   exams: "kỳ thi",
+  record: "bản ghi",
+  records: "bản ghi",
   "proctored exams": "kỳ thi có giám sát",
   group: "nhóm",
   groups: "nhóm",
@@ -655,6 +828,44 @@ const UNIT_TRANSLATIONS = {
 const EN_EXACT_TRANSLATIONS: Record<string, string> = Object.fromEntries(
   Object.entries(VI_EXACT_TRANSLATIONS).map(([english, vietnamese]) => [vietnamese, english]),
 );
+
+const EMBEDDED_VI_REPLACEMENTS: Array<[RegExp, string]> = [
+  [/\bJan\b/g, "Thg 1"],
+  [/\bFeb\b/g, "Thg 2"],
+  [/\bMar\b/g, "Thg 3"],
+  [/\bApr\b/g, "Thg 4"],
+  [/\bMay\b/g, "Thg 5"],
+  [/\bJun\b/g, "Thg 6"],
+  [/\bJul\b/g, "Thg 7"],
+  [/\bAug\b/g, "Thg 8"],
+  [/\bSep\b/g, "Thg 9"],
+  [/\bOct\b/g, "Thg 10"],
+  [/\bNov\b/g, "Thg 11"],
+  [/\bDec\b/g, "Thg 12"],
+];
+
+const EMBEDDED_EN_REPLACEMENTS: Array<[RegExp, string]> = [
+  [/Thg 10(?!\d)/g, "Oct"],
+  [/Thg 11(?!\d)/g, "Nov"],
+  [/Thg 12(?!\d)/g, "Dec"],
+  [/Thg 1(?!\d)/g, "Jan"],
+  [/Thg 2(?!\d)/g, "Feb"],
+  [/Thg 3(?!\d)/g, "Mar"],
+  [/Thg 4(?!\d)/g, "Apr"],
+  [/Thg 5(?!\d)/g, "May"],
+  [/Thg 6(?!\d)/g, "Jun"],
+  [/Thg 7(?!\d)/g, "Jul"],
+  [/Thg 8(?!\d)/g, "Aug"],
+  [/Thg 9(?!\d)/g, "Sep"],
+];
+
+const translateEmbeddedDateTokens = (locale: LegacyLocale, value: string) => {
+  const replacements = locale === "vi" ? EMBEDDED_VI_REPLACEMENTS : EMBEDDED_EN_REPLACEMENTS;
+  return replacements.reduce(
+    (translatedValue, [pattern, replacement]) => translatedValue.replace(pattern, replacement),
+    value,
+  );
+};
 
 const normalizeLocale = (locale: string): LegacyLocale => (locale.toLowerCase().startsWith("vi") ? "vi" : "en");
 
@@ -688,12 +899,17 @@ const translateDynamicText = (locale: LegacyLocale, value: string): string => {
           [/^(\d+) submitted$/, (count) => `${count} đã nộp`],
           [/^(\d+) total$/, (count) => `${count} tổng`],
           [/^(\d+) critical$/, (count) => `${count} nghiêm trọng`],
+          [/^(\d+) question\(s\)$/, (count) => `${count} câu hỏi`],
+          [/^(\d+)\/(\d+) questions$/, (answered, total) => `${answered}/${total} câu hỏi`],
           [/^Capacity (\d+)$/, (capacity) => `Sức chứa ${capacity}`],
           [/^Used by (\d+) exam\(s\)$/, (count) => `Được dùng cho ${count} kỳ thi`],
           [/^Linked to (\d+) exam\(s\)$/, (count) => `Liên kết với ${count} kỳ thi`],
           [/^Created (.+)$/, (value) => `Tạo ${value}`],
           [/^Updated (.+)$/, (value) => `Cập nhật ${value}`],
           [/^Add Members to (.+)$/, (groupName) => `Thêm thành viên vào ${groupName}`],
+          [/^Imported (\d+) members with (\d+) row error\(s\)\.$/, (members, errors) => `Đã import ${members} thành viên với ${errors} lỗi dòng.`],
+          [/^Imported (\d+) members\.$/, (members) => `Đã import ${members} thành viên.`],
+          [/^Group #(\d+)$/, (id) => `Nhóm #${id}`],
           [/^Audit Event #(\d+)$/, (id) => `Sự kiện audit #${id}`],
           [/^Last graded by (.+) on (.+)\.$/, (grader, date) => `Lần chấm gần nhất bởi ${grader} vào ${date}.`],
           [/^Step (\d+) of (\d+)$/, (current, total) => `Bước ${current}/${total}`],
@@ -725,12 +941,17 @@ const translateDynamicText = (locale: LegacyLocale, value: string): string => {
           [/^(\d+) đã nộp$/, (count) => `${count} submitted`],
           [/^(\d+) tổng$/, (count) => `${count} total`],
           [/^(\d+) nghiêm trọng$/, (count) => `${count} critical`],
+          [/^(\d+) câu hỏi$/, (count) => `${count} question(s)`],
+          [/^(\d+)\/(\d+) câu hỏi$/, (answered, total) => `${answered}/${total} questions`],
           [/^Sức chứa (\d+)$/, (capacity) => `Capacity ${capacity}`],
           [/^Được dùng cho (\d+) kỳ thi$/, (count) => `Used by ${count} exam(s)`],
           [/^Liên kết với (\d+) kỳ thi$/, (count) => `Linked to ${count} exam(s)`],
           [/^Tạo (.+)$/, (value) => `Created ${value}`],
           [/^Cập nhật (.+)$/, (value) => `Updated ${value}`],
           [/^Thêm thành viên vào (.+)$/, (groupName) => `Add Members to ${groupName}`],
+          [/^Đã import (\d+) thành viên với (\d+) lỗi dòng\.$/, (members, errors) => `Imported ${members} members with ${errors} row error(s).`],
+          [/^Đã import (\d+) thành viên\.$/, (members) => `Imported ${members} members.`],
+          [/^Nhóm #(\d+)$/, (id) => `Group #${id}`],
           [/^Sự kiện audit #(\d+)$/, (id) => `Audit Event #${id}`],
           [/^Lần chấm gần nhất bởi (.+) vào (.+)\.$/, (grader, date) => `Last graded by ${grader} on ${date}.`],
           [/^Bước (\d+)\/(\d+)$/, (current, total) => `Step ${current} of ${total}`],
@@ -773,12 +994,13 @@ export function translateLegacyUiText(locale: string, value: string): string {
   const translated =
     (normalizedLocale === "vi" ? VI_EXACT_TRANSLATIONS[trimmed] : EN_EXACT_TRANSLATIONS[trimmed]) ??
     translateDynamicText(normalizedLocale, trimmed);
+  const normalizedTranslation = translateEmbeddedDateTokens(normalizedLocale, translated);
 
-  if (translated === trimmed) {
+  if (normalizedTranslation === trimmed) {
     return value;
   }
 
   const leadingWhitespace = value.match(/^\s*/)?.[0] ?? "";
   const trailingWhitespace = value.match(/\s*$/)?.[0] ?? "";
-  return `${leadingWhitespace}${translated}${trailingWhitespace}`;
+  return `${leadingWhitespace}${normalizedTranslation}${trailingWhitespace}`;
 }

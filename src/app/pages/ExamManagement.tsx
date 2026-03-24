@@ -31,6 +31,7 @@ interface SubjectOption {
 interface ExamRecord {
   id: number;
   name: string;
+  mode: "exam" | "class";
   subject: SubjectOption;
   description: string;
   status: "draft" | "scheduled" | "open" | "paused" | "closed" | "archived";
@@ -71,6 +72,15 @@ interface ExamRecord {
 }
 
 const PAGE_SIZE = 20;
+const examModeLabels = {
+  exam: "Exam",
+  class: "Class",
+} as const;
+
+const examModeBadgeClassNames = {
+  exam: "border-blue-200 bg-blue-50 text-blue-700",
+  class: "border-emerald-200 bg-emerald-50 text-emerald-700",
+} as const;
 
 const formatSchedule = (value: string | null, withDate = true) => {
   if (!value) {
@@ -85,6 +95,7 @@ const formatSchedule = (value: string | null, withDate = true) => {
 
 export function ExamManagement() {
   const [searchQuery, setSearchQuery] = useState("");
+  const [modeFilter, setModeFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
   const [subjectFilter, setSubjectFilter] = useState("all");
   const [page, setPage] = useState(1);
@@ -103,16 +114,17 @@ export function ExamManagement() {
         query: {
           page,
           search: debouncedSearch || undefined,
+          mode: modeFilter !== "all" ? modeFilter : undefined,
           status: statusFilter !== "all" ? statusFilter : undefined,
           subject: subjectFilter !== "all" ? subjectFilter : undefined,
         },
       }),
-    [page, debouncedSearch, statusFilter, subjectFilter],
+    [page, debouncedSearch, modeFilter, statusFilter, subjectFilter],
   );
 
   useEffect(() => {
     setPage(1);
-  }, [debouncedSearch, statusFilter, subjectFilter]);
+  }, [debouncedSearch, modeFilter, statusFilter, subjectFilter]);
 
   const subjects = subjectsList.data?.results ?? [];
   const exams = examsList.data?.results ?? [];
@@ -122,20 +134,21 @@ export function ExamManagement() {
 
   const cloneExam = async (examId: number) => {
     await mutation.run(async () => {
+      const currentExam = exams.find((item) => item.id === examId);
       await apiRequest(`/api/v1/exams/${examId}/clone/`, {
         method: "POST",
         body: {},
       });
       await examsList.reload();
-      notify.success("Exam cloned.");
+      notify.success(currentExam?.mode === "class" ? "Class cloned." : "Exam cloned.");
     });
   };
 
   const deleteExam = async (exam: ExamRecord) => {
     const confirmed = await notify.confirm({
-      title: "Delete this exam?",
-      text: `Exam "${exam.name}" will be permanently removed.`,
-      confirmText: "Delete Exam",
+      title: exam.mode === "class" ? "Delete this class?" : "Delete this exam?",
+      text: `${exam.mode === "class" ? "Class" : "Exam"} "${exam.name}" will be permanently removed.`,
+      confirmText: exam.mode === "class" ? "Delete Class" : "Delete Exam",
       confirmButtonColor: "#dc2626",
     });
     if (!confirmed) {
@@ -147,7 +160,7 @@ export function ExamManagement() {
         method: "DELETE",
       });
       await examsList.reload();
-      notify.success("Exam deleted.");
+      notify.success(exam.mode === "class" ? "Class deleted." : "Exam deleted.");
     });
   };
 
@@ -155,12 +168,12 @@ export function ExamManagement() {
     <div>
       <PageHeader
         title="Exam Management"
-        description="Create, schedule, assign, and monitor exams with live backend data."
+        description="Create, schedule, assign, and manage exams or learning classes with live backend data."
         action={
           <Link to="/exams/create">
             <Button>
               <Plus className="w-4 h-4 mr-2" />
-              Create New Exam
+              Create Exam / Class
             </Button>
           </Link>
         }
@@ -178,6 +191,16 @@ export function ExamManagement() {
                 className="pl-10"
               />
             </div>
+            <Select value={modeFilter} onValueChange={setModeFilter}>
+              <SelectTrigger className="w-full xl:w-[180px]">
+                <SelectValue placeholder="All Modes" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Modes</SelectItem>
+                <SelectItem value="exam">Exam</SelectItem>
+                <SelectItem value="class">Class</SelectItem>
+              </SelectContent>
+            </Select>
             <Select value={statusFilter} onValueChange={setStatusFilter}>
               <SelectTrigger className="w-full xl:w-[200px]">
                 <SelectValue placeholder="All Status" />
@@ -240,37 +263,72 @@ export function ExamManagement() {
                         <p className="font-medium text-gray-900">{exam.name}</p>
                         <p className="mt-1 text-xs text-gray-500">Updated {formatSchedule(exam.updated_at)}</p>
                       </div>
-                      <StatusBadge status={exam.status} />
+                      <div className="flex flex-wrap justify-end gap-2">
+                        <Badge
+                          variant="outline"
+                          className={examModeBadgeClassNames[exam.mode]}
+                        >
+                          {examModeLabels[exam.mode]}
+                        </Badge>
+                        <StatusBadge status={exam.status} />
+                      </div>
                     </div>
 
                     <div className="mt-3 flex flex-wrap gap-2">
                       <Badge variant="outline">{exam.subject.name}</Badge>
-                      <Badge variant="outline">{exam.current_version?.item_count ?? 0} questions</Badge>
-                      <Badge variant="outline">{exam.duration_minutes} min</Badge>
-                      {exam.enable_proctoring ? <Badge variant="outline">Proctored</Badge> : null}
+                      {exam.mode === "exam" ? (
+                        <>
+                          <Badge variant="outline">{exam.current_version?.item_count ?? 0} questions</Badge>
+                          <Badge variant="outline">{exam.duration_minutes} min</Badge>
+                          {exam.enable_proctoring ? <Badge variant="outline">Proctored</Badge> : null}
+                        </>
+                      ) : (
+                        <Badge variant="outline">Learning access only</Badge>
+                      )}
                     </div>
 
                     <div className="mt-4 grid grid-cols-1 gap-3 text-sm text-gray-600 sm:grid-cols-2">
                       <div>
-                        <p className="text-xs uppercase tracking-wide text-gray-400">Schedule</p>
-                        <p>{formatSchedule(exam.schedule_window?.opens_at ?? null)}</p>
-                        <p>to {formatSchedule(exam.schedule_window?.closes_at ?? null, false)}</p>
+                        <p className="text-xs uppercase tracking-wide text-gray-400">
+                          {exam.mode === "exam" ? "Schedule" : "Access"}
+                        </p>
+                        {exam.mode === "exam" ? (
+                          <>
+                            <p>{formatSchedule(exam.schedule_window?.opens_at ?? null)}</p>
+                            <p>to {formatSchedule(exam.schedule_window?.closes_at ?? null, false)}</p>
+                          </>
+                        ) : (
+                          <>
+                            <p>Learning container</p>
+                            <p>No delivery window</p>
+                          </>
+                        )}
                       </div>
                       <div>
-                        <p className="text-xs uppercase tracking-wide text-gray-400">Assigned</p>
-                        <p>{totalCandidates} candidates</p>
+                        <p className="text-xs uppercase tracking-wide text-gray-400">
+                          {exam.mode === "exam" ? "Assigned" : "Enrollment"}
+                        </p>
+                        <p>{totalCandidates} {exam.mode === "exam" ? "candidates" : "learners"}</p>
                         <p>{exam.assignment_summary.group_count} groups</p>
                       </div>
                     </div>
 
                     <div className="mt-4">
-                      <div className="mb-2 flex items-center justify-between text-sm text-gray-600">
-                        <span>Progress</span>
-                        <span>{submittedSessions}/{totalCandidates || 0}</span>
-                      </div>
-                      <div className="h-2 rounded-full bg-gray-200">
-                        <div className="h-2 rounded-full bg-green-600" style={{ width: `${progressPercent}%` }} />
-                      </div>
+                      {exam.mode === "exam" ? (
+                        <>
+                          <div className="mb-2 flex items-center justify-between text-sm text-gray-600">
+                            <span>Progress</span>
+                            <span>{submittedSessions}/{totalCandidates || 0}</span>
+                          </div>
+                          <div className="h-2 rounded-full bg-gray-200">
+                            <div className="h-2 rounded-full bg-green-600" style={{ width: `${progressPercent}%` }} />
+                          </div>
+                        </>
+                      ) : (
+                        <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800">
+                          Class records grant subject materials and practice access without a fixed delivery session.
+                        </div>
+                      )}
                     </div>
 
                     <div className="mt-4 flex flex-wrap gap-2">
@@ -280,24 +338,25 @@ export function ExamManagement() {
                           View
                         </Button>
                       </Link>
-                      {(exam.status === "open" || exam.delivery_summary.in_progress_sessions > 0) && (
+                      {exam.mode === "exam" &&
+                        (exam.status === "open" || exam.delivery_summary.in_progress_sessions > 0) && (
                         <Link to={`/exams/${exam.id}?tab=monitoring`}>
                           <Button size="sm" variant="outline">
                             <Eye className="mr-2 h-4 w-4" />
                             Monitor
                           </Button>
                         </Link>
-                      )}
+                        )}
                       <Link to={`/exams/${exam.id}/edit`}>
                         <Button size="sm" variant="outline">
                           <Edit className="mr-2 h-4 w-4" />
-                          Edit
+                          {exam.mode === "exam" ? "Edit" : "Edit Class"}
                         </Button>
                       </Link>
                       <Link to={`/exams/${exam.id}/assign`}>
                         <Button size="sm" variant="outline">
                           <Users className="mr-2 h-4 w-4" />
-                          Assign
+                          {exam.mode === "exam" ? "Assign" : "Enroll"}
                         </Button>
                       </Link>
                       <Button
@@ -326,10 +385,11 @@ export function ExamManagement() {
           </div>
 
           <div className="hidden overflow-x-auto md:block">
-            <table className="w-full min-w-[1160px]">
+            <table className="w-full min-w-[1240px]">
               <thead>
                 <tr className="border-b border-gray-200">
                   <th className="text-left py-3 px-4 text-sm font-semibold text-gray-700">Exam Name</th>
+                  <th className="text-left py-3 px-4 text-sm font-semibold text-gray-700">Mode</th>
                   <th className="text-left py-3 px-4 text-sm font-semibold text-gray-700">Subject</th>
                   <th className="text-left py-3 px-4 text-sm font-semibold text-gray-700">Status</th>
                   <th className="text-left py-3 px-4 text-sm font-semibold text-gray-700">Schedule</th>
@@ -342,13 +402,13 @@ export function ExamManagement() {
               <tbody>
                 {examsList.isLoading ? (
                   <tr>
-                    <td colSpan={8} className="py-12 text-center text-sm text-gray-500">
+                    <td colSpan={9} className="py-12 text-center text-sm text-gray-500">
                       Loading exams...
                     </td>
                   </tr>
                 ) : exams.length === 0 ? (
                   <tr>
-                    <td colSpan={8} className="py-12 text-center text-sm text-gray-500">
+                    <td colSpan={9} className="py-12 text-center text-sm text-gray-500">
                       No exams matched the current filters.
                     </td>
                   </tr>
@@ -368,28 +428,47 @@ export function ExamManagement() {
                           </p>
                         </td>
                         <td className="py-4 px-4">
+                          <Badge variant="outline" className={examModeBadgeClassNames[exam.mode]}>
+                            {examModeLabels[exam.mode]}
+                          </Badge>
+                        </td>
+                        <td className="py-4 px-4">
                           <Badge variant="outline">{exam.subject.name}</Badge>
                         </td>
                         <td className="py-4 px-4">
                           <StatusBadge status={exam.status} />
                         </td>
                         <td className="py-4 px-4">
-                          <div className="text-sm">
-                            <p className="text-gray-900">
-                              {formatSchedule(exam.schedule_window?.opens_at ?? null)}
-                            </p>
-                            <p className="text-gray-500">
-                              to {formatSchedule(exam.schedule_window?.closes_at ?? null, false)}
-                            </p>
-                          </div>
+                          {exam.mode === "exam" ? (
+                            <div className="text-sm">
+                              <p className="text-gray-900">
+                                {formatSchedule(exam.schedule_window?.opens_at ?? null)}
+                              </p>
+                              <p className="text-gray-500">
+                                to {formatSchedule(exam.schedule_window?.closes_at ?? null, false)}
+                              </p>
+                            </div>
+                          ) : (
+                            <div className="text-sm text-gray-600">
+                              <p className="text-gray-900">Learning container</p>
+                              <p className="text-gray-500">No delivery window</p>
+                            </div>
+                          )}
                         </td>
                         <td className="py-4 px-4">
-                          <div className="text-sm text-gray-700">
-                            <p>{exam.current_version?.item_count ?? 0} questions</p>
-                            <p className="text-gray-500">
-                              {exam.duration_minutes} min • v{exam.current_version?.version_number ?? 1}
-                            </p>
-                          </div>
+                          {exam.mode === "exam" ? (
+                            <div className="text-sm text-gray-700">
+                              <p>{exam.current_version?.item_count ?? 0} questions</p>
+                              <p className="text-gray-500">
+                                {exam.duration_minutes} min • v{exam.current_version?.version_number ?? 1}
+                              </p>
+                            </div>
+                          ) : (
+                            <div className="text-sm text-gray-700">
+                              <p>Practice & materials access</p>
+                              <p className="text-gray-500">No fixed paper is delivered</p>
+                            </div>
+                          )}
                         </td>
                         <td className="py-4 px-4">
                           {exam.assignment_summary.assigned_groups.length > 0 ? (
@@ -410,7 +489,9 @@ export function ExamManagement() {
                           )}
                         </td>
                         <td className="py-4 px-4">
-                          {totalCandidates > 0 ? (
+                          {exam.mode === "class" ? (
+                            <span className="text-sm text-emerald-700">Learning access only</span>
+                          ) : totalCandidates > 0 ? (
                             <div className="space-y-2">
                               <div className="flex items-center gap-2">
                                 <div className="flex-1 bg-gray-200 rounded-full h-2 min-w-[80px]">
@@ -434,24 +515,37 @@ export function ExamManagement() {
                         <td className="py-4 px-4">
                           <div className="flex gap-1">
                             <Link to={`/exams/${exam.id}`}>
-                              <Button size="sm" variant="ghost" title="View">
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                title={exam.mode === "exam" ? "View" : "View Class"}
+                              >
                                 <Eye className="w-4 h-4" />
                               </Button>
                             </Link>
-                            {(exam.status === "open" || exam.delivery_summary.in_progress_sessions > 0) && (
+                            {exam.mode === "exam" &&
+                              (exam.status === "open" || exam.delivery_summary.in_progress_sessions > 0) && (
                               <Link to={`/exams/${exam.id}?tab=monitoring`}>
                                 <Button size="sm" variant="ghost" title="Monitor">
                                   <Eye className="w-4 h-4" />
                                 </Button>
                               </Link>
-                            )}
+                              )}
                             <Link to={`/exams/${exam.id}/edit`}>
-                              <Button size="sm" variant="ghost" title="Edit">
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                title={exam.mode === "exam" ? "Edit" : "Edit Class"}
+                              >
                                 <Edit className="w-4 h-4" />
                               </Button>
                             </Link>
                             <Link to={`/exams/${exam.id}/assign`}>
-                              <Button size="sm" variant="ghost" title="Assign">
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                title={exam.mode === "exam" ? "Assign" : "Enroll"}
+                              >
                                 <Users className="w-4 h-4" />
                               </Button>
                             </Link>
@@ -485,7 +579,7 @@ export function ExamManagement() {
 
           <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <p className="text-sm text-gray-600">
-              Showing <strong>{rangeStart}-{rangeEnd}</strong> of <strong>{totalCount}</strong> exams
+              Showing <strong>{rangeStart}-{rangeEnd}</strong> of <strong>{totalCount}</strong> records
             </p>
             <div className="flex gap-2">
               <Button

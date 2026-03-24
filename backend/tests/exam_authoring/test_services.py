@@ -8,7 +8,7 @@ def test_create_exam_builds_current_version_schedule_and_assignments(subject, ad
     from apps.question_bank.services import create_question
 
     school = School.objects.create(name="School A", code="SCHA")
-    group = CandidateGroup.objects.create(name="Computer Science - Year 1", school=school)
+    group = CandidateGroup.objects.create(name="Computer Science - Year 1")
     question = create_question(
         subject=subject,
         created_by=admin_user,
@@ -101,7 +101,7 @@ def test_clone_exam_copies_current_version_and_assignments(subject, admin_user, 
     from apps.question_bank.services import create_question
 
     school = School.objects.create(name="School A", code="SCHA")
-    group = CandidateGroup.objects.create(name="Computer Science - Year 1", school=school)
+    group = CandidateGroup.objects.create(name="Computer Science - Year 1")
     question = create_question(
         subject=subject,
         created_by=admin_user,

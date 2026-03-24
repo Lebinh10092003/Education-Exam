@@ -28,17 +28,23 @@ import {
 } from "../components/ui/select";
 import { Textarea } from "../components/ui/textarea";
 import { apiRequest, type PaginatedResponse } from "../lib/http";
-import { questionImportTemplate } from "../lib/importTemplates";
+import { examStudentImportTemplate, questionImportTemplate } from "../lib/importTemplates";
 import { validateQuestionImportFile } from "../lib/questionImportValidation";
 import { useAsyncList } from "../hooks/useAsyncList";
 import { useDebouncedValue } from "../hooks/useDebouncedValue";
 import { useMutationState } from "../hooks/useMutationState";
 
-const steps = [
+const examSteps = [
   { id: 1, name: "Basic Info", description: "Exam details" },
   { id: 2, name: "Questions", description: "Select questions" },
   { id: 3, name: "Assignment", description: "Schedule & assign" },
 ];
+
+const classSteps = [
+  { id: 1, name: "Basic Info", description: "Class details" },
+  { id: 2, name: "Learning Access", description: "How practice is unlocked" },
+  { id: 3, name: "Enrollment", description: "Assign learner groups" },
+] as const;
 
 interface SubjectOption {
   id: number;
@@ -53,18 +59,20 @@ interface GroupOption {
   member_count: number;
 }
 
-interface ExamPeriodOption {
-  id: number;
-  name: string;
-  start_date: string;
-  end_date: string;
+interface StudentImportErrorRecord {
+  row_number: number;
+  identifier: string;
+  message: string;
 }
 
-interface ExamRoomOption {
-  id: number;
-  name: string;
-  location: string;
-  capacity: number;
+interface StudentImportSummary {
+  total_rows: number;
+  created_users: number;
+  updated_users: number;
+  assigned_users: number;
+  skipped_rows: number;
+  failed_rows: number;
+  errors: StudentImportErrorRecord[];
 }
 
 interface QuestionRecord {
@@ -99,9 +107,8 @@ interface QuestionImportBatchResult {
 interface ExamRecord {
   id: number;
   name: string;
+  mode: "exam" | "class";
   subject: SubjectOption;
-  period: ExamPeriodOption | null;
-  room: ExamRoomOption | null;
   description: string;
   status: "draft" | "scheduled" | "open" | "paused" | "closed" | "archived";
   duration_minutes: number;
@@ -140,9 +147,8 @@ interface RandomRuleState {
 
 interface ExamFormState {
   name: string;
+  mode: "exam" | "class";
   subject_id: string;
-  period_id: string;
-  room_id: string;
   description: string;
   status: ExamRecord["status"];
   duration_minutes: string;
@@ -160,9 +166,8 @@ interface ExamFormState {
 
 const buildDefaultFormState = (): ExamFormState => ({
   name: "",
+  mode: "exam",
   subject_id: "",
-  period_id: "none",
-  room_id: "none",
   description: "",
   status: "draft",
   duration_minutes: "60",
@@ -212,9 +217,8 @@ const toFormState = (exam: ExamRecord): ExamFormState => {
 
   return {
     name: exam.name,
+    mode: exam.mode,
     subject_id: String(exam.subject.id),
-    period_id: exam.period ? String(exam.period.id) : "none",
-    room_id: exam.room ? String(exam.room.id) : "none",
     description: exam.description,
     status: exam.status,
     duration_minutes: String(exam.duration_minutes),
@@ -250,11 +254,14 @@ export function ExamCreationWizard() {
   const [importFormat, setImportFormat] = useState<"csv" | "json">("csv");
   const [importFile, setImportFile] = useState<File | null>(null);
   const [importResult, setImportResult] = useState<QuestionImportBatchResult | null>(null);
+  const [studentImportFile, setStudentImportFile] = useState<File | null>(null);
+  const [studentImportSummary, setStudentImportSummary] = useState<StudentImportSummary | null>(null);
 
   const debouncedQuestionSearch = useDebouncedValue(questionSearchQuery, 300);
   const debouncedGroupSearch = useDebouncedValue(groupSearchQuery, 300);
   const mutation = useMutationState();
   const importMutation = useMutationState();
+  const studentImportMutation = useMutationState();
 
   const subjectsList = useAsyncList(
     async () => apiRequest<PaginatedResponse<SubjectOption>>("/api/v1/subjects/"),
@@ -269,22 +276,6 @@ export function ExamCreationWizard() {
         },
       }),
     [debouncedGroupSearch],
-  );
-
-  const periodsList = useAsyncList(
-    async () =>
-      apiRequest<PaginatedResponse<ExamPeriodOption>>("/api/v1/exam-periods/", {
-        query: { page_size: 100 },
-      }),
-    [],
-  );
-
-  const roomsList = useAsyncList(
-    async () =>
-      apiRequest<PaginatedResponse<ExamRoomOption>>("/api/v1/exam-rooms/", {
-        query: { page_size: 100 },
-      }),
-    [],
   );
 
   const questionsList = useAsyncList(
@@ -368,6 +359,8 @@ export function ExamCreationWizard() {
         count: Number(value),
       }));
 
+  const currentSteps = formState.mode === "class" ? classSteps : examSteps;
+
   const validateStep = (step: number) => {
     if (step === 1) {
       if (!formState.name.trim() || !formState.subject_id) {
@@ -378,6 +371,9 @@ export function ExamCreationWizard() {
     }
 
     if (step === 2) {
+      if (formState.mode === "class") {
+        return true;
+      }
       if (
         formState.manual_question_ids.length === 0 &&
         buildRandomRulesPayload().length === 0
@@ -408,24 +404,27 @@ export function ExamCreationWizard() {
       return;
     }
 
+    const isClass = formState.mode === "class";
+    const randomRules = isClass ? [] : buildRandomRulesPayload();
+    const manualQuestionIds = isClass ? [] : formState.manual_question_ids;
+
     const payload = {
       name: formState.name.trim(),
+      mode: formState.mode,
       subject_id: Number(formState.subject_id),
-      period_id: formState.period_id === "none" ? null : Number(formState.period_id),
-      room_id: formState.room_id === "none" ? null : Number(formState.room_id),
       description: formState.description.trim(),
       status: formState.status,
       duration_minutes: Number(formState.duration_minutes),
       passing_score: Number(formState.passing_score),
       max_attempts: Number(formState.max_attempts),
-      manual_question_ids: formState.manual_question_ids,
-      random_rules: buildRandomRulesPayload(),
+      manual_question_ids: manualQuestionIds,
+      random_rules: randomRules,
       group_ids: formState.selected_group_ids,
-      opening_at: formState.opening_at || null,
-      closing_at: formState.closing_at || null,
-      shuffle_questions: formState.shuffle_questions,
-      show_results_immediately: formState.show_results_immediately,
-      enable_proctoring: formState.enable_proctoring,
+      opening_at: isClass ? null : formState.opening_at || null,
+      closing_at: isClass ? null : formState.closing_at || null,
+      shuffle_questions: isClass ? false : formState.shuffle_questions,
+      show_results_immediately: isClass ? false : formState.show_results_immediately,
+      enable_proctoring: isClass ? false : formState.enable_proctoring,
     };
 
     await mutation.run(async () => {
@@ -441,15 +440,21 @@ export function ExamCreationWizard() {
         });
       }
 
-      notify.success(isEditing ? "Exam updated." : "Exam created.");
+      notify.success(
+        isEditing
+          ? formState.mode === "class"
+            ? "Class updated."
+            : "Exam updated."
+          : formState.mode === "class"
+            ? "Class created."
+            : "Exam created.",
+      );
       navigate("/exams");
     });
   };
 
   const subjects = subjectsList.data?.results ?? [];
   const groups = groupsList.data?.results ?? [];
-  const periods = periodsList.data?.results ?? [];
-  const rooms = roomsList.data?.results ?? [];
   const questions = questionsList.data?.results ?? [];
   const currentSubject =
     subjects.find((subject) => String(subject.id) === formState.subject_id) ??
@@ -516,16 +521,54 @@ export function ExamCreationWizard() {
     });
   };
 
+  const handleImportStudents = async () => {
+    if (!id) {
+      notify.error("Save the class first, then import students from the enrollment step.");
+      return;
+    }
+
+    if (!studentImportFile) {
+      notify.error("Choose a CSV file to import.");
+      return;
+    }
+
+    const formData = new FormData();
+    formData.set("file", studentImportFile);
+
+    await studentImportMutation.run(async () => {
+      const summary = await apiRequest<StudentImportSummary>(`/api/v1/exams/${id}/student-import/`, {
+        method: "POST",
+        body: formData,
+      });
+      setStudentImportSummary(summary);
+      if (summary.failed_rows > 0) {
+        notify.info(`Imported with ${summary.failed_rows} row error(s).`);
+      } else {
+        notify.success("Students imported successfully.");
+      }
+    });
+  };
+
   return (
     <div>
       <PageHeader
-        title={isEditing ? "Edit Exam" : "Create New Exam"}
-        description="Follow the steps to define exam details, question composition, and assignments."
+        title={
+          isEditing
+            ? formState.mode === "class"
+              ? "Edit Class"
+              : "Edit Exam"
+            : "Create Exam / Class"
+        }
+        description={
+          formState.mode === "class"
+            ? "Define the subject container and learner enrollment used to unlock materials and practice."
+            : "Follow the steps to define exam details, question composition, and assignments."
+        }
       />
 
       <div className="mb-8">
         <div className="flex items-center justify-between max-w-3xl mx-auto">
-          {steps.map((step, idx) => (
+          {currentSteps.map((step, idx) => (
             <div key={step.id} className="flex items-center flex-1">
               <div className="flex flex-col items-center flex-1">
                 <div
@@ -556,7 +599,7 @@ export function ExamCreationWizard() {
                   <p className="text-xs text-gray-500">{step.description}</p>
                 </div>
               </div>
-              {idx < steps.length - 1 && (
+              {idx < currentSteps.length - 1 && (
                 <div className={`h-0.5 flex-1 mx-4 ${currentStep > step.id ? "bg-green-600" : "bg-gray-300"}`} />
               )}
             </div>
@@ -569,16 +612,16 @@ export function ExamCreationWizard() {
         questionsList.error ||
         examDetails.error ||
         mutation.error ||
-        importMutation.error) && (
+        importMutation.error ||
+        studentImportMutation.error) && (
         <div className="mb-6 max-w-4xl mx-auto rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
           {subjectsList.error ||
             groupsList.error ||
-            periodsList.error ||
-            roomsList.error ||
             questionsList.error ||
             examDetails.error ||
             mutation.error ||
-            importMutation.error}
+            importMutation.error ||
+            studentImportMutation.error}
         </div>
       )}
 
@@ -587,20 +630,43 @@ export function ExamCreationWizard() {
           {currentStep === 1 && (
             <div className="space-y-6">
               <div>
-                <h3 className="text-lg font-semibold mb-4">Basic Exam Information</h3>
+                <h3 className="text-lg font-semibold mb-4">
+                  {formState.mode === "class" ? "Basic Class Information" : "Basic Exam Information"}
+                </h3>
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="md:col-span-2">
-                  <Label htmlFor="examName">Exam Name</Label>
+                  <Label htmlFor="examName">{formState.mode === "class" ? "Class Name" : "Exam Name"}</Label>
                   <Input
                     id="examName"
-                    placeholder="e.g., Mathematics Final Exam"
+                    placeholder={
+                      formState.mode === "class"
+                        ? "e.g., IMO Learning Class"
+                        : "e.g., Mathematics Final Exam"
+                    }
                     className="mt-2"
                     value={formState.name}
                     onChange={(event) =>
                       setFormState((previous) => ({ ...previous, name: event.target.value }))
                     }
                   />
+                </div>
+                <div>
+                  <Label>Mode</Label>
+                  <Select
+                    value={formState.mode}
+                    onValueChange={(value: ExamFormState["mode"]) =>
+                      setFormState((previous) => ({ ...previous, mode: value }))
+                    }
+                  >
+                    <SelectTrigger className="mt-2">
+                      <SelectValue placeholder="Select mode" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="exam">Exam</SelectItem>
+                      <SelectItem value="class">Class</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
                 <div>
                   <Label>Subject</Label>
@@ -638,59 +704,72 @@ export function ExamCreationWizard() {
                     </SelectContent>
                   </Select>
                 </div>
-                <div>
-                  <Label htmlFor="duration">Duration (minutes)</Label>
-                  <Input
-                    id="duration"
-                    type="number"
-                    placeholder="120"
-                    className="mt-2"
-                    value={formState.duration_minutes}
-                    onChange={(event) =>
-                      setFormState((previous) => ({
-                        ...previous,
-                        duration_minutes: event.target.value,
-                      }))
-                    }
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="passingScore">Passing Score (%)</Label>
-                  <Input
-                    id="passingScore"
-                    type="number"
-                    placeholder="60"
-                    className="mt-2"
-                    value={formState.passing_score}
-                    onChange={(event) =>
-                      setFormState((previous) => ({
-                        ...previous,
-                        passing_score: event.target.value,
-                      }))
-                    }
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="maxAttempts">Max Attempts</Label>
-                  <Input
-                    id="maxAttempts"
-                    type="number"
-                    placeholder="1"
-                    className="mt-2"
-                    value={formState.max_attempts}
-                    onChange={(event) =>
-                      setFormState((previous) => ({
-                        ...previous,
-                        max_attempts: event.target.value,
-                      }))
-                    }
-                  />
-                </div>
+                {formState.mode === "exam" ? (
+                  <>
+                    <div>
+                      <Label htmlFor="duration">Duration (minutes)</Label>
+                      <Input
+                        id="duration"
+                        type="number"
+                        placeholder="120"
+                        className="mt-2"
+                        value={formState.duration_minutes}
+                        onChange={(event) =>
+                          setFormState((previous) => ({
+                            ...previous,
+                            duration_minutes: event.target.value,
+                          }))
+                        }
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="passingScore">Passing Score (%)</Label>
+                      <Input
+                        id="passingScore"
+                        type="number"
+                        placeholder="60"
+                        className="mt-2"
+                        value={formState.passing_score}
+                        onChange={(event) =>
+                          setFormState((previous) => ({
+                            ...previous,
+                            passing_score: event.target.value,
+                          }))
+                        }
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="maxAttempts">Max Attempts</Label>
+                      <Input
+                        id="maxAttempts"
+                        type="number"
+                        placeholder="1"
+                        className="mt-2"
+                        value={formState.max_attempts}
+                        onChange={(event) =>
+                          setFormState((previous) => ({
+                            ...previous,
+                            max_attempts: event.target.value,
+                          }))
+                        }
+                      />
+                    </div>
+                  </>
+                ) : (
+                  <div className="md:col-span-2 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900">
+                    Class mode unlocks subject materials and random practice for assigned learners.
+                    It does not create a fixed deliverable exam paper.
+                  </div>
+                )}
                 <div className="md:col-span-2">
                   <Label htmlFor="description">Description</Label>
                   <Textarea
                     id="description"
-                    placeholder="Brief description of the exam"
+                    placeholder={
+                      formState.mode === "class"
+                        ? "Brief description of the learning class"
+                        : "Brief description of the exam"
+                    }
                     className="mt-2"
                     rows={3}
                     value={formState.description}
@@ -708,13 +787,33 @@ export function ExamCreationWizard() {
           {currentStep === 2 && (
             <div className="space-y-6">
               <div>
-                <h3 className="text-lg font-semibold mb-4">Select Questions</h3>
+                <h3 className="text-lg font-semibold mb-4">
+                  {formState.mode === "class" ? "Learning Access" : "Select Questions"}
+                </h3>
                 <p className="text-sm text-gray-600">
-                  Mix manually selected questions with optional random draws by difficulty.
+                  {formState.mode === "class"
+                    ? "Class records do not ship a fixed exam paper. Assigned learners will receive random subject practice from the backend question bank."
+                    : "Mix manually selected questions with optional random draws by difficulty."}
                 </p>
               </div>
 
-              <div className="space-y-4">
+              {formState.mode === "class" ? (
+                <div className="space-y-4">
+                  <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900">
+                    Each practice attempt will request up to 30 random objective questions from the
+                    selected subject. If the question bank has fewer than 30 eligible questions, the
+                    backend will use the maximum available set.
+                  </div>
+                  <div className="rounded-lg border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-700">
+                    Question difficulty distribution is randomized by the backend from the current
+                    subject bank. No question composition needs to be configured for class mode here.
+                  </div>
+                  <div className="rounded-lg border border-dashed border-gray-300 px-4 py-6 text-sm text-gray-600">
+                    Continue to the next step to enroll learner groups into this subject class.
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-4">
                 <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
                   <div className="mb-4">
                     <h4 className="font-medium text-blue-900">Random Selection</h4>
@@ -857,96 +956,66 @@ export function ExamCreationWizard() {
                   </div>
                 </div>
               </div>
+              )}
             </div>
           )}
 
           {currentStep === 3 && (
             <div className="space-y-6">
               <div>
-                <h3 className="text-lg font-semibold mb-4">Schedule & Assignment</h3>
+                <h3 className="text-lg font-semibold mb-4">
+                  {formState.mode === "class" ? "Enrollment" : "Schedule & Assignment"}
+                </h3>
                 <p className="text-sm text-gray-600">
-                  Define the exam window and assign candidate groups.
+                  {formState.mode === "class"
+                    ? "Assign learner groups that should receive subject materials and practice access."
+                    : "Define the exam window and assign candidate groups."}
                 </p>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div>
-                  <Label>Exam Period</Label>
-                  <Select
-                    value={formState.period_id}
-                    onValueChange={(value) =>
-                      setFormState((previous) => ({ ...previous, period_id: value }))
-                    }
-                  >
-                    <SelectTrigger className="mt-2">
-                      <SelectValue placeholder="Select period" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="none">No period</SelectItem>
-                      {periods.map((period) => (
-                        <SelectItem key={period.id} value={String(period.id)}>
-                          {period.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+              {formState.mode === "exam" ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div>
+                    <Label htmlFor="openingDate">Opening Date & Time</Label>
+                    <Input
+                      id="openingDate"
+                      type="datetime-local"
+                      className="mt-2"
+                      value={formState.opening_at}
+                      onChange={(event) =>
+                        setFormState((previous) => ({
+                          ...previous,
+                          opening_at: event.target.value,
+                        }))
+                      }
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="closingDate">Closing Date & Time</Label>
+                    <Input
+                      id="closingDate"
+                      type="datetime-local"
+                      className="mt-2"
+                      value={formState.closing_at}
+                      onChange={(event) =>
+                        setFormState((previous) => ({
+                          ...previous,
+                          closing_at: event.target.value,
+                        }))
+                      }
+                    />
+                  </div>
                 </div>
-                <div>
-                  <Label>Exam Room</Label>
-                  <Select
-                    value={formState.room_id}
-                    onValueChange={(value) =>
-                      setFormState((previous) => ({ ...previous, room_id: value }))
-                    }
-                  >
-                    <SelectTrigger className="mt-2">
-                      <SelectValue placeholder="Select room" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="none">No room</SelectItem>
-                      {rooms.map((room) => (
-                        <SelectItem key={room.id} value={String(room.id)}>
-                          {room.name} ({room.capacity})
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+              ) : (
+                <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900">
+                  Class mode does not require a fixed schedule window or proctoring setup.
+                  Access is controlled by enrollment and the class status.
                 </div>
-                <div>
-                  <Label htmlFor="openingDate">Opening Date & Time</Label>
-                  <Input
-                    id="openingDate"
-                    type="datetime-local"
-                    className="mt-2"
-                    value={formState.opening_at}
-                    onChange={(event) =>
-                      setFormState((previous) => ({
-                        ...previous,
-                        opening_at: event.target.value,
-                      }))
-                    }
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="closingDate">Closing Date & Time</Label>
-                  <Input
-                    id="closingDate"
-                    type="datetime-local"
-                    className="mt-2"
-                    value={formState.closing_at}
-                    onChange={(event) =>
-                      setFormState((previous) => ({
-                        ...previous,
-                        closing_at: event.target.value,
-                      }))
-                    }
-                  />
-                </div>
-              </div>
+              )}
 
               <div>
                 <div className="flex items-center justify-between gap-4">
-                  <Label>Assign to Groups</Label>
+                  <Label>{formState.mode === "class" ? "Enroll Groups" : "Assign to Groups"}</Label>
                   <div className="relative w-full max-w-xs">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
                     <Input
@@ -982,62 +1051,169 @@ export function ExamCreationWizard() {
                 </div>
               </div>
 
-              <div className="p-4 bg-gray-50 rounded-lg border">
-                <h4 className="font-medium mb-3">Additional Settings</h4>
-                <div className="space-y-3">
-                  <label className="flex items-center gap-3 cursor-pointer">
-                    <Checkbox
-                      checked={formState.shuffle_questions}
-                      onCheckedChange={(checked) =>
-                        setFormState((previous) => ({
-                          ...previous,
-                          shuffle_questions: checked === true,
-                        }))
-                      }
-                    />
-                    <div>
-                      <p className="text-sm font-medium">Shuffle Questions</p>
-                      <p className="text-xs text-gray-500">
-                        Randomize question order for each candidate
-                      </p>
+              {formState.mode === "class" ? (
+                <div className="space-y-5 rounded-lg border border-blue-200 bg-blue-50 px-4 py-5">
+                  <div>
+                    <h4 className="font-medium text-blue-900">Import Students Directly To This Class</h4>
+                    <p className="mt-1 text-sm text-blue-800">
+                      Upload a CSV to create or update `student` accounts by CCCD, then enroll them
+                      straight into this class.
+                    </p>
+                  </div>
+
+                  {id ? (
+                    <>
+                      <div className="rounded-lg border border-blue-200 bg-white px-4 py-3 text-sm text-blue-900">
+                        New passwords default to the generated username. If email is blank, the
+                        backend will generate `username@student.local`.
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label htmlFor="class-student-import-file">Student CSV File</Label>
+                        <Input
+                          id="class-student-import-file"
+                          type="file"
+                          accept=".csv"
+                          onChange={(event) => {
+                            setStudentImportFile(event.target.files?.[0] ?? null);
+                            setStudentImportSummary(null);
+                          }}
+                        />
+                        {studentImportFile ? (
+                          <p className="text-xs text-blue-800">
+                            Selected file: <strong>{studentImportFile.name}</strong>
+                          </p>
+                        ) : null}
+                      </div>
+
+                      <div className="flex flex-col gap-3 rounded-lg border border-blue-200 bg-white px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+                        <div>
+                          <p className="text-sm font-medium text-gray-900">Open the CSV template</p>
+                          <p className="text-xs text-gray-500">
+                            Preview the required columns and download a starter file before importing.
+                          </p>
+                        </div>
+                        <ImportTemplateActions template={examStudentImportTemplate} selectedFormat="csv" />
+                      </div>
+
+                      <div className="flex justify-end">
+                        <Button onClick={() => void handleImportStudents()} disabled={studentImportMutation.isSubmitting}>
+                          <Upload className="mr-2 h-4 w-4" />
+                          {studentImportMutation.isSubmitting ? "Importing..." : "Import Students"}
+                        </Button>
+                      </div>
+
+                      {studentImportSummary ? (
+                        <div className="space-y-4 rounded-xl border border-blue-200 bg-white p-4">
+                          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                            <div className="rounded-lg border border-gray-200 bg-gray-50 p-3">
+                              <p className="text-xs uppercase tracking-wide text-gray-500">Created</p>
+                              <p className="mt-1 text-2xl font-semibold text-gray-900">{studentImportSummary.created_users}</p>
+                            </div>
+                            <div className="rounded-lg border border-gray-200 bg-gray-50 p-3">
+                              <p className="text-xs uppercase tracking-wide text-gray-500">Updated</p>
+                              <p className="mt-1 text-2xl font-semibold text-gray-900">{studentImportSummary.updated_users}</p>
+                            </div>
+                            <div className="rounded-lg border border-gray-200 bg-gray-50 p-3">
+                              <p className="text-xs uppercase tracking-wide text-gray-500">Assigned</p>
+                              <p className="mt-1 text-2xl font-semibold text-gray-900">{studentImportSummary.assigned_users}</p>
+                            </div>
+                            <div className="rounded-lg border border-gray-200 bg-gray-50 p-3">
+                              <p className="text-xs uppercase tracking-wide text-gray-500">Failed</p>
+                              <p className="mt-1 text-2xl font-semibold text-gray-900">{studentImportSummary.failed_rows}</p>
+                            </div>
+                          </div>
+
+                          <div className="text-sm text-gray-600">
+                            Processed <strong>{studentImportSummary.total_rows}</strong> row(s) with{" "}
+                            <strong>{studentImportSummary.skipped_rows}</strong> skipped.
+                          </div>
+
+                          {studentImportSummary.errors.length > 0 ? (
+                            <div className="rounded-lg border border-amber-200 bg-amber-50 p-4">
+                              <p className="text-sm font-medium text-amber-900">Rows that still need attention</p>
+                              <div className="mt-3 space-y-2">
+                                {studentImportSummary.errors.map((error) => (
+                                  <div
+                                    key={`${error.row_number}-${error.identifier}-${error.message}`}
+                                    className="rounded-md border border-amber-200 bg-white px-3 py-2 text-sm text-amber-900"
+                                  >
+                                    Row {error.row_number}
+                                    {error.identifier ? ` • ${error.identifier}` : ""}: {error.message}
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          ) : null}
+                        </div>
+                      ) : null}
+                    </>
+                  ) : (
+                    <div className="rounded-lg border border-dashed border-blue-300 bg-white px-4 py-4 text-sm text-blue-900">
+                      Save the class first, then reopen the enrollment step to import students directly by CSV.
                     </div>
-                  </label>
-                  <label className="flex items-center gap-3 cursor-pointer">
-                    <Checkbox
-                      checked={formState.show_results_immediately}
-                      onCheckedChange={(checked) =>
-                        setFormState((previous) => ({
-                          ...previous,
-                          show_results_immediately: checked === true,
-                        }))
-                      }
-                    />
-                    <div>
-                      <p className="text-sm font-medium">Show Results Immediately</p>
-                      <p className="text-xs text-gray-500">
-                        Display results right after submission when allowed
-                      </p>
-                    </div>
-                  </label>
-                  <label className="flex items-center gap-3 cursor-pointer">
-                    <Checkbox
-                      checked={formState.enable_proctoring}
-                      onCheckedChange={(checked) =>
-                        setFormState((previous) => ({
-                          ...previous,
-                          enable_proctoring: checked === true,
-                        }))
-                      }
-                    />
-                    <div>
-                      <p className="text-sm font-medium">Enable Proctoring</p>
-                      <p className="text-xs text-gray-500">
-                        Send this exam through the monitoring pipeline
-                      </p>
-                    </div>
-                  </label>
+                  )}
                 </div>
-              </div>
+              ) : null}
+
+              {formState.mode === "exam" ? (
+                <div className="p-4 bg-gray-50 rounded-lg border">
+                  <h4 className="font-medium mb-3">Additional Settings</h4>
+                  <div className="space-y-3">
+                    <label className="flex items-center gap-3 cursor-pointer">
+                      <Checkbox
+                        checked={formState.shuffle_questions}
+                        onCheckedChange={(checked) =>
+                          setFormState((previous) => ({
+                            ...previous,
+                            shuffle_questions: checked === true,
+                          }))
+                        }
+                      />
+                      <div>
+                        <p className="text-sm font-medium">Shuffle Questions</p>
+                        <p className="text-xs text-gray-500">
+                          Randomize question order for each candidate
+                        </p>
+                      </div>
+                    </label>
+                    <label className="flex items-center gap-3 cursor-pointer">
+                      <Checkbox
+                        checked={formState.show_results_immediately}
+                        onCheckedChange={(checked) =>
+                          setFormState((previous) => ({
+                            ...previous,
+                            show_results_immediately: checked === true,
+                          }))
+                        }
+                      />
+                      <div>
+                        <p className="text-sm font-medium">Show Results Immediately</p>
+                        <p className="text-xs text-gray-500">
+                          Display results right after submission when allowed
+                        </p>
+                      </div>
+                    </label>
+                    <label className="flex items-center gap-3 cursor-pointer">
+                      <Checkbox
+                        checked={formState.enable_proctoring}
+                        onCheckedChange={(checked) =>
+                          setFormState((previous) => ({
+                            ...previous,
+                            enable_proctoring: checked === true,
+                          }))
+                        }
+                      />
+                      <div>
+                        <p className="text-sm font-medium">Enable Proctoring</p>
+                        <p className="text-xs text-gray-500">
+                          Send this exam through the monitoring pipeline
+                        </p>
+                      </div>
+                    </label>
+                  </div>
+                </div>
+              ) : null}
             </div>
           )}
         </CardContent>
@@ -1126,7 +1302,7 @@ export function ExamCreationWizard() {
           Previous
         </Button>
         <div className="text-sm text-gray-600">
-          Step {currentStep} of {steps.length}
+          Step {currentStep} of {currentSteps.length}
         </div>
         {currentStep < 3 ? (
           <Button onClick={nextStep}>
@@ -1141,8 +1317,12 @@ export function ExamCreationWizard() {
                 ? "Saving..."
                 : "Creating..."
               : isEditing
-                ? "Save Exam"
-                : "Create Exam"}
+                ? formState.mode === "class"
+                  ? "Save Class"
+                  : "Save Exam"
+                : formState.mode === "class"
+                  ? "Create Class"
+                  : "Create Exam"}
           </Button>
         )}
       </div>

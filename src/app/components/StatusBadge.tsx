@@ -20,11 +20,16 @@ const statusConfig = {
   active: { label: "Active", className: "bg-green-100 text-green-800 hover:bg-green-100" },
   locked: { label: "Locked", className: "bg-red-100 text-red-800 hover:bg-red-100" },
   pending: { label: "Pending", className: "bg-yellow-100 text-yellow-800 hover:bg-yellow-100" },
+  pending_grading: { label: "Pending Grading", className: "bg-yellow-100 text-yellow-800 hover:bg-yellow-100" },
+  finalized: { label: "Finalized", className: "bg-green-100 text-green-800 hover:bg-green-100" },
   
   // Exam attempt statuses
   "in-progress": { label: "In Progress", className: "bg-blue-100 text-blue-800 hover:bg-blue-100" },
   in_progress: { label: "In Progress", className: "bg-blue-100 text-blue-800 hover:bg-blue-100" },
   completed: { label: "Completed", className: "bg-green-100 text-green-800 hover:bg-green-100" },
+  pass: { label: "Pass", className: "bg-green-100 text-green-800 hover:bg-green-100" },
+  passed: { label: "Passed", className: "bg-green-100 text-green-800 hover:bg-green-100" },
+  fail: { label: "Fail", className: "bg-red-100 text-red-800 hover:bg-red-100" },
   failed: { label: "Failed", className: "bg-red-100 text-red-800 hover:bg-red-100" },
   submitted: { label: "Submitted", className: "bg-green-100 text-green-800 hover:bg-green-100" },
   expired: { label: "Expired", className: "bg-red-100 text-red-800 hover:bg-red-100" },
@@ -38,11 +43,13 @@ const statusConfig = {
 };
 
 export function StatusBadge({ status }: StatusBadgeProps) {
+  const normalizedStatus = status.trim().toLowerCase().replaceAll("-", "_").replace(/\s+/g, "_");
   const config =
+    statusConfig[normalizedStatus as keyof typeof statusConfig] ??
     statusConfig[status as keyof typeof statusConfig] ??
     {
       label: status
-        .split(/[_-]/)
+        .split(/[_-\s]/)
         .filter(Boolean)
         .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
         .join(" "),

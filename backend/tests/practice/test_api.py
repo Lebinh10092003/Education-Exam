@@ -15,10 +15,27 @@ def _create_objective_question(*, subject, admin_user, difficulty, question_text
     )
 
 
+def _assign_subject_access(*, subject, admin_user, user, mode="class"):
+    from apps.exam_authoring.services import create_exam
+
+    create_exam(
+        name=f"{subject.name} {mode.title()} Access",
+        mode=mode,
+        subject=subject,
+        created_by=admin_user,
+        status="draft" if mode == "class" else "scheduled",
+        duration_minutes=45,
+        passing_score=0,
+        max_attempts=1,
+        user_ids=[user.id],
+    )
+
+
 @pytest.mark.django_db
 def test_candidate_can_fetch_practice_catalog(api_client, candidate_user, subject, admin_user):
     from rest_framework_simplejwt.tokens import RefreshToken
 
+    _assign_subject_access(subject=subject, admin_user=admin_user, user=candidate_user)
     _create_objective_question(
         subject=subject,
         admin_user=admin_user,
@@ -41,6 +58,7 @@ def test_candidate_can_fetch_practice_catalog(api_client, candidate_user, subjec
 def test_candidate_can_create_answer_submit_and_review_practice_session(api_client, candidate_user, subject, admin_user):
     from rest_framework_simplejwt.tokens import RefreshToken
 
+    _assign_subject_access(subject=subject, admin_user=admin_user, user=candidate_user)
     _create_objective_question(
         subject=subject,
         admin_user=admin_user,
@@ -53,11 +71,7 @@ def test_candidate_can_create_answer_submit_and_review_practice_session(api_clie
 
     create_response = api_client.post(
         "/api/v1/practice/sessions/",
-        {
-            "subject_id": subject.id,
-            "duration_minutes": 20,
-            "difficulty_counts": {"easy": 1, "medium": 0, "hard": 0},
-        },
+        {"subject_id": subject.id},
         format="json",
     )
 
@@ -79,6 +93,8 @@ def test_candidate_can_create_answer_submit_and_review_practice_session(api_clie
     review_response = api_client.get(f"/api/v1/practice/sessions/{session_id}/review/")
     assert review_response.status_code == 200
     assert review_response.json()["summary"]["correct_count"] == 1
+    assert review_response.json()["details_available"] is True
+    assert "questions" not in review_response.json()
 
 
 @pytest.mark.django_db
@@ -97,8 +113,6 @@ def test_candidate_cannot_access_other_users_practice_session(api_client, candid
     practice_session = create_practice_session(
         candidate=candidate_user,
         subject=subject,
-        duration_minutes=15,
-        difficulty_counts={"easy": 1, "medium": 0, "hard": 0},
     )
 
     token = str(RefreshToken.for_user(user).access_token)
@@ -107,3 +121,26 @@ def test_candidate_cannot_access_other_users_practice_session(api_client, candid
     response = api_client.get(f"/api/v1/practice/sessions/{practice_session.id}/")
 
     assert response.status_code == 403
+
+
+@pytest.mark.django_db
+def test_candidate_reuses_in_progress_practice_session_for_same_subject(api_client, candidate_user, subject, admin_user):
+    from rest_framework_simplejwt.tokens import RefreshToken
+
+    _assign_subject_access(subject=subject, admin_user=admin_user, user=candidate_user)
+    _create_objective_question(
+        subject=subject,
+        admin_user=admin_user,
+        difficulty="easy",
+        question_text="Reusable question",
+    )
+
+    token = str(RefreshToken.for_user(candidate_user).access_token)
+    api_client.credentials(HTTP_AUTHORIZATION=f"Bearer {token}")
+
+    first = api_client.post("/api/v1/practice/sessions/", {"subject_id": subject.id}, format="json")
+    second = api_client.post("/api/v1/practice/sessions/", {"subject_id": subject.id}, format="json")
+
+    assert first.status_code == 201
+    assert second.status_code == 200
+    assert first.json()["id"] == second.json()["id"]

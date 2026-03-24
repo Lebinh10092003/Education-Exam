@@ -199,298 +199,6 @@ paths:
               schema:
                 $ref: '#/components/schemas/DashboardOverview'
           description: ''
-  /api/v1/exam-periods/:
-    get:
-      operationId: api_v1_exam_periods_list
-      parameters:
-      - name: page
-        required: false
-        in: query
-        description: A page number within the paginated result set.
-        schema:
-          type: integer
-      tags:
-      - api
-      security:
-      - jwtAuth: []
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/PaginatedExamPeriodList'
-          description: ''
-    post:
-      operationId: api_v1_exam_periods_create
-      tags:
-      - api
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/ExamPeriod'
-          application/x-www-form-urlencoded:
-            schema:
-              $ref: '#/components/schemas/ExamPeriod'
-          multipart/form-data:
-            schema:
-              $ref: '#/components/schemas/ExamPeriod'
-        required: true
-      security:
-      - jwtAuth: []
-      responses:
-        '201':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ExamPeriod'
-          description: ''
-  /api/v1/exam-periods/{id}/:
-    get:
-      operationId: api_v1_exam_periods_retrieve
-      parameters:
-      - in: path
-        name: id
-        schema:
-          type: integer
-        description: A unique integer value identifying this exam period.
-        required: true
-      tags:
-      - api
-      security:
-      - jwtAuth: []
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ExamPeriod'
-          description: ''
-    put:
-      operationId: api_v1_exam_periods_update
-      parameters:
-      - in: path
-        name: id
-        schema:
-          type: integer
-        description: A unique integer value identifying this exam period.
-        required: true
-      tags:
-      - api
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/ExamPeriod'
-          application/x-www-form-urlencoded:
-            schema:
-              $ref: '#/components/schemas/ExamPeriod'
-          multipart/form-data:
-            schema:
-              $ref: '#/components/schemas/ExamPeriod'
-        required: true
-      security:
-      - jwtAuth: []
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ExamPeriod'
-          description: ''
-    patch:
-      operationId: api_v1_exam_periods_partial_update
-      parameters:
-      - in: path
-        name: id
-        schema:
-          type: integer
-        description: A unique integer value identifying this exam period.
-        required: true
-      tags:
-      - api
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/PatchedExamPeriod'
-          application/x-www-form-urlencoded:
-            schema:
-              $ref: '#/components/schemas/PatchedExamPeriod'
-          multipart/form-data:
-            schema:
-              $ref: '#/components/schemas/PatchedExamPeriod'
-      security:
-      - jwtAuth: []
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ExamPeriod'
-          description: ''
-    delete:
-      operationId: api_v1_exam_periods_destroy
-      parameters:
-      - in: path
-        name: id
-        schema:
-          type: integer
-        description: A unique integer value identifying this exam period.
-        required: true
-      tags:
-      - api
-      security:
-      - jwtAuth: []
-      responses:
-        '204':
-          description: No response body
-  /api/v1/exam-rooms/:
-    get:
-      operationId: api_v1_exam_rooms_list
-      parameters:
-      - name: page
-        required: false
-        in: query
-        description: A page number within the paginated result set.
-        schema:
-          type: integer
-      tags:
-      - api
-      security:
-      - jwtAuth: []
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/PaginatedExamRoomList'
-          description: ''
-    post:
-      operationId: api_v1_exam_rooms_create
-      tags:
-      - api
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/ExamRoom'
-          application/x-www-form-urlencoded:
-            schema:
-              $ref: '#/components/schemas/ExamRoom'
-          multipart/form-data:
-            schema:
-              $ref: '#/components/schemas/ExamRoom'
-        required: true
-      security:
-      - jwtAuth: []
-      responses:
-        '201':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ExamRoom'
-          description: ''
-  /api/v1/exam-rooms/{id}/:
-    get:
-      operationId: api_v1_exam_rooms_retrieve
-      parameters:
-      - in: path
-        name: id
-        schema:
-          type: integer
-        description: A unique integer value identifying this exam room.
-        required: true
-      tags:
-      - api
-      security:
-      - jwtAuth: []
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ExamRoom'
-          description: ''
-    put:
-      operationId: api_v1_exam_rooms_update
-      parameters:
-      - in: path
-        name: id
-        schema:
-          type: integer
-        description: A unique integer value identifying this exam room.
-        required: true
-      tags:
-      - api
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/ExamRoom'
-          application/x-www-form-urlencoded:
-            schema:
-              $ref: '#/components/schemas/ExamRoom'
-          multipart/form-data:
-            schema:
-              $ref: '#/components/schemas/ExamRoom'
-        required: true
-      security:
-      - jwtAuth: []
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ExamRoom'
-          description: ''
-    patch:
-      operationId: api_v1_exam_rooms_partial_update
-      parameters:
-      - in: path
-        name: id
-        schema:
-          type: integer
-        description: A unique integer value identifying this exam room.
-        required: true
-      tags:
-      - api
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/PatchedExamRoom'
-          application/x-www-form-urlencoded:
-            schema:
-              $ref: '#/components/schemas/PatchedExamRoom'
-          multipart/form-data:
-            schema:
-              $ref: '#/components/schemas/PatchedExamRoom'
-      security:
-      - jwtAuth: []
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ExamRoom'
-          description: ''
-    delete:
-      operationId: api_v1_exam_rooms_destroy
-      parameters:
-      - in: path
-        name: id
-        schema:
-          type: integer
-        description: A unique integer value identifying this exam room.
-        required: true
-      tags:
-      - api
-      security:
-      - jwtAuth: []
-      responses:
-        '204':
-          description: No response body
   /api/v1/exam-sessions/{id}/:
     get:
       operationId: api_v1_exam_sessions_retrieve
@@ -1602,6 +1310,196 @@ paths:
               schema:
                 $ref: '#/components/schemas/Permission'
           description: ''
+  /api/v1/practice/catalog/:
+    get:
+      operationId: api_v1_practice_catalog_list
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/PracticeCatalogItem'
+          description: ''
+  /api/v1/practice/history/:
+    get:
+      operationId: api_v1_practice_history_list
+      parameters:
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedPracticeSessionHistoryList'
+          description: ''
+  /api/v1/practice/sessions/:
+    post:
+      operationId: api_v1_practice_sessions_create
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PracticeSessionCreate'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PracticeSessionCreate'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PracticeSessionCreate'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PracticeSession'
+          description: ''
+  /api/v1/practice/sessions/{id}/:
+    get:
+      operationId: api_v1_practice_sessions_retrieve
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PracticeSession'
+          description: ''
+  /api/v1/practice/sessions/{id}/autosave/:
+    post:
+      operationId: api_v1_practice_sessions_autosave_create
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PracticeAutosaveSnapshotWrite'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PracticeAutosaveSnapshotWrite'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PracticeAutosaveSnapshotWrite'
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PracticeAutosaveSnapshot'
+          description: ''
+  /api/v1/practice/sessions/{id}/review/:
+    get:
+      operationId: api_v1_practice_sessions_review_retrieve
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PracticeReview'
+          description: ''
+  /api/v1/practice/sessions/{id}/submit/:
+    post:
+      operationId: api_v1_practice_sessions_submit_create
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PracticeSessionSubmission'
+          description: ''
+  /api/v1/practice/sessions/{session_id}/answers/{question_id}/:
+    put:
+      operationId: api_v1_practice_sessions_answers_update
+      parameters:
+      - in: path
+        name: question_id
+        schema:
+          type: integer
+        required: true
+      - in: path
+        name: session_id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PracticeSessionAnswerWrite'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PracticeSessionAnswerWrite'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PracticeSessionAnswerWrite'
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PracticeSessionAnswerResponse'
+          description: ''
   /api/v1/proctoring/cases/:
     get:
       operationId: api_v1_proctoring_cases_list
@@ -1677,6 +1575,21 @@ paths:
               schema:
                 $ref: '#/components/schemas/ViolationCase'
           description: ''
+  /api/v1/proctoring/cases/export/:
+    get:
+      operationId: api_v1_proctoring_cases_export_retrieve
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: string
+                format: binary
+          description: ''
   /api/v1/proctoring/exams/{exam_id}/monitoring/:
     get:
       operationId: api_v1_proctoring_exams_monitoring_retrieve
@@ -1696,6 +1609,27 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ExamMonitoringSnapshot'
+          description: ''
+  /api/v1/proctoring/exams/monitoring/:
+    get:
+      operationId: api_v1_proctoring_exams_monitoring_list
+      parameters:
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedExamMonitoringHubListResponseList'
           description: ''
   /api/v1/proctoring/sessions/{session_id}/capability/:
     post:
@@ -1821,6 +1755,78 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/SessionHeartbeat'
+          description: ''
+  /api/v1/proctoring/sessions/{session_id}/media/publish-token/:
+    post:
+      operationId: api_v1_proctoring_sessions_media_publish_token_create
+      parameters:
+      - in: path
+        name: session_id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MediaProviderToken'
+          description: ''
+  /api/v1/proctoring/sessions/{session_id}/media/status/:
+    post:
+      operationId: api_v1_proctoring_sessions_media_status_create
+      parameters:
+      - in: path
+        name: session_id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProctoringMediaStateWrite'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/ProctoringMediaStateWrite'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/ProctoringMediaStateWrite'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProctoringMediaState'
+          description: ''
+  /api/v1/proctoring/sessions/{session_id}/media/view-token/:
+    post:
+      operationId: api_v1_proctoring_sessions_media_view_token_create
+      parameters:
+      - in: path
+        name: session_id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MediaProviderToken'
           description: ''
   /api/v1/profile/:
     get:
@@ -3030,16 +3036,19 @@ components:
           $ref: '#/components/schemas/ExamStatusEnum'
         duration_minutes:
           type: integer
-          maximum: 2147483647
+          maximum: 9223372036854775807
           minimum: 0
+          format: int64
         passing_score:
           type: integer
-          maximum: 2147483647
+          maximum: 9223372036854775807
           minimum: 0
+          format: int64
         max_attempts:
           type: integer
-          maximum: 2147483647
+          maximum: 9223372036854775807
           minimum: 0
+          format: int64
         subject:
           allOf:
           - $ref: '#/components/schemas/CandidateExamSubject'
@@ -3150,8 +3159,9 @@ components:
           $ref: '#/components/schemas/ExamSessionStatusEnum'
         attempt_number:
           type: integer
-          maximum: 2147483647
+          maximum: 9223372036854775807
           minimum: 0
+          format: int64
         started_at:
           type: string
           format: date-time
@@ -3237,12 +3247,6 @@ components:
           maxLength: 255
         description:
           type: string
-        school_id:
-          type: integer
-          nullable: true
-        school_name:
-          type: string
-          readOnly: true
         is_active:
           type: boolean
         member_count:
@@ -3265,7 +3269,6 @@ components:
       - id
       - member_count
       - name
-      - school_name
       - updated_at
     CandidateSummary:
       type: object
@@ -3470,6 +3473,26 @@ components:
           writeOnly: true
       required:
       - password
+    EvidencePreview:
+      type: object
+      properties:
+        id:
+          type: integer
+        evidence_type:
+          type: string
+        file_url:
+          type: string
+        captured_at:
+          type: string
+        deleted_at:
+          type: string
+          nullable: true
+      required:
+      - captured_at
+      - deleted_at
+      - evidence_type
+      - file_url
+      - id
     ExamAssignedGroup:
       type: object
       properties:
@@ -3534,8 +3557,9 @@ components:
           $ref: '#/components/schemas/ExamItemSourceEnum'
         sort_order:
           type: integer
-          maximum: 2147483647
+          maximum: 9223372036854775807
           minimum: 0
+          format: int64
         points:
           type: string
           format: decimal
@@ -3555,6 +3579,91 @@ components:
       description: |-
         * `manual` - Manual
         * `random` - Random
+    ExamMonitoringHubItem:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        subject_name:
+          type: string
+        status:
+          type: string
+        total_candidates:
+          type: integer
+        total_sessions:
+          type: integer
+        in_progress_sessions:
+          type: integer
+        submitted_sessions:
+          type: integer
+        alert_count:
+          type: integer
+        critical_alert_count:
+          type: integer
+        latest_alert_at:
+          type: string
+          format: date-time
+          nullable: true
+        highest_alert_severity:
+          type: string
+          readOnly: true
+      required:
+      - alert_count
+      - critical_alert_count
+      - highest_alert_severity
+      - id
+      - in_progress_sessions
+      - latest_alert_at
+      - name
+      - status
+      - subject_name
+      - submitted_sessions
+      - total_candidates
+      - total_sessions
+    ExamMonitoringHubListResponse:
+      type: object
+      properties:
+        count:
+          type: integer
+        next:
+          type: string
+          nullable: true
+        previous:
+          type: string
+          nullable: true
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/ExamMonitoringHubItem'
+        summary:
+          $ref: '#/components/schemas/ExamMonitoringHubSummary'
+      required:
+      - count
+      - next
+      - previous
+      - results
+      - summary
+    ExamMonitoringHubSummary:
+      type: object
+      properties:
+        exam_count:
+          type: integer
+        total_candidates:
+          type: integer
+        in_progress_sessions:
+          type: integer
+        alert_count:
+          type: integer
+        critical_exam_count:
+          type: integer
+      required:
+      - alert_count
+      - critical_exam_count
+      - exam_count
+      - in_progress_sessions
+      - total_candidates
     ExamMonitoringSnapshot:
       type: object
       properties:
@@ -3587,66 +3696,6 @@ components:
       - in_progress
       - not_started
       - total_candidates
-    ExamPeriod:
-      type: object
-      properties:
-        id:
-          type: integer
-          readOnly: true
-        name:
-          type: string
-          maxLength: 255
-        description:
-          type: string
-        start_date:
-          type: string
-          format: date
-        end_date:
-          type: string
-          format: date
-        status:
-          type: string
-          readOnly: true
-        exams_count:
-          type: integer
-          readOnly: true
-        created_at:
-          type: string
-          format: date-time
-          readOnly: true
-        updated_at:
-          type: string
-          format: date-time
-          readOnly: true
-      required:
-      - created_at
-      - end_date
-      - exams_count
-      - id
-      - name
-      - start_date
-      - status
-      - updated_at
-    ExamPeriodSummary:
-      type: object
-      properties:
-        id:
-          type: integer
-          readOnly: true
-        name:
-          type: string
-          maxLength: 255
-        start_date:
-          type: string
-          format: date
-        end_date:
-          type: string
-          format: date
-      required:
-      - end_date
-      - id
-      - name
-      - start_date
     ExamQuestionRevisionSummary:
       type: object
       properties:
@@ -3677,8 +3726,9 @@ components:
           readOnly: true
         sort_order:
           type: integer
-          maximum: 2147483647
+          maximum: 9223372036854775807
           minimum: 0
+          format: int64
         difficulty:
           oneOf:
           - $ref: '#/components/schemas/DifficultyEnum'
@@ -3690,8 +3740,9 @@ components:
         tag_ids: {}
         count:
           type: integer
-          maximum: 2147483647
+          maximum: 9223372036854775807
           minimum: 0
+          format: int64
       required:
       - id
     ExamRandomRuleInput:
@@ -3723,17 +3774,11 @@ components:
         name:
           type: string
           maxLength: 255
+        mode:
+          $ref: '#/components/schemas/ModeEnum'
         subject:
           allOf:
           - $ref: '#/components/schemas/ExamSubject'
-          readOnly: true
-        period:
-          allOf:
-          - $ref: '#/components/schemas/ExamPeriodSummary'
-          readOnly: true
-        room:
-          allOf:
-          - $ref: '#/components/schemas/ExamRoomSummary'
           readOnly: true
         description:
           type: string
@@ -3741,16 +3786,19 @@ components:
           $ref: '#/components/schemas/ExamStatusEnum'
         duration_minutes:
           type: integer
-          maximum: 2147483647
+          maximum: 9223372036854775807
           minimum: 0
+          format: int64
         passing_score:
           type: integer
-          maximum: 2147483647
+          maximum: 9223372036854775807
           minimum: 0
+          format: int64
         max_attempts:
           type: integer
-          maximum: 2147483647
+          maximum: 9223372036854775807
           minimum: 0
+          format: int64
         shuffle_questions:
           type: boolean
         show_results_immediately:
@@ -3788,65 +3836,9 @@ components:
       - delivery_summary
       - id
       - name
-      - period
-      - room
       - schedule_window
       - subject
       - updated_at
-    ExamRoom:
-      type: object
-      properties:
-        id:
-          type: integer
-          readOnly: true
-        name:
-          type: string
-          maxLength: 255
-        location:
-          type: string
-          maxLength: 255
-        capacity:
-          type: integer
-          maximum: 2147483647
-          minimum: 0
-        features: {}
-        exams_count:
-          type: integer
-          readOnly: true
-        created_at:
-          type: string
-          format: date-time
-          readOnly: true
-        updated_at:
-          type: string
-          format: date-time
-          readOnly: true
-      required:
-      - created_at
-      - exams_count
-      - id
-      - name
-      - updated_at
-    ExamRoomSummary:
-      type: object
-      properties:
-        id:
-          type: integer
-          readOnly: true
-        name:
-          type: string
-          maxLength: 255
-        location:
-          type: string
-          maxLength: 255
-        capacity:
-          type: integer
-          maximum: 2147483647
-          minimum: 0
-        features: {}
-      required:
-      - id
-      - name
     ExamScheduleWindow:
       type: object
       properties:
@@ -3961,8 +3953,9 @@ components:
           readOnly: true
         version_number:
           type: integer
-          maximum: 2147483647
+          maximum: 9223372036854775807
           minimum: 0
+          format: int64
         item_count:
           type: integer
           readOnly: true
@@ -3992,14 +3985,10 @@ components:
       properties:
         name:
           type: string
+        mode:
+          $ref: '#/components/schemas/ModeEnum'
         subject_id:
           type: integer
-        period_id:
-          type: integer
-          nullable: true
-        room_id:
-          type: integer
-          nullable: true
         description:
           type: string
         status:
@@ -4259,6 +4248,50 @@ components:
       - email
       - full_name
       - id
+    Media:
+      type: object
+      properties:
+        webcam_publish_status:
+          type: string
+        screen_capture_status:
+          type: string
+        last_publish_at:
+          type: string
+          nullable: true
+      required:
+      - last_publish_at
+      - screen_capture_status
+      - webcam_publish_status
+    MediaProviderToken:
+      type: object
+      properties:
+        provider:
+          type: string
+        server_url:
+          type: string
+        room_name:
+          type: string
+        participant_name:
+          type: string
+        access_token:
+          type: string
+        expires_at:
+          type: string
+      required:
+      - access_token
+      - expires_at
+      - participant_name
+      - provider
+      - room_name
+      - server_url
+    ModeEnum:
+      enum:
+      - exam
+      - class
+      type: string
+      description: |-
+        * `exam` - Exam
+        * `class` - Class
     MonitoringAlert:
       type: object
       properties:
@@ -4295,6 +4328,9 @@ components:
     MonitoringCandidateStatus:
       type: object
       properties:
+        session_id:
+          type: integer
+          nullable: true
         candidate:
           $ref: '#/components/schemas/CandidateSummary'
         status:
@@ -4312,12 +4348,16 @@ components:
         last_activity_at:
           type: string
           nullable: true
+        media:
+          $ref: '#/components/schemas/Media'
       required:
       - candidate
       - connection_status
       - last_activity_at
+      - media
       - progress_percentage
       - questions_answered
+      - session_id
       - status
       - time_elapsed_minutes
       - total_questions
@@ -4456,7 +4496,7 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/CandidateGroup'
-    PaginatedExamPeriodList:
+    PaginatedExamMonitoringHubListResponseList:
       type: object
       required:
       - count
@@ -4478,7 +4518,7 @@ components:
         results:
           type: array
           items:
-            $ref: '#/components/schemas/ExamPeriod'
+            $ref: '#/components/schemas/ExamMonitoringHubListResponse'
     PaginatedExamReadList:
       type: object
       required:
@@ -4502,29 +4542,6 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/ExamRead'
-    PaginatedExamRoomList:
-      type: object
-      required:
-      - count
-      - results
-      properties:
-        count:
-          type: integer
-          example: 123
-        next:
-          type: string
-          nullable: true
-          format: uri
-          example: http://api.example.org/accounts/?page=4
-        previous:
-          type: string
-          nullable: true
-          format: uri
-          example: http://api.example.org/accounts/?page=2
-        results:
-          type: array
-          items:
-            $ref: '#/components/schemas/ExamRoom'
     PaginatedManualGradingTaskList:
       type: object
       required:
@@ -4617,6 +4634,29 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/Permission'
+    PaginatedPracticeSessionHistoryList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/PracticeSessionHistory'
     PaginatedQuestionImportBatchList:
       type: object
       required:
@@ -4835,12 +4875,6 @@ components:
           maxLength: 255
         description:
           type: string
-        school_id:
-          type: integer
-          nullable: true
-        school_name:
-          type: string
-          readOnly: true
         is_active:
           type: boolean
         member_count:
@@ -4857,78 +4891,15 @@ components:
           type: string
           format: date-time
           readOnly: true
-    PatchedExamPeriod:
-      type: object
-      properties:
-        id:
-          type: integer
-          readOnly: true
-        name:
-          type: string
-          maxLength: 255
-        description:
-          type: string
-        start_date:
-          type: string
-          format: date
-        end_date:
-          type: string
-          format: date
-        status:
-          type: string
-          readOnly: true
-        exams_count:
-          type: integer
-          readOnly: true
-        created_at:
-          type: string
-          format: date-time
-          readOnly: true
-        updated_at:
-          type: string
-          format: date-time
-          readOnly: true
-    PatchedExamRoom:
-      type: object
-      properties:
-        id:
-          type: integer
-          readOnly: true
-        name:
-          type: string
-          maxLength: 255
-        location:
-          type: string
-          maxLength: 255
-        capacity:
-          type: integer
-          maximum: 2147483647
-          minimum: 0
-        features: {}
-        exams_count:
-          type: integer
-          readOnly: true
-        created_at:
-          type: string
-          format: date-time
-          readOnly: true
-        updated_at:
-          type: string
-          format: date-time
-          readOnly: true
     PatchedExamWrite:
       type: object
       properties:
         name:
           type: string
+        mode:
+          $ref: '#/components/schemas/ModeEnum'
         subject_id:
           type: integer
-        period_id:
-          type: integer
-          nullable: true
-        room_id:
-          type: integer
-          nullable: true
         description:
           type: string
         status:
@@ -5230,6 +5201,386 @@ components:
       - id
       - is_system
       - module
+    PracticeAutosaveSnapshot:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        answered_count:
+          type: integer
+          maximum: 9223372036854775807
+          minimum: 0
+          format: int64
+        marked_count:
+          type: integer
+          maximum: 9223372036854775807
+          minimum: 0
+          format: int64
+        payload: {}
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - created_at
+      - id
+    PracticeAutosaveSnapshotWrite:
+      type: object
+      properties:
+        payload: {}
+    PracticeCatalogCounts:
+      type: object
+      properties:
+        easy:
+          type: integer
+        medium:
+          type: integer
+        hard:
+          type: integer
+        total:
+          type: integer
+      required:
+      - easy
+      - hard
+      - medium
+      - total
+    PracticeCatalogItem:
+      type: object
+      properties:
+        subject:
+          $ref: '#/components/schemas/CandidateExamSubject'
+        counts:
+          $ref: '#/components/schemas/PracticeCatalogCounts'
+      required:
+      - counts
+      - subject
+    PracticeReview:
+      type: object
+      properties:
+        id:
+          type: integer
+        subject:
+          $ref: '#/components/schemas/CandidateExamSubject'
+        status:
+          type: string
+        started_at:
+          type: string
+          format: date-time
+        submitted_at:
+          type: string
+          format: date-time
+          nullable: true
+        duration_minutes:
+          type: integer
+        details_available:
+          type: boolean
+        details_retention_until:
+          type: string
+          format: date-time
+          nullable: true
+        details_purged_at:
+          type: string
+          format: date-time
+          nullable: true
+        summary:
+          $ref: '#/components/schemas/PracticeReviewSummary'
+      required:
+      - details_available
+      - details_purged_at
+      - details_retention_until
+      - duration_minutes
+      - id
+      - started_at
+      - status
+      - subject
+      - submitted_at
+      - summary
+    PracticeReviewSummary:
+      type: object
+      properties:
+        correct_count:
+          type: integer
+        incorrect_count:
+          type: integer
+        total_count:
+          type: integer
+        score_percentage:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,4}(?:\.\d{0,2})?$
+      required:
+      - correct_count
+      - incorrect_count
+      - score_percentage
+      - total_count
+    PracticeSession:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        subject:
+          allOf:
+          - $ref: '#/components/schemas/CandidateExamSubject'
+          readOnly: true
+        status:
+          $ref: '#/components/schemas/PracticeSessionStatusEnum'
+        duration_minutes:
+          type: integer
+          maximum: 9223372036854775807
+          minimum: 0
+          format: int64
+        question_count:
+          type: integer
+          maximum: 9223372036854775807
+          minimum: 0
+          format: int64
+        started_at:
+          type: string
+          format: date-time
+        expires_at:
+          type: string
+          format: date-time
+        submitted_at:
+          type: string
+          format: date-time
+          nullable: true
+        remaining_seconds:
+          type: integer
+          readOnly: true
+        correct_count:
+          type: integer
+          maximum: 9223372036854775807
+          minimum: 0
+          format: int64
+        total_count:
+          type: integer
+          maximum: 9223372036854775807
+          minimum: 0
+          format: int64
+        score_percentage:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,4}(?:\.\d{0,2})?$
+        answered_count:
+          type: integer
+          readOnly: true
+        marked_count:
+          type: integer
+          readOnly: true
+        total_questions:
+          type: integer
+          readOnly: true
+        questions:
+          type: array
+          items:
+            $ref: '#/components/schemas/PracticeSessionQuestion'
+          readOnly: true
+      required:
+      - answered_count
+      - duration_minutes
+      - expires_at
+      - id
+      - marked_count
+      - question_count
+      - questions
+      - remaining_seconds
+      - started_at
+      - subject
+      - total_questions
+    PracticeSessionAnswerResponse:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        selected_option_keys: {}
+        is_answered:
+          type: boolean
+        is_marked_for_review:
+          type: boolean
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - id
+      - updated_at
+    PracticeSessionAnswerWrite:
+      type: object
+      properties:
+        selected_option_keys:
+          type: array
+          items:
+            type: string
+        is_marked_for_review:
+          type: boolean
+    PracticeSessionCreate:
+      type: object
+      properties:
+        subject_id:
+          type: integer
+      required:
+      - subject_id
+    PracticeSessionHistory:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        subject:
+          allOf:
+          - $ref: '#/components/schemas/CandidateExamSubject'
+          readOnly: true
+        status:
+          $ref: '#/components/schemas/PracticeSessionStatusEnum'
+        duration_minutes:
+          type: integer
+          maximum: 9223372036854775807
+          minimum: 0
+          format: int64
+        question_count:
+          type: integer
+          maximum: 9223372036854775807
+          minimum: 0
+          format: int64
+        started_at:
+          type: string
+          format: date-time
+        expires_at:
+          type: string
+          format: date-time
+        submitted_at:
+          type: string
+          format: date-time
+          nullable: true
+        remaining_seconds:
+          type: integer
+          readOnly: true
+        correct_count:
+          type: integer
+          maximum: 9223372036854775807
+          minimum: 0
+          format: int64
+        total_count:
+          type: integer
+          maximum: 9223372036854775807
+          minimum: 0
+          format: int64
+        score_percentage:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,4}(?:\.\d{0,2})?$
+        answered_count:
+          type: integer
+          readOnly: true
+        marked_count:
+          type: integer
+          readOnly: true
+        total_questions:
+          type: integer
+          readOnly: true
+      required:
+      - answered_count
+      - duration_minutes
+      - expires_at
+      - id
+      - marked_count
+      - question_count
+      - remaining_seconds
+      - started_at
+      - subject
+      - total_questions
+    PracticeSessionQuestion:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        sort_order:
+          type: integer
+          maximum: 9223372036854775807
+          minimum: 0
+          format: int64
+        difficulty:
+          type: string
+          maxLength: 16
+        question_type:
+          type: string
+          maxLength: 32
+        question_text:
+          type: string
+        options:
+          type: array
+          items:
+            $ref: '#/components/schemas/PracticeSessionQuestionOption'
+          readOnly: true
+        selected_option_keys: {}
+        is_answered:
+          type: boolean
+        is_marked_for_review:
+          type: boolean
+      required:
+      - difficulty
+      - id
+      - options
+      - question_text
+      - question_type
+      - sort_order
+    PracticeSessionQuestionOption:
+      type: object
+      properties:
+        key:
+          type: string
+        text:
+          type: string
+        sort_order:
+          type: integer
+      required:
+      - key
+      - sort_order
+      - text
+    PracticeSessionStatusEnum:
+      enum:
+      - in_progress
+      - submitted
+      - expired
+      - abandoned
+      type: string
+      description: |-
+        * `in_progress` - In Progress
+        * `submitted` - Submitted
+        * `expired` - Expired
+        * `abandoned` - Abandoned
+    PracticeSessionSubmission:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        status:
+          $ref: '#/components/schemas/PracticeSessionStatusEnum'
+        submitted_at:
+          type: string
+          format: date-time
+          nullable: true
+        correct_count:
+          type: integer
+          maximum: 9223372036854775807
+          minimum: 0
+          format: int64
+        total_count:
+          type: integer
+          maximum: 9223372036854775807
+          minimum: 0
+          format: int64
+        score_percentage:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,4}(?:\.\d{0,2})?$
+      required:
+      - id
     PriorityEnum:
       enum:
       - low
@@ -5348,6 +5699,71 @@ components:
         * `webcam_snapshot` - Webcam Snapshot
         * `screen_capture` - Screen Capture
         * `attachment` - Attachment
+    ProctoringMediaState:
+      type: object
+      properties:
+        provider:
+          type: string
+          maxLength: 32
+        room_name:
+          type: string
+          maxLength: 255
+        participant_name:
+          type: string
+          maxLength: 255
+        webcam_publish_status:
+          $ref: '#/components/schemas/ProctoringMediaStatePublishStatusEnum'
+        screen_capture_status:
+          $ref: '#/components/schemas/ProctoringMediaStateCaptureStatusEnum'
+        webcam_publish_error:
+          type: string
+        last_publish_at:
+          type: string
+          format: date-time
+          nullable: true
+        last_status_at:
+          type: string
+          format: date-time
+          nullable: true
+        metadata: {}
+    ProctoringMediaStateCaptureStatusEnum:
+      enum:
+      - unavailable
+      - ready
+      - revoked
+      - failed
+      type: string
+      description: |-
+        * `unavailable` - Unavailable
+        * `ready` - Ready
+        * `revoked` - Revoked
+        * `failed` - Failed
+    ProctoringMediaStatePublishStatusEnum:
+      enum:
+      - idle
+      - publishing
+      - failed
+      - stopped
+      type: string
+      description: |-
+        * `idle` - Idle
+        * `publishing` - Publishing
+        * `failed` - Failed
+        * `stopped` - Stopped
+    ProctoringMediaStateWrite:
+      type: object
+      properties:
+        webcam_publish_status:
+          $ref: '#/components/schemas/ProctoringMediaStatePublishStatusEnum'
+        screen_capture_status:
+          $ref: '#/components/schemas/ProctoringMediaStateCaptureStatusEnum'
+        webcam_publish_error:
+          type: string
+          default: ''
+        metadata: {}
+      required:
+      - screen_capture_status
+      - webcam_publish_status
     Profile:
       type: object
       properties:
@@ -5359,8 +5775,7 @@ components:
           readOnly: true
         email:
           type: string
-          format: email
-          maxLength: 254
+          readOnly: true
         full_name:
           type: string
           maxLength: 255
@@ -5425,16 +5840,20 @@ components:
           $ref: '#/components/schemas/QuestionImportBatchStatusEnum'
         total_records:
           type: integer
-          maximum: 2147483647
+          maximum: 9223372036854775807
           minimum: 0
+          format: int64
         success_count:
           type: integer
-          maximum: 2147483647
+          maximum: 9223372036854775807
           minimum: 0
+          format: int64
         error_count:
           type: integer
-          maximum: 2147483647
+          maximum: 9223372036854775807
           minimum: 0
+          format: int64
+        created_question_ids: {}
         errors:
           type: array
           items:
@@ -5479,8 +5898,9 @@ components:
           readOnly: true
         row_number:
           type: integer
-          maximum: 2147483647
+          maximum: 9223372036854775807
           minimum: 0
+          format: int64
         field_name:
           type: string
           maxLength: 64
@@ -5509,8 +5929,9 @@ components:
           type: string
         sort_order:
           type: integer
-          maximum: 2147483647
+          maximum: 9223372036854775807
           minimum: 0
+          format: int64
       required:
       - key
       - text
@@ -5573,8 +5994,9 @@ components:
           readOnly: true
         revision_number:
           type: integer
-          maximum: 2147483647
+          maximum: 9223372036854775807
           minimum: 0
+          format: int64
         question_text:
           type: string
         options:
@@ -5923,8 +6345,9 @@ components:
           $ref: '#/components/schemas/SessionHeartbeatConnectionStatusEnum'
         latency_ms:
           type: integer
-          maximum: 2147483647
+          maximum: 9223372036854775807
           minimum: 0
+          format: int64
           nullable: true
         payload: {}
         recorded_at:
@@ -5963,8 +6386,9 @@ components:
           readOnly: true
         sort_order:
           type: integer
-          maximum: 2147483647
+          maximum: 9223372036854775807
           minimum: 0
+          format: int64
         points:
           type: string
           format: decimal
@@ -6016,8 +6440,9 @@ components:
           type: string
         sort_order:
           type: integer
-          maximum: 2147483647
+          maximum: 9223372036854775807
           minimum: 0
+          format: int64
       required:
       - key
       - text
@@ -6175,6 +6600,11 @@ components:
           items:
             type: integer
           readOnly: true
+        evidence_items:
+          type: array
+          items:
+            $ref: '#/components/schemas/EvidencePreview'
+          readOnly: true
         resolved_at:
           type: string
           format: date-time
@@ -6190,6 +6620,7 @@ components:
       - candidate
       - event_ids
       - evidence_ids
+      - evidence_items
       - exam
       - id
       - reviews

@@ -11,7 +11,7 @@ def _build_candidate_exam(*, subject, admin_user, candidate_user):
     from apps.question_bank.services import create_question
 
     school = School.objects.create(name=f"Dashboard School {candidate_user.id}", code=f"DS-{candidate_user.id}")
-    group = CandidateGroup.objects.create(name=f"Dashboard Group {candidate_user.id}", school=school)
+    group = CandidateGroup.objects.create(name=f"Dashboard Group {candidate_user.id}")
     GroupMembership.objects.create(group=group, user=candidate_user)
     question = create_question(
         subject=subject,
@@ -47,7 +47,7 @@ def _build_published_result(*, subject, admin_user, candidate_user):
     from apps.question_bank.services import create_question
 
     school = School.objects.create(name=f"Published School {candidate_user.id}", code=f"PS-{candidate_user.id}")
-    group = CandidateGroup.objects.create(name=f"Published Group {candidate_user.id}", school=school)
+    group = CandidateGroup.objects.create(name=f"Published Group {candidate_user.id}")
     GroupMembership.objects.create(group=group, user=candidate_user)
     question = create_question(
         subject=subject,
@@ -86,17 +86,35 @@ def _build_published_result(*, subject, admin_user, candidate_user):
 
 @pytest.mark.django_db
 def test_candidate_can_load_dashboard_overview(api_client, candidate_user, subject, admin_user):
+    from apps.academics.models import Subject
     from apps.materials.models import Material
     from rest_framework_simplejwt.tokens import RefreshToken
 
     _build_candidate_exam(subject=subject, admin_user=admin_user, candidate_user=candidate_user)
     _build_published_result(subject=subject, admin_user=admin_user, candidate_user=candidate_user)
+    unassigned_subject = Subject.objects.create(
+        name="Unassigned Physics",
+        code="UNPHYS",
+        description="Unassigned",
+        color="bg-slate-600",
+    )
     Material.objects.create(
         title="Calculus Fundamentals",
         description="Candidate handbook",
         subject=subject,
         file=SimpleUploadedFile("guide.txt", b"payload", content_type="text/plain"),
         file_name="guide.txt",
+        file_size=7,
+        mime_type="text/plain",
+        uploaded_by=admin_user,
+        is_active=True,
+    )
+    Material.objects.create(
+        title="Physics Handbook",
+        description="Should stay hidden",
+        subject=unassigned_subject,
+        file=SimpleUploadedFile("physics.txt", b"payload", content_type="text/plain"),
+        file_name="physics.txt",
         file_size=7,
         mime_type="text/plain",
         uploaded_by=admin_user,

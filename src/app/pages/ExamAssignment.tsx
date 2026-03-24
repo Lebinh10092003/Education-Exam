@@ -20,6 +20,7 @@ import { useMutationState } from "../hooks/useMutationState";
 interface ExamAssignmentExam {
   id: number;
   name: string;
+  mode: "exam" | "class";
   subject: {
     id: number;
     name: string;
@@ -37,11 +38,6 @@ interface GroupAssignmentRecord {
   name: string;
   member_count: number;
   assigned: boolean;
-  school: {
-    id: number | null;
-    name: string;
-    code: string;
-  };
 }
 
 interface StudentImportErrorRecord {
@@ -162,6 +158,7 @@ export function ExamAssignment() {
   };
 
   const exam = examDetails.data;
+  const isClass = exam?.mode === "class";
   const groups = groupsList.data?.results ?? [];
   const combinedError =
     examDetails.error || groupsList.error || assignmentMutation.error || importMutation.error;
@@ -169,11 +166,13 @@ export function ExamAssignment() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Assign Exam"
+        title={isClass ? "Assign Class" : "Assign Exam"}
         description={
           exam
-            ? `${exam.name} • ${exam.subject.name} • ${exam.assignment_summary.total_candidates} total candidates`
-            : "Load exam assignment targets"
+            ? `${exam.name} • ${exam.subject.name} • ${exam.assignment_summary.total_candidates} total ${isClass ? "learners" : "candidates"}`
+            : isClass
+              ? "Load class enrollment targets"
+              : "Load exam assignment targets"
         }
         action={
           <Button
@@ -181,7 +180,11 @@ export function ExamAssignment() {
             disabled={assignmentMutation.isSubmitting || examDetails.isLoading}
           >
             <UserPlus className="mr-2 h-4 w-4" />
-            {assignmentMutation.isSubmitting ? "Saving..." : "Save Group Assignment"}
+            {assignmentMutation.isSubmitting
+              ? "Saving..."
+              : isClass
+                ? "Save Enrollment"
+                : "Save Group Assignment"}
           </Button>
         }
       />
@@ -208,7 +211,9 @@ export function ExamAssignment() {
 
           <div className="space-y-3">
             {groupsList.isLoading ? (
-              <div className="py-12 text-center text-sm text-gray-500">Loading group assignments...</div>
+              <div className="py-12 text-center text-sm text-gray-500">
+                {isClass ? "Loading class enrollment groups..." : "Loading group assignments..."}
+              </div>
             ) : groups.length === 0 ? (
               <div className="py-12 text-center text-sm text-gray-500">No groups matched the current search.</div>
             ) : (
@@ -228,7 +233,6 @@ export function ExamAssignment() {
                     </div>
                     <p className="text-sm text-gray-500">
                       {group.member_count} members
-                      {group.school.name ? ` • ${group.school.name}` : ""}
                     </p>
                   </div>
                 </label>
@@ -240,10 +244,12 @@ export function ExamAssignment() {
 
       <Card>
         <CardHeader className="space-y-2">
-          <CardTitle>Import Students Directly To This Exam</CardTitle>
+          <CardTitle>
+            {isClass ? "Import Students Directly To This Class" : "Import Students Directly To This Exam"}
+          </CardTitle>
           <p className="text-sm text-gray-600">
             Upload a CSV to create or update `student` accounts by CCCD, then assign them straight
-            to this exam. New passwords default to the generated username.
+            to this {isClass ? "class" : "exam"}. New passwords default to the generated username.
           </p>
         </CardHeader>
         <CardContent className="space-y-5">

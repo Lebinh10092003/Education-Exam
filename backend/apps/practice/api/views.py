@@ -8,6 +8,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from apps.academics.models import Subject
+from apps.exam_delivery.access import get_accessible_subject_queryset
 from apps.platform_core.i18n import t
 
 from ..models import PracticeSession, PracticeSessionQuestion
@@ -16,8 +17,10 @@ from ..services import (
     assert_user_can_access_practice_session,
     create_practice_autosave_snapshot,
     create_practice_session,
+    get_active_practice_session,
     save_practice_answer,
     submit_practice_session,
+    user_has_practice_subject_access,
 )
 from .serializers import (
     PracticeAutosaveSnapshotSerializer,
@@ -45,7 +48,7 @@ class PracticeCatalogView(APIView):
     @extend_schema(responses=PracticeCatalogItemSerializer(many=True))
     def get(self, request):
         subjects = (
-            Subject.objects.filter(is_active=True)
+            Subject.objects.filter(pk__in=get_accessible_subject_queryset(user=request.user).values("pk"))
             .annotate(
                 easy_count=Count(
                     "questions",
@@ -107,15 +110,19 @@ class PracticeSessionCreateView(APIView):
         serializer = PracticeSessionCreateSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         subject = get_object_or_404(Subject, pk=serializer.validated_data["subject_id"], is_active=True)
-        session = create_practice_session(
-            candidate=request.user,
-            subject=subject,
-            duration_minutes=serializer.validated_data["duration_minutes"],
-            difficulty_counts=serializer.validated_data["difficulty_counts"],
-        )
+        if not user_has_practice_subject_access(user=request.user, subject=subject):
+            return Response(
+                {"detail": t(vi="Bạn không có quyền luyện tập môn học này.", en="You do not have access to this subject.")},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+        session = get_active_practice_session(candidate=request.user, subject=subject)
+        response_status = status.HTTP_200_OK
+        if session is None:
+            session = create_practice_session(candidate=request.user, subject=subject)
+            response_status = status.HTTP_201_CREATED
         session = get_practice_session_queryset().get(pk=session.pk)
         output = PracticeSessionSerializer(session, context={"request": request})
-        return Response(output.data, status=status.HTTP_201_CREATED)
+        return Response(output.data, status=response_status)
 
 
 class PracticeSessionDetailView(APIView):
@@ -204,7 +211,6 @@ class PracticeSessionReviewView(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        questions = list(session.questions.order_by("sort_order"))
         payload = {
             "id": session.id,
             "subject": session.subject,
@@ -212,13 +218,15 @@ class PracticeSessionReviewView(APIView):
             "started_at": session.started_at,
             "submitted_at": session.submitted_at,
             "duration_minutes": session.duration_minutes,
+            "details_available": session.questions.exists(),
+            "details_retention_until": session.details_retention_until,
+            "details_purged_at": session.details_purged_at,
             "summary": {
                 "correct_count": session.correct_count,
                 "incorrect_count": max(session.total_count - session.correct_count, 0),
                 "total_count": session.total_count,
                 "score_percentage": session.score_percentage,
             },
-            "questions": questions,
         }
         output = PracticeReviewSerializer(payload, context={"request": request})
         return Response(output.data)

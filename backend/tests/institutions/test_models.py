@@ -12,7 +12,7 @@ def test_group_membership_is_unique_per_user_and_group():
         email="candidate@example.com",
         password="secret123",
     )
-    group = CandidateGroup.objects.create(name="Group A", school=school)
+    group = CandidateGroup.objects.create(name="Group A")
 
     GroupMembership.objects.create(group=group, user=user)
 

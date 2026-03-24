@@ -7,8 +7,6 @@ const navigation = {
     questionBank: "Ngân hàng câu hỏi",
     exams: "Quản lý kỳ thi",
     examList: "Danh sách kỳ thi",
-    examPeriods: "Đợt thi",
-    examRooms: "Phòng thi",
     liveMonitoring: "Giám sát trực tiếp",
     manualGrading: "Chấm tự luận",
     materials: "Thư viện tài liệu",

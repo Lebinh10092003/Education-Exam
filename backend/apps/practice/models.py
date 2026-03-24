@@ -2,6 +2,7 @@ from decimal import Decimal
 
 from django.conf import settings
 from django.db import models
+from django.utils import timezone
 
 from apps.platform_core.models import TimeStampedModel
 
@@ -29,6 +30,8 @@ class PracticeSession(TimeStampedModel):
     started_at = models.DateTimeField()
     expires_at = models.DateTimeField()
     submitted_at = models.DateTimeField(null=True, blank=True)
+    details_retention_until = models.DateTimeField(null=True, blank=True)
+    details_purged_at = models.DateTimeField(null=True, blank=True)
     last_activity_at = models.DateTimeField(null=True, blank=True)
     correct_count = models.PositiveIntegerField(default=0)
     total_count = models.PositiveIntegerField(default=0)
@@ -39,6 +42,14 @@ class PracticeSession(TimeStampedModel):
 
     def __str__(self):
         return f"Practice<{self.candidate_id}:{self.subject.code}:{self.id}>"
+
+    @property
+    def details_available(self):
+        if self.details_purged_at is not None:
+            return False
+        if self.details_retention_until is None:
+            return True
+        return self.details_retention_until > timezone.now()
 
 
 class PracticeSessionQuestion(TimeStampedModel):

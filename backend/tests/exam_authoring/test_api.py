@@ -12,7 +12,7 @@ def test_admin_can_create_exam_with_manual_questions_random_rules_and_groups(
     from apps.question_bank.services import create_question
 
     school = School.objects.create(name="School A", code="SCHA")
-    group = CandidateGroup.objects.create(name="Computer Science - Year 1", school=school)
+    group = CandidateGroup.objects.create(name="Computer Science - Year 1")
     question = create_question(
         subject=subject,
         created_by=admin_user,
@@ -38,6 +38,7 @@ def test_admin_can_create_exam_with_manual_questions_random_rules_and_groups(
         "/api/v1/exams/",
         {
             "name": "Mathematics Final Exam",
+            "mode": "class",
             "subject_id": subject.id,
             "description": "Semester final",
             "status": "scheduled",
@@ -59,6 +60,7 @@ def test_admin_can_create_exam_with_manual_questions_random_rules_and_groups(
     assert response.status_code == 201
     payload = response.json()
     assert payload["status"] == "scheduled"
+    assert payload["mode"] == "class"
     assert payload["current_version"]["version_number"] == 1
     assert payload["current_version"]["item_count"] == 2
     assert payload["assignment_summary"]["group_count"] == 1
@@ -141,6 +143,7 @@ def test_exam_update_creates_new_version(api_client, admin_token, admin_user, su
     response = api_client.patch(
         f"/api/v1/exams/{exam.id}/",
         {
+            "mode": "class",
             "manual_question_ids": [first_question.id, second_question.id],
             "description": "Updated version",
         },
@@ -148,6 +151,7 @@ def test_exam_update_creates_new_version(api_client, admin_token, admin_user, su
     )
 
     assert response.status_code == 200
+    assert response.json()["mode"] == "class"
     assert response.json()["current_version"]["version_number"] == 2
     assert response.json()["current_version"]["item_count"] == 2
 

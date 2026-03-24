@@ -13,8 +13,8 @@ def test_assignment_summary_returns_all_groups_with_assigned_flags(
     from apps.institutions.models import CandidateGroup, GroupMembership, School
 
     school = School.objects.create(name="School A", code="SCHA")
-    first_group = CandidateGroup.objects.create(name="Computer Science - Year 1", school=school)
-    second_group = CandidateGroup.objects.create(name="Mathematics Advanced", school=school)
+    first_group = CandidateGroup.objects.create(name="Computer Science - Year 1")
+    second_group = CandidateGroup.objects.create(name="Mathematics Advanced")
     GroupMembership.objects.create(group=first_group, user=candidate_user)
     exam = create_exam(
         name="Mathematics Final Exam",
@@ -50,8 +50,8 @@ def test_assignment_sync_replaces_existing_group_assignments(
     from apps.institutions.models import CandidateGroup, School
 
     school = School.objects.create(name="School A", code="SCHA")
-    first_group = CandidateGroup.objects.create(name="Computer Science - Year 1", school=school)
-    second_group = CandidateGroup.objects.create(name="Mathematics Advanced", school=school)
+    first_group = CandidateGroup.objects.create(name="Computer Science - Year 1")
+    second_group = CandidateGroup.objects.create(name="Mathematics Advanced")
     exam = create_exam(
         name="Mathematics Final Exam",
         subject=subject,

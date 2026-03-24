@@ -5,6 +5,7 @@ from rest_framework.parsers import FormParser, MultiPartParser
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
+from apps.exam_delivery.access import get_accessible_subject_queryset
 from apps.identity.permissions import HasAPIPermissionCode
 
 from ..models import Material
@@ -59,7 +60,11 @@ class CandidateMaterialListView(generics.ListAPIView):
     permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
-        queryset = Material.objects.select_related("subject", "uploaded_by").filter(is_active=True).order_by("-created_at", "title")
+        queryset = (
+            Material.objects.select_related("subject", "uploaded_by")
+            .filter(is_active=True, subject__in=get_accessible_subject_queryset(user=self.request.user))
+            .order_by("-created_at", "title")
+        )
         search = self.request.query_params.get("search")
         if search:
             queryset = queryset.filter(

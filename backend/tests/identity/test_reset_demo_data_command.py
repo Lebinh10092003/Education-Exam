@@ -7,7 +7,7 @@ def test_reset_demo_data_command_rebuilds_full_dataset(settings, tmp_path):
     from django.contrib.auth import get_user_model
 
     from apps.academics.models import Subject
-    from apps.exam_authoring.models import Exam, ExamPeriod, ExamRoom
+    from apps.exam_authoring.models import Exam
     from apps.grading.models import ManualGradingTask, Result
     from apps.identity.models import Role
     from apps.institutions.models import CandidateGroup, School
@@ -35,9 +35,8 @@ def test_reset_demo_data_command_rebuilds_full_dataset(settings, tmp_path):
     assert CandidateGroup.objects.count() == 4
     assert Subject.objects.count() == 4
     assert Question.objects.count() == 16
-    assert ExamPeriod.objects.count() == 2
-    assert ExamRoom.objects.count() == 3
     assert Exam.objects.count() == 5
+    assert Exam.objects.filter(mode=Exam.Mode.CLASS).count() == 1
     assert Material.objects.count() == 6
 
     assert Result.objects.count() == 3

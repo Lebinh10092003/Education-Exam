@@ -29,10 +29,6 @@ SYSTEM_PERMISSION_DEFINITIONS = (
     ("notifications.manage", "notifications", "manage"),
     ("audit.view", "audit", "view"),
     ("audit.manage", "audit", "manage"),
-    ("exam_periods.view", "exam_periods", "view"),
-    ("exam_periods.manage", "exam_periods", "manage"),
-    ("exam_rooms.view", "exam_rooms", "view"),
-    ("exam_rooms.manage", "exam_rooms", "manage"),
 )
 
 SYSTEM_ROLE_DEFINITIONS = {

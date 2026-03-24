@@ -1,6 +1,6 @@
 from decimal import Decimal
 
-from django.db.models import Avg, Q
+from django.db.models import Avg
 from django.shortcuts import get_object_or_404
 from drf_spectacular.utils import extend_schema
 from rest_framework import mixins, status, viewsets
@@ -11,11 +11,12 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.exceptions import PermissionDenied
 
-from apps.exam_authoring.models import Exam
 from apps.grading.models import Result
+from apps.exam_authoring.models import Exam
 from apps.materials.models import Material
 from apps.platform_core.i18n import t
 
+from ..access import get_accessible_subject_queryset, get_candidate_exam_queryset
 from ..models import ExamSession, SessionQuestion
 from ..services import (
     UNSET,
@@ -36,22 +37,6 @@ from .serializers import (
     SessionSubmissionSummarySerializer,
 )
 
-
-def get_candidate_exam_queryset(*, user):
-    return (
-        Exam.objects.select_related("subject", "schedule_window", "current_version")
-        .filter(
-            Q(assignments__user=user)
-            | Q(
-                assignments__group__memberships__user=user,
-                assignments__group__memberships__is_active=True,
-            )
-        )
-        .exclude(status__in=[Exam.Status.DRAFT, Exam.Status.ARCHIVED])
-        .distinct()
-    )
-
-
 class CandidateAssignedExamListView(ListAPIView):
     serializer_class = CandidateAssignedExamSerializer
     permission_classes = [IsAuthenticated]
@@ -67,6 +52,7 @@ class CandidateDashboardOverviewView(APIView):
     def get(self, request):
         exams = get_candidate_exam_queryset(user=request.user)
         upcoming_exams = exams.order_by("schedule_window__opens_at", "name")
+        accessible_subjects = get_accessible_subject_queryset(user=request.user)
         published_results = (
             Result.objects.select_related(
                 "session",
@@ -81,7 +67,10 @@ class CandidateDashboardOverviewView(APIView):
             )
             .order_by("-published_at", "-created_at")
         )
-        active_materials = Material.objects.select_related("subject", "uploaded_by").filter(is_active=True)
+        active_materials = (
+            Material.objects.select_related("subject", "uploaded_by")
+            .filter(is_active=True, subject__in=accessible_subjects)
+        )
         payload = {
             "stats": {
                 "assigned_exam_count": exams.count(),

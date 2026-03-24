@@ -113,10 +113,6 @@ def admin_user(db, permission_grant):
         "notifications.view",
         "audit.manage",
         "audit.view",
-        "exam_periods.manage",
-        "exam_periods.view",
-        "exam_rooms.manage",
-        "exam_rooms.view",
     ):
         permission_grant(user, code)
     return user

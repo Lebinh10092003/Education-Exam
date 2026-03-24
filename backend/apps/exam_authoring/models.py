@@ -8,33 +8,11 @@ from apps.platform_core.models import TimeStampedModel
 from apps.question_bank.models import Question
 
 
-class ExamPeriod(TimeStampedModel):
-    name = models.CharField(max_length=255)
-    description = models.TextField(blank=True)
-    start_date = models.DateField()
-    end_date = models.DateField()
-
-    class Meta:
-        ordering = ("start_date", "name")
-
-    def __str__(self):
-        return self.name
-
-
-class ExamRoom(TimeStampedModel):
-    name = models.CharField(max_length=255)
-    location = models.CharField(max_length=255, blank=True)
-    capacity = models.PositiveIntegerField(default=0)
-    features = models.JSONField(default=list, blank=True)
-
-    class Meta:
-        ordering = ("name",)
-
-    def __str__(self):
-        return self.name
-
-
 class Exam(TimeStampedModel):
+    class Mode(models.TextChoices):
+        EXAM = "exam", "Exam"
+        CLASS = "class", "Class"
+
     class Status(models.TextChoices):
         DRAFT = "draft", "Draft"
         SCHEDULED = "scheduled", "Scheduled"
@@ -44,6 +22,7 @@ class Exam(TimeStampedModel):
         ARCHIVED = "archived", "Archived"
 
     name = models.CharField(max_length=255)
+    mode = models.CharField(max_length=16, choices=Mode.choices, default=Mode.EXAM)
     subject = models.ForeignKey(
         "academics.Subject",
         on_delete=models.PROTECT,
@@ -78,21 +57,6 @@ class Exam(TimeStampedModel):
         on_delete=models.SET_NULL,
         related_name="current_for_exams",
     )
-    period = models.ForeignKey(
-        "exam_authoring.ExamPeriod",
-        null=True,
-        blank=True,
-        on_delete=models.SET_NULL,
-        related_name="exams",
-    )
-    room = models.ForeignKey(
-        "exam_authoring.ExamRoom",
-        null=True,
-        blank=True,
-        on_delete=models.SET_NULL,
-        related_name="exams",
-    )
-
     class Meta:
         ordering = ("-created_at",)
 
