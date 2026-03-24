@@ -30,25 +30,74 @@ export type CandidateExamAvailability =
   | "closed"
   | "locked";
 
-export const formatExamDateTime = (value: string | null) => {
+const isVietnameseLocale = (locale: string) => locale.toLowerCase().startsWith("vi");
+
+const getCandidateExamCopy = (locale: string) =>
+  isVietnameseLocale(locale)
+    ? {
+        notScheduled: "Chưa lên lịch",
+        noScheduleWindow: "Chưa có khung thời gian",
+        opens: "Mở từ",
+        closes: "Đóng lúc",
+        availability: {
+          resume: "Đang làm",
+          available: "Khả dụng",
+          upcoming: "Sắp diễn ra",
+          closed: "Đã đóng",
+          locked: "Đã dùng hết lượt",
+        },
+        actions: {
+          continueExam: "Tiếp tục bài thi",
+          startExam: "Bắt đầu bài thi",
+          viewDetails: "Xem chi tiết",
+          unavailable: "Không khả dụng",
+        },
+      }
+    : {
+        notScheduled: "Not scheduled",
+        noScheduleWindow: "No schedule window",
+        opens: "Opens",
+        closes: "Closes",
+        availability: {
+          resume: "In Progress",
+          available: "Available",
+          upcoming: "Upcoming",
+          closed: "Closed",
+          locked: "Attempts Used",
+        },
+        actions: {
+          continueExam: "Continue Exam",
+          startExam: "Start Exam",
+          viewDetails: "View Details",
+          unavailable: "Unavailable",
+        },
+      };
+
+const normalizeExamLocale = (locale: string) => (isVietnameseLocale(locale) ? "vi-VN" : "en-GB");
+
+export const formatExamDateTime = (value: string | null, locale = "en") => {
+  const copy = getCandidateExamCopy(locale);
   if (!value) {
-    return "Not scheduled";
+    return copy.notScheduled;
   }
 
-  return new Intl.DateTimeFormat("en-GB", {
+  return new Intl.DateTimeFormat(normalizeExamLocale(locale), {
     dateStyle: "medium",
     timeStyle: "short",
   }).format(new Date(value));
 };
 
-export const formatExamSchedule = (opensAt: string | null, closesAt: string | null) => {
+export const formatExamSchedule = (opensAt: string | null, closesAt: string | null, locale = "en") => {
+  const copy = getCandidateExamCopy(locale);
   if (!opensAt && !closesAt) {
-    return "No schedule window";
+    return copy.noScheduleWindow;
   }
   if (opensAt && closesAt) {
-    return `${formatExamDateTime(opensAt)} -> ${formatExamDateTime(closesAt)}`;
+    return `${formatExamDateTime(opensAt, locale)} -> ${formatExamDateTime(closesAt, locale)}`;
   }
-  return opensAt ? `Opens ${formatExamDateTime(opensAt)}` : `Closes ${formatExamDateTime(closesAt)}`;
+  return opensAt
+    ? `${copy.opens} ${formatExamDateTime(opensAt, locale)}`
+    : `${copy.closes} ${formatExamDateTime(closesAt, locale)}`;
 };
 
 export const getExamAvailabilityState = (
@@ -75,21 +124,33 @@ export const canLaunchExam = (exam: CandidateAssignedExam, now?: Date) => {
   return availability === "available" || availability === "resume";
 };
 
-export const getExamAvailabilityLabel = (exam: CandidateAssignedExam, now?: Date) => {
-  const availability = getExamAvailabilityState(exam, now);
+export const getExamAvailabilityLabel = (
+  exam: CandidateAssignedExam,
+  options: { locale?: string; now?: Date } = {},
+) => {
+  const availability = getExamAvailabilityState(exam, options.now);
+  return getExamAvailabilityLabelForState(availability, options.locale ?? "en", exam.status);
+};
+
+export const getExamAvailabilityLabelForState = (
+  availability: CandidateExamAvailability,
+  locale = "en",
+  fallbackStatus?: string,
+) => {
+  const copy = getCandidateExamCopy(locale);
   switch (availability) {
     case "resume":
-      return "In Progress";
+      return copy.availability.resume;
     case "available":
-      return "Available";
+      return copy.availability.available;
     case "upcoming":
-      return "Upcoming";
+      return copy.availability.upcoming;
     case "closed":
-      return "Closed";
+      return copy.availability.closed;
     case "locked":
-      return "Attempts Used";
+      return copy.availability.locked;
     default:
-      return exam.status;
+      return fallbackStatus ?? availability;
   }
 };
 
@@ -111,13 +172,17 @@ export const getExamAvailabilityTone = (exam: CandidateAssignedExam, now?: Date)
   }
 };
 
-export const getExamPrimaryAction = (exam: CandidateAssignedExam, now?: Date) => {
-  const availability = getExamAvailabilityState(exam, now);
+export const getExamPrimaryAction = (
+  exam: CandidateAssignedExam,
+  options: { locale?: string; now?: Date } = {},
+) => {
+  const availability = getExamAvailabilityState(exam, options.now);
+  const copy = getCandidateExamCopy(options.locale ?? "en");
 
   if (availability === "resume") {
     return {
       href: `/candidate/exam/${exam.id}`,
-      label: "Continue Exam",
+      label: copy.actions.continueExam,
       disabled: false,
     };
   }
@@ -125,14 +190,14 @@ export const getExamPrimaryAction = (exam: CandidateAssignedExam, now?: Date) =>
   if (availability === "available" || availability === "upcoming" || availability === "closed") {
     return {
       href: `/candidate/exams/${exam.id}/instructions`,
-      label: availability === "available" ? "Start Exam" : "View Details",
+      label: availability === "available" ? copy.actions.startExam : copy.actions.viewDetails,
       disabled: false,
     };
   }
 
   return {
     href: "",
-    label: "Unavailable",
+    label: copy.actions.unavailable,
     disabled: true,
   };
 };

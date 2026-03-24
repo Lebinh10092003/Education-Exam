@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Link, useNavigate } from "react-router";
 import { BookOpenCheck, Clock3, History, PlayCircle, RotateCcw, Sparkles } from "lucide-react";
 
@@ -6,7 +7,6 @@ import { PageHeader } from "../components/PageHeader";
 import { Badge } from "../components/ui/badge";
 import { Button } from "../components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
-import { Input } from "../components/ui/input";
 import { useAsyncList } from "../hooks/useAsyncList";
 import { apiRequest, type PaginatedResponse } from "../lib/http";
 import { notify } from "../lib/notify";
@@ -16,21 +16,12 @@ import type {
   PracticeHistoryItem,
   PracticeSessionRecord,
 } from "./practiceShared";
-import { formatPracticeDateTime, formatPracticePercent, sumDifficultyCounts } from "./practiceShared";
-
-type DifficultyKey = "easy" | "medium" | "hard";
-
-const difficultyOrder: DifficultyKey[] = ["easy", "medium", "hard"];
+import { formatPracticeDateTime, formatPracticePercent } from "./practiceShared";
 
 export function PracticeExam() {
+  const { t, i18n } = useTranslation("practice");
   const navigate = useNavigate();
   const [selectedSubjectId, setSelectedSubjectId] = useState<number | null>(null);
-  const [durationMinutes, setDurationMinutes] = useState(20);
-  const [difficultyCounts, setDifficultyCounts] = useState<Record<DifficultyKey, number>>({
-    easy: 2,
-    medium: 0,
-    hard: 0,
-  });
   const [isCreating, setIsCreating] = useState(false);
 
   const catalog = useAsyncList(
@@ -58,39 +49,23 @@ export function PracticeExam() {
     [catalogResults, selectedSubjectId],
   );
 
-  const requestedQuestionCount = useMemo(() => sumDifficultyCounts(difficultyCounts), [difficultyCounts]);
+  const generatedQuestionCount = selectedCatalog ? Math.min(selectedCatalog.counts.total, 30) : 0;
   const resumableSessions = (history.data?.results ?? []).filter((item) => item.status === "in_progress");
   const completedSessions = (history.data?.results ?? []).filter((item) => item.status === "submitted");
 
   const validationMessage = useMemo(() => {
+    if (!catalogResults.length) {
+      return t("catalog.noInventory");
+    }
     if (!selectedCatalog) {
-      return "Select a subject with available objective questions to begin practice.";
-    }
-    if (requestedQuestionCount <= 0) {
-      return "Choose at least one practice question.";
-    }
-    if (durationMinutes < 5 || durationMinutes > 180) {
-      return "Duration must be between 5 and 180 minutes.";
-    }
-    for (const difficulty of difficultyOrder) {
-      if (difficultyCounts[difficulty] > selectedCatalog.counts[difficulty]) {
-        return `Requested ${difficulty} questions exceeds the available bank for ${selectedCatalog.subject.name}.`;
-      }
+      return t("catalog.selectSubject");
     }
     return null;
-  }, [difficultyCounts, durationMinutes, requestedQuestionCount, selectedCatalog]);
-
-  const handleDifficultyChange = (difficulty: DifficultyKey, value: string) => {
-    const parsed = Number(value);
-    setDifficultyCounts((current) => ({
-      ...current,
-      [difficulty]: Number.isFinite(parsed) && parsed >= 0 ? parsed : 0,
-    }));
-  };
+  }, [catalogResults.length, selectedCatalog, t]);
 
   const handleCreateSession = async () => {
     if (!selectedCatalog || validationMessage) {
-      notify.error(validationMessage ?? "Practice configuration is incomplete.");
+      notify.error(validationMessage ?? t("catalog.configIncomplete"));
       return;
     }
 
@@ -100,13 +75,11 @@ export function PracticeExam() {
         method: "POST",
         body: {
           subject_id: selectedCatalog.subject.id,
-          duration_minutes: durationMinutes,
-          difficulty_counts: difficultyCounts,
         },
       });
       navigate(`/candidate/practice/sessions/${session.id}`);
     } catch (error) {
-      notify.error(error instanceof Error ? error.message : "Unable to create practice session.");
+      notify.error(error instanceof Error ? error.message : t("catalog.createFailed"));
     } finally {
       setIsCreating(false);
     }
@@ -115,11 +88,11 @@ export function PracticeExam() {
   return (
     <div className="mx-auto max-w-6xl space-y-8">
       <PageHeader
-        title="Quick Practice"
-        description="Build a fresh practice set from the question bank without touching any real exam attempt."
+        title={t("catalog.title")}
+        description={t("catalog.description")}
         action={
           <Button variant="outline" asChild>
-            <Link to="/candidate/exams">Open My Exams</Link>
+            <Link to="/candidate/exams">{t("catalog.openMyExams")}</Link>
           </Button>
         }
       />
@@ -144,7 +117,7 @@ export function PracticeExam() {
                 <BookOpenCheck className="h-5 w-5" />
               </div>
               <div>
-                <p className="text-sm text-blue-700">Bank-ready questions</p>
+                <p className="text-sm text-blue-700">{t("catalog.bankReadyQuestions")}</p>
                 <p className="text-2xl font-semibold text-slate-950">
                   {catalogResults.reduce((sum, item) => sum + item.counts.total, 0)}
                 </p>
@@ -160,7 +133,7 @@ export function PracticeExam() {
                 <RotateCcw className="h-5 w-5" />
               </div>
               <div>
-                <p className="text-sm text-amber-700">Resumable sessions</p>
+                <p className="text-sm text-amber-700">{t("catalog.resumableSessions")}</p>
                 <p className="text-2xl font-semibold text-slate-950">{resumableSessions.length}</p>
               </div>
             </div>
@@ -174,7 +147,7 @@ export function PracticeExam() {
                 <History className="h-5 w-5" />
               </div>
               <div>
-                <p className="text-sm text-emerald-700">Completed practice sets</p>
+                <p className="text-sm text-emerald-700">{t("catalog.completedPracticeSets")}</p>
                 <p className="text-2xl font-semibold text-slate-950">{completedSessions.length}</p>
               </div>
             </div>
@@ -183,19 +156,18 @@ export function PracticeExam() {
       </div>
 
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1.15fr),380px]">
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Sparkles className="h-5 w-5 text-blue-600" />
-              Configure A Practice Set
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-6">
-            <div className="grid gap-4 md:grid-cols-2">
+        <section className="space-y-6">
+          <div className="flex items-center gap-2">
+            <Sparkles className="h-5 w-5 text-blue-600" />
+            <h2 className="text-xl font-semibold text-slate-950">{t("catalog.startSet")}</h2>
+          </div>
+
+          <div className="space-y-6">
+            <div className="max-w-md">
               <label className="space-y-2 text-sm font-medium text-slate-700">
-                Subject
+                {t("catalog.subject")}
                 <select
-                  aria-label="Subject"
+                  aria-label={t("catalog.subject")}
                   className="flex h-10 w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900"
                   value={selectedSubjectId ?? ""}
                   onChange={(event) => setSelectedSubjectId(Number(event.target.value))}
@@ -207,40 +179,29 @@ export function PracticeExam() {
                   ))}
                 </select>
               </label>
-
-              <label className="space-y-2 text-sm font-medium text-slate-700">
-                Duration (minutes)
-                <Input
-                  aria-label="Duration (minutes)"
-                  type="number"
-                  min={5}
-                  max={180}
-                  value={durationMinutes}
-                  onChange={(event) => setDurationMinutes(Number(event.target.value))}
-                />
-              </label>
             </div>
 
-            <div className="grid gap-4 md:grid-cols-3">
-              {difficultyOrder.map((difficulty) => (
-                <label key={difficulty} className="space-y-2 text-sm font-medium capitalize text-slate-700">
-                  {difficulty} questions
-                  <Input
-                    aria-label={`${difficulty.charAt(0).toUpperCase()}${difficulty.slice(1)} questions`}
-                    type="number"
-                    min={0}
-                    value={difficultyCounts[difficulty]}
-                    onChange={(event) => handleDifficultyChange(difficulty, event.target.value)}
-                  />
-                </label>
-              ))}
+            <div className="grid gap-4 md:grid-cols-2">
+              <div className="rounded-2xl border border-blue-200 bg-blue-50 p-4 text-sm text-blue-900">
+                <p className="font-medium text-slate-950">{t("catalog.randomObjectiveSet")}</p>
+                <p className="mt-1">
+                  {selectedCatalog
+                    ? t("catalog.randomObjectiveDescription", {
+                        count: generatedQuestionCount,
+                        subject: selectedCatalog.subject.name,
+                      })
+                    : t("catalog.randomObjectiveFallback")}
+                </p>
+              </div>
+              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
+                <p className="font-medium text-slate-900">{t("catalog.automaticTiming")}</p>
+                <p className="mt-1">{t("catalog.automaticTimingDescription")}</p>
+              </div>
             </div>
 
             <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
-              <p className="font-medium text-slate-900">Practice boundary</p>
-              <p className="mt-1">
-                Sessions created here never consume live attempts, proctoring events, or published exam results.
-              </p>
+              <p className="font-medium text-slate-900">{t("catalog.practiceBoundary")}</p>
+              <p className="mt-1">{t("catalog.practiceBoundaryDescription")}</p>
             </div>
 
             {validationMessage ? (
@@ -251,19 +212,26 @@ export function PracticeExam() {
 
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div className="text-sm text-slate-600">
-                Requested questions: <span className="font-semibold text-slate-950">{requestedQuestionCount}</span>
+                {selectedCatalog ? (
+                  <>
+                    {t("catalog.randomSetSize")}:{" "}
+                    <span className="font-semibold text-slate-950">{generatedQuestionCount}</span>
+                  </>
+                ) : (
+                  t("catalog.chooseSubjectPreview")
+                )}
               </div>
               <Button onClick={handleCreateSession} disabled={isCreating || Boolean(validationMessage)}>
                 <PlayCircle className="mr-2 h-4 w-4" />
-                {isCreating ? "Creating..." : "Start Practice"}
+                {isCreating ? t("catalog.creating") : t("catalog.startPractice")}
               </Button>
             </div>
-          </CardContent>
-        </Card>
+          </div>
+        </section>
 
         <Card>
           <CardHeader>
-            <CardTitle>Subject Availability</CardTitle>
+            <CardTitle>{t("catalog.subjectAvailability")}</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
             {catalogResults.length ? (
@@ -285,19 +253,19 @@ export function PracticeExam() {
                         <p className="font-medium text-slate-950">{item.subject.name}</p>
                         <p className="text-xs uppercase tracking-wide text-slate-500">{item.subject.code}</p>
                       </div>
-                      <Badge variant="outline">{item.counts.total} total</Badge>
+                      <Badge variant="outline">{`${item.counts.total} ${t("catalog.total")}`}</Badge>
                     </div>
                     <div className="mt-3 grid grid-cols-3 gap-2 text-xs text-slate-600">
-                      <span>Easy: {item.counts.easy}</span>
-                      <span>Medium: {item.counts.medium}</span>
-                      <span>Hard: {item.counts.hard}</span>
+                      <span>{t("catalog.easy")}: {item.counts.easy}</span>
+                      <span>{t("catalog.medium")}: {item.counts.medium}</span>
+                      <span>{t("catalog.hard")}: {item.counts.hard}</span>
                     </div>
                   </button>
                 );
               })
             ) : (
               <div className="rounded-2xl border border-dashed border-slate-200 p-6 text-center text-sm text-slate-500">
-                No objective question inventory is available yet.
+                {t("catalog.noInventory")}
               </div>
             )}
           </CardContent>
@@ -307,7 +275,7 @@ export function PracticeExam() {
       <div className="grid gap-6 lg:grid-cols-2">
         <Card>
           <CardHeader>
-            <CardTitle>Resume session</CardTitle>
+            <CardTitle>{t("catalog.resumeSession")}</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             {resumableSessions.length ? (
@@ -317,21 +285,24 @@ export function PracticeExam() {
                     <div>
                       <p className="font-medium text-slate-950">{session.subject.name}</p>
                       <p className="mt-1 text-sm text-slate-500">
-                        Started {formatPracticeDateTime(session.started_at)}
+                        {t("catalog.startedAt", { date: formatPracticeDateTime(session.started_at, i18n.language) })}
                       </p>
                       <p className="mt-2 text-sm text-slate-600">
-                        {session.answered_count}/{session.total_questions} answered
+                        {t("catalog.answeredProgress", {
+                          answered: session.answered_count,
+                          total: session.total_questions,
+                        })}
                       </p>
                     </div>
                     <Button asChild>
-                      <Link to={`/candidate/practice/sessions/${session.id}`}>Resume</Link>
+                      <Link to={`/candidate/practice/sessions/${session.id}`}>{t("catalog.resume")}</Link>
                     </Button>
                   </div>
                 </div>
               ))
             ) : (
               <div className="rounded-2xl border border-dashed border-slate-200 p-6 text-center text-sm text-slate-500">
-                No in-progress practice session to resume.
+                {t("catalog.noResumableSession")}
               </div>
             )}
           </CardContent>
@@ -339,7 +310,7 @@ export function PracticeExam() {
 
         <Card>
           <CardHeader>
-            <CardTitle>Latest practice history</CardTitle>
+            <CardTitle>{t("catalog.latestHistory")}</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             {completedSessions.length ? (
@@ -349,24 +320,27 @@ export function PracticeExam() {
                     <div>
                       <p className="font-medium text-slate-950">{session.subject.name}</p>
                       <p className="mt-1 text-sm text-slate-500">
-                        Submitted {formatPracticeDateTime(session.submitted_at)}
+                        {t("catalog.submittedAt", { date: formatPracticeDateTime(session.submitted_at, i18n.language) })}
                       </p>
                       <div className="mt-2 flex items-center gap-3 text-sm text-slate-600">
                         <span>{formatPracticePercent(session.score_percentage)}</span>
                         <span>
-                          {session.correct_count}/{session.total_count} correct
+                          {t("catalog.correctProgress", {
+                            correct: session.correct_count,
+                            total: session.total_count,
+                          })}
                         </span>
                       </div>
                     </div>
                     <Button variant="outline" asChild>
-                      <Link to={`/candidate/practice/sessions/${session.id}/review`}>Review</Link>
+                      <Link to={`/candidate/practice/sessions/${session.id}/review`}>{t("catalog.review")}</Link>
                     </Button>
                   </div>
                 </div>
               ))
             ) : (
               <div className="rounded-2xl border border-dashed border-slate-200 p-6 text-center text-sm text-slate-500">
-                Your submitted practice sets will appear here.
+                {t("catalog.noSubmittedHistory")}
               </div>
             )}
           </CardContent>
@@ -377,10 +351,10 @@ export function PracticeExam() {
         <CardContent className="flex flex-col gap-3 p-5 text-sm text-slate-600 md:flex-row md:items-center md:justify-between">
           <div className="flex items-center gap-2">
             <Clock3 className="h-4 w-4 text-slate-500" />
-            Local dev and production same-origin both work with the new `/api/v1/practice/` namespace.
+            {t("catalog.namespaceNotice")}
           </div>
           <Link className="font-medium text-blue-700 hover:text-blue-800" to="/candidate/exams">
-            Real exams stay under My Exams
+            {t("catalog.realExamsStay")}
           </Link>
         </CardContent>
       </Card>

@@ -3,12 +3,14 @@ import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import i18n from "../i18n";
 import { TakeExam } from "./TakeExam";
 
 const mockApiRequest = vi.fn();
 const mockNotifyConfirm = vi.fn();
 const mockNotifyError = vi.fn();
 const mockNotifySuccess = vi.fn();
+const mockNotifyWarning = vi.fn();
 const mockRequestProctoringStreams = vi.fn();
 const mockCaptureTrackSnapshot = vi.fn();
 const mockConnectCandidatePublisher = vi.fn();
@@ -27,7 +29,7 @@ vi.mock("../lib/notify", () => ({
   notify: {
     success: (...args: unknown[]) => mockNotifySuccess(...args),
     info: vi.fn(),
-    warning: vi.fn(),
+    warning: (...args: unknown[]) => mockNotifyWarning(...args),
     error: (...args: unknown[]) => mockNotifyError(...args),
     confirm: (...args: unknown[]) => mockNotifyConfirm(...args),
   },
@@ -120,8 +122,9 @@ describe("TakeExam", () => {
     vi.clearAllMocks();
   });
 
-  beforeEach(() => {
+  beforeEach(async () => {
     mockNotifyConfirm.mockResolvedValue(true);
+    await i18n.changeLanguage("en");
     Object.defineProperty(HTMLMediaElement.prototype, "srcObject", {
       configurable: true,
       writable: true,
@@ -329,6 +332,11 @@ describe("TakeExam", () => {
       "/api/v1/proctoring/sessions/77/evidence/",
       expect.objectContaining({ method: "POST", body: expect.any(FormData) }),
     );
+    expect(mockNotifyWarning).toHaveBeenCalledWith(
+      "A proctoring warning was recorded. Candidate exited fullscreen mode.",
+    );
+    expect(await screen.findByText("A proctoring warning was recorded.")).toBeInTheDocument();
+    expect(screen.getByText("Candidate exited fullscreen mode.")).toBeInTheDocument();
   });
 
   it("updates the saved indicator without showing a success toast when selecting an answer", async () => {
@@ -356,5 +364,25 @@ describe("TakeExam", () => {
 
     expect(await screen.findByText(/saved/i)).toBeInTheDocument();
     expect(mockNotifySuccess).not.toHaveBeenCalledWith("Answer saved.");
+  });
+
+  it("renders the protected setup flow in Vietnamese when locale is vi", async () => {
+    await i18n.changeLanguage("vi");
+    const user = userEvent.setup();
+
+    renderTakeExam();
+
+    expect(await screen.findByText("Thiết lập bài thi có giám sát")).toBeInTheDocument();
+    expect(screen.getByText("Các quyền được yêu cầu")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Cấp quyền và bắt đầu giám sát" })).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Cấp quyền và bắt đầu giám sát" }));
+
+    await waitFor(() => {
+      expect(mockApiRequest).toHaveBeenCalledWith(
+        "/api/v1/proctoring/sessions/77/media/publish-token/",
+        expect.objectContaining({ method: "POST" }),
+      );
+    });
   });
 });

@@ -36,6 +36,23 @@ describe("MaterialPreviewPanel", () => {
     expect(screen.getByTitle("Study Guide")).toBeInTheDocument();
   });
 
+  it("suppresses direct download controls for protected PDF previews when requested", () => {
+    render(
+      <MaterialPreviewPanel
+        disableDownloadControls
+        file_name="guide.pdf"
+        file_url="/media/materials/guide.pdf"
+        mime_type="application/pdf"
+        title="Study Guide"
+      />,
+    );
+
+    expect(screen.getByTitle("Study Guide")).toHaveAttribute(
+      "src",
+      "/media/materials/guide.pdf#toolbar=0&navpanes=0&scrollbar=1",
+    );
+  });
+
   it("loads plain text files into a readable preview", async () => {
     vi.spyOn(global, "fetch").mockResolvedValueOnce(
       new Response("chapter 1\nchapter 2", { status: 200 }),

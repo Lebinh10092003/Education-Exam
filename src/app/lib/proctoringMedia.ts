@@ -59,6 +59,9 @@ const normalizeMediaConnectionError = (error: unknown, payload: MediaTokenPayloa
 
   if (
     normalized.includes("could not establish signal connection")
+    || normalized.includes("could not establish pc connection")
+    || normalized.includes("peer connection")
+    || normalized.includes("ice connection")
     || normalized.includes("failed to fetch")
     || normalized.includes("websocket connection")
   ) {

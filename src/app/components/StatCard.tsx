@@ -19,24 +19,28 @@ export function StatCard({
   value,
   icon: Icon,
   trend,
-  iconBgColor = "bg-blue-100",
-  iconColor = "text-blue-600",
+  iconBgColor = "bg-blue-100 dark:bg-blue-500/12",
+  iconColor = "text-blue-600 dark:text-blue-300",
 }: StatCardProps) {
   return (
-    <Card>
+    <Card className="shadow-sm dark:shadow-[0_18px_38px_rgba(2,6,23,0.22)]">
       <CardContent className="p-6">
         <div className="flex items-center justify-between">
           <div className="flex-1">
-            <p className="mb-1 text-sm text-gray-600">{title}</p>
-            <p className="text-2xl font-bold text-gray-900">{value}</p>
+            <p className="mb-1 text-sm text-muted-foreground">{title}</p>
+            <p className="text-2xl font-bold text-foreground">{value}</p>
             {trend ? (
-              <p className={`mt-2 text-sm ${trend.isPositive ? "text-green-600" : "text-red-600"}`}>
+              <p
+                className={`mt-2 text-sm ${
+                  trend.isPositive ? "text-green-600 dark:text-green-300" : "text-red-600 dark:text-red-300"
+                }`}
+              >
                 <span aria-hidden="true">{trend.isPositive ? "\u2191" : "\u2193"}</span>{" "}
                 <span>{trend.value}</span>
               </p>
             ) : null}
           </div>
-          <div className={`${iconBgColor} ${iconColor} rounded-xl p-4`}>
+          <div className={`${iconBgColor} ${iconColor} rounded-2xl border border-white/5 p-4`}>
             <Icon className="h-6 w-6" />
           </div>
         </div>

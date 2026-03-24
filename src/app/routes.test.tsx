@@ -1,6 +1,7 @@
 import { render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import type { ContextType } from "react";
-import { matchRoutes, MemoryRouter, Route, Routes } from "react-router";
+import { Link, matchRoutes, MemoryRouter, Route, Routes } from "react-router";
 import { describe, expect, it, vi } from "vitest";
 
 import { AuthContext, type AuthProfile, getDefaultRouteForProfile } from "./auth/AuthContext";
@@ -129,6 +130,39 @@ describe("protected layouts", () => {
 
     expect(await screen.findAllByText(i18n.t("candidate.portal", { ns: "navigation" }))).not.toHaveLength(0);
     expect(screen.getAllByText(i18n.t("candidate.exams", { ns: "navigation" }))).not.toHaveLength(0);
+  });
+
+  it("keeps candidate routing stable when navigating from practice into a practice session route", async () => {
+    await i18n.changeLanguage("en");
+    const user = userEvent.setup();
+
+    render(
+      <AuthContext.Provider
+        value={buildAuthValue({
+          profile: candidateProfile,
+          isAuthenticated: true,
+          hasAnyRole: vi.fn().mockReturnValue(false),
+        })}
+      >
+        <MemoryRouter initialEntries={["/candidate/practice"]}>
+          <Routes>
+            <Route path="/candidate" element={<ProtectedCandidateLayout />}>
+              <Route
+                path="practice"
+                element={<Link to="/candidate/practice/sessions/44">Open Practice Session</Link>}
+              />
+              <Route path="practice/sessions/:id" element={<div>Practice Session Screen</div>} />
+            </Route>
+          </Routes>
+        </MemoryRouter>
+      </AuthContext.Provider>,
+    );
+
+    expect(await screen.findByRole("link", { name: "Open Practice Session" })).toBeInTheDocument();
+
+    await user.click(screen.getByRole("link", { name: "Open Practice Session" }));
+
+    expect(await screen.findByText("Practice Session Screen")).toBeInTheDocument();
   });
 
   it("redirects legacy exam monitoring routes to the canonical detail query route", async () => {

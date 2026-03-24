@@ -3,6 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import i18n from "../i18n";
 import { ExamInstructions } from "./ExamInstructions";
 import { MyExams } from "./MyExams";
 
@@ -55,7 +56,7 @@ describe("student exam flows", () => {
     vi.clearAllMocks();
   });
 
-  beforeEach(() => {
+  beforeEach(async () => {
     mockApiRequest.mockImplementation(async (path: string) => {
       if (path === "/api/v1/my-exams/") {
         return buildPaginated([examRecord]);
@@ -63,6 +64,7 @@ describe("student exam flows", () => {
 
       throw new Error(`Unhandled apiRequest path: ${path}`);
     });
+    await i18n.changeLanguage("en");
   });
 
   it("renders assigned exams and links available exams to the instructions route", async () => {
@@ -98,5 +100,22 @@ describe("student exam flows", () => {
     }
 
     expect(screen.getByRole("button", { name: /^start exam$/i })).toBeEnabled();
+  });
+
+  it("renders the exam instructions flow in Vietnamese when locale is vi", async () => {
+    await i18n.changeLanguage("vi");
+
+    render(
+      <MemoryRouter initialEntries={["/candidate/exams/1/instructions"]}>
+        <Routes>
+          <Route path="/candidate/exams/:id/instructions" element={<ExamInstructions />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    expect(await screen.findByText("Kiểm tra sẵn sàng")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Quay lại bài thi của tôi" })).toBeInTheDocument();
+    expect(screen.getByText("Tóm tắt khởi chạy")).toBeInTheDocument();
+    expect(screen.getByText("Hoàn tất checklist để bật nút vào bài thi cuối cùng.")).toBeInTheDocument();
   });
 });

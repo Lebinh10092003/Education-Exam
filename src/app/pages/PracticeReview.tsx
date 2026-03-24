@@ -1,3 +1,4 @@
+import { useTranslation } from "react-i18next";
 import { Link, useParams } from "react-router";
 import { ArrowLeft, CheckCircle2, Target, XCircle } from "lucide-react";
 
@@ -11,6 +12,7 @@ import type { PracticeReviewRecord } from "./practiceShared";
 import { formatPracticeDateTime, formatPracticePercent, getSelectedOptionLabel } from "./practiceShared";
 
 export function PracticeReview() {
+  const { t, i18n } = useTranslation("practice");
   const { id } = useParams();
   const sessionId = Number(id);
 
@@ -23,7 +25,7 @@ export function PracticeReview() {
     return (
       <Card>
         <CardContent className="p-10 text-center text-sm text-slate-500">
-          Loading practice review...
+          {t("review.loading")}
         </CardContent>
       </Card>
     );
@@ -33,10 +35,10 @@ export function PracticeReview() {
     return (
       <Card>
         <CardContent className="p-10 text-center">
-          <p className="text-lg font-semibold text-slate-950">Unable to load practice review.</p>
-          <p className="mt-2 text-sm text-slate-500">{review.error ?? "This review is unavailable."}</p>
+          <p className="text-lg font-semibold text-slate-950">{t("review.unableToLoad")}</p>
+          <p className="mt-2 text-sm text-slate-500">{review.error ?? t("review.unavailable")}</p>
           <Button className="mt-6" asChild>
-            <Link to="/candidate/practice">Back to Practice</Link>
+            <Link to="/candidate/practice">{t("review.backToPractice")}</Link>
           </Button>
         </CardContent>
       </Card>
@@ -50,31 +52,36 @@ export function PracticeReview() {
       <Button variant="ghost" className="px-0 text-slate-600 hover:bg-transparent" asChild>
         <Link to="/candidate/practice">
           <ArrowLeft className="h-4 w-4" />
-          Back to Practice
+          {t("review.backToPractice")}
         </Link>
       </Button>
 
       <PageHeader
-        title="Practice Review"
-        description={`Submitted ${formatPracticeDateTime(data.submitted_at)} for ${data.subject.name}.`}
+        title={t("review.title")}
+        description={t("review.description", {
+          date: formatPracticeDateTime(data.submitted_at, i18n.language),
+          subject: data.subject.name,
+        })}
       />
 
       <div className="grid gap-4 md:grid-cols-3">
         <Card className="border-blue-200 bg-blue-50">
           <CardContent className="p-5">
-            <p className="text-sm text-blue-700">Score</p>
-            <p className="mt-2 text-4xl font-bold text-slate-950">{`Score ${formatPracticePercent(data.summary.score_percentage)}`}</p>
+            <p className="text-sm text-blue-700">{t("review.score")}</p>
+            <p className="mt-2 text-4xl font-bold text-slate-950">
+              {t("review.scoreValue", { score: formatPracticePercent(data.summary.score_percentage) })}
+            </p>
           </CardContent>
         </Card>
         <Card className="border-emerald-200 bg-emerald-50">
           <CardContent className="p-5">
-            <p className="text-sm text-emerald-700">Correct</p>
+            <p className="text-sm text-emerald-700">{t("review.correct")}</p>
             <p className="mt-2 text-4xl font-bold text-slate-950">{data.summary.correct_count}</p>
           </CardContent>
         </Card>
         <Card className="border-rose-200 bg-rose-50">
           <CardContent className="p-5">
-            <p className="text-sm text-rose-700">Incorrect</p>
+            <p className="text-sm text-rose-700">{t("review.incorrect")}</p>
             <p className="mt-2 text-4xl font-bold text-slate-950">{data.summary.incorrect_count}</p>
           </CardContent>
         </Card>
@@ -82,20 +89,24 @@ export function PracticeReview() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Session Summary</CardTitle>
+          <CardTitle>{t("review.sessionSummary")}</CardTitle>
         </CardHeader>
         <CardContent className="grid gap-4 md:grid-cols-3">
           <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
-            <p className="text-xs uppercase tracking-wide text-slate-500">Subject</p>
+            <p className="text-xs uppercase tracking-wide text-slate-500">{t("review.subject")}</p>
             <p className="mt-2 font-medium text-slate-950">{data.subject.name}</p>
           </div>
           <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
-            <p className="text-xs uppercase tracking-wide text-slate-500">Started</p>
-            <p className="mt-2 font-medium text-slate-950">{formatPracticeDateTime(data.started_at)}</p>
+            <p className="text-xs uppercase tracking-wide text-slate-500">{t("review.started")}</p>
+            <p className="mt-2 font-medium text-slate-950">
+              {formatPracticeDateTime(data.started_at, i18n.language)}
+            </p>
           </div>
           <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
-            <p className="text-xs uppercase tracking-wide text-slate-500">Duration</p>
-            <p className="mt-2 font-medium text-slate-950">{data.duration_minutes} minutes</p>
+            <p className="text-xs uppercase tracking-wide text-slate-500">{t("review.duration")}</p>
+            <p className="mt-2 font-medium text-slate-950">
+              {t("review.durationValue", { minutes: data.duration_minutes })}
+            </p>
           </div>
         </CardContent>
       </Card>
@@ -106,11 +117,11 @@ export function PracticeReview() {
             <CardHeader>
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>
-                  <CardTitle className="text-lg">Question {question.sort_order}</CardTitle>
+                  <CardTitle className="text-lg">{t("review.question", { number: question.sort_order })}</CardTitle>
                   <p className="mt-2 text-sm text-slate-700">{question.question_text}</p>
                 </div>
                 <Badge className={question.is_correct ? "bg-emerald-100 text-emerald-700" : "bg-rose-100 text-rose-700"}>
-                  {question.is_correct ? "Correct" : "Incorrect"}
+                  {question.is_correct ? t("review.correctStatus") : t("review.incorrectStatus")}
                 </Badge>
               </div>
             </CardHeader>
@@ -119,19 +130,19 @@ export function PracticeReview() {
                 <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm">
                   <div className="flex items-center gap-2 font-medium text-slate-900">
                     <XCircle className="h-4 w-4 text-slate-500" />
-                    Your answer
+                    {t("review.yourAnswer")}
                   </div>
                   <p className="mt-2 text-slate-600">
-                    {getSelectedOptionLabel(question.options, question.selected_option_keys)}
+                    {getSelectedOptionLabel(question.options, question.selected_option_keys, t("shared.noAnswer"))}
                   </p>
                 </div>
                 <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-sm">
                   <div className="flex items-center gap-2 font-medium text-emerald-900">
                     <CheckCircle2 className="h-4 w-4" />
-                    Correct answer
+                    {t("review.correctAnswer")}
                   </div>
                   <p className="mt-2 text-emerald-800">
-                    {getSelectedOptionLabel(question.options, question.correct_option_keys)}
+                    {getSelectedOptionLabel(question.options, question.correct_option_keys, t("shared.noAnswer"))}
                   </p>
                 </div>
               </div>
@@ -140,7 +151,7 @@ export function PracticeReview() {
                 <div className="rounded-2xl border border-blue-200 bg-blue-50 p-4 text-sm text-blue-900">
                   <div className="flex items-center gap-2 font-medium">
                     <Target className="h-4 w-4" />
-                    Explanation
+                    {t("review.explanation")}
                   </div>
                   <p className="mt-2">{question.explanation_text}</p>
                 </div>

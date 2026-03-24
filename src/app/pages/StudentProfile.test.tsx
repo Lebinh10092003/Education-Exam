@@ -1,5 +1,4 @@
-import { render, screen, waitFor } from "@testing-library/react";
-import userEvent from "@testing-library/user-event";
+import { render, screen } from "@testing-library/react";
 import type { ContextType } from "react";
 import { MemoryRouter } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -8,16 +7,6 @@ import { AuthContext, type AuthProfile } from "../auth/AuthContext";
 import i18n from "../i18n";
 import { LOCALE_STORAGE_KEY } from "../lib/storage";
 import { StudentProfile } from "./StudentProfile";
-
-const mockSetTheme = vi.fn();
-
-vi.mock("next-themes", () => ({
-  useTheme: () => ({
-    theme: "light",
-    resolvedTheme: "light",
-    setTheme: mockSetTheme,
-  }),
-}));
 
 type AuthContextValue = NonNullable<ContextType<typeof AuthContext>>;
 
@@ -81,9 +70,7 @@ describe("StudentProfile", () => {
     expect(screen.queryByRole("button", { name: "Save Changes" })).not.toBeInTheDocument();
   });
 
-  it("applies theme and language preferences from system settings", async () => {
-    const user = userEvent.setup();
-
+  it("keeps system preferences out of the profile page", () => {
     render(
       <AuthContext.Provider value={buildAuthValue()}>
         <MemoryRouter>
@@ -92,17 +79,8 @@ describe("StudentProfile", () => {
       </AuthContext.Provider>,
     );
 
-    expect(screen.getAllByText("System Settings").length).toBeGreaterThan(0);
-
-    await user.click(screen.getAllByRole("button", { name: "Dark" })[0]);
-    expect(mockSetTheme).toHaveBeenCalledWith("dark");
-
-    await user.click(screen.getAllByRole("button", { name: "Tiếng Việt" })[0]);
-
-    await waitFor(() => {
-      expect(i18n.resolvedLanguage ?? i18n.language).toMatch(/^vi/);
-    });
-
-    expect(window.localStorage.getItem(LOCALE_STORAGE_KEY)).toBe("vi");
+    expect(screen.queryByText("System Settings")).not.toBeInTheDocument();
+    expect(screen.queryByText("Appearance Theme")).not.toBeInTheDocument();
+    expect(screen.queryByText("Default Language")).not.toBeInTheDocument();
   });
 });

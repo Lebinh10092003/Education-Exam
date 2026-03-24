@@ -30,6 +30,9 @@ services:
   livekit:
     image: livekit/livekit-server:latest
     command: --config /etc/livekit.yaml
+    environment:
+      NODE_IP: 127.0.0.1
+      LIVEKIT_RTC_ENABLE_LOOPBACK_CANDIDATE: "true"
     ports:
       - "7880:7880"
       - "7881:7881"

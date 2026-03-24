@@ -1,5 +1,5 @@
 import { AlertCircle, FileText, LoaderCircle } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type MouseEvent } from "react";
 import { useTranslation } from "react-i18next";
 
 import {
@@ -11,6 +11,8 @@ import {
 
 interface MaterialPreviewPanelProps extends MaterialPreviewSource {
   title?: string;
+  fallbackMessage?: string;
+  disableDownloadControls?: boolean;
 }
 
 type PreviewState =
@@ -26,6 +28,8 @@ export function MaterialPreviewPanel({
   file_name,
   mime_type,
   title,
+  fallbackMessage,
+  disableDownloadControls = false,
 }: MaterialPreviewPanelProps) {
   const { t } = useTranslation(["common"]);
   const previewUrl = useMemo(() => resolveMaterialFileUrl(file_url), [file_url]);
@@ -34,6 +38,19 @@ export function MaterialPreviewPanel({
     [file_name, file_url, mime_type],
   );
   const [previewState, setPreviewState] = useState<PreviewState>({ status: "idle", kind: previewKind });
+  const pdfPreviewUrl = useMemo(() => {
+    if (!disableDownloadControls || previewKind !== "pdf" || !previewUrl) {
+      return previewUrl;
+    }
+    const joiner = previewUrl.includes("#") ? "&" : "#";
+    return `${previewUrl}${joiner}toolbar=0&navpanes=0&scrollbar=1`;
+  }, [disableDownloadControls, previewKind, previewUrl]);
+
+  const handleContextMenu = disableDownloadControls
+    ? (event: MouseEvent<HTMLElement>) => {
+        event.preventDefault();
+      }
+    : undefined;
 
   useEffect(() => {
     let isCancelled = false;
@@ -144,9 +161,10 @@ export function MaterialPreviewPanel({
           })}
         </p>
         <p className="mt-2 max-w-xl text-sm text-slate-500">
-          {t("common:materials.previewFallback", {
-            defaultValue: "Use Open in New Tab or Download to access the full document.",
-          })}
+          {fallbackMessage
+            ?? t("common:materials.previewFallback", {
+              defaultValue: "Use Open in New Tab or Download to access the full document.",
+            })}
         </p>
       </div>
     );
@@ -154,10 +172,10 @@ export function MaterialPreviewPanel({
 
   if (previewKind === "pdf") {
     return (
-      <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
+      <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white" onContextMenu={handleContextMenu}>
         <iframe
           className="min-h-[520px] w-full bg-white"
-          src={previewUrl}
+          src={pdfPreviewUrl}
           title={title || file_name}
         />
       </div>
@@ -166,7 +184,7 @@ export function MaterialPreviewPanel({
 
   if (previewKind === "image") {
     return (
-      <div className="overflow-hidden rounded-2xl border border-slate-200 bg-slate-950/5">
+      <div className="overflow-hidden rounded-2xl border border-slate-200 bg-slate-950/5" onContextMenu={handleContextMenu}>
         <img alt={title || file_name} className="max-h-[620px] w-full object-contain" src={previewUrl} />
       </div>
     );
@@ -174,8 +192,14 @@ export function MaterialPreviewPanel({
 
   if (previewKind === "video") {
     return (
-      <div className="overflow-hidden rounded-2xl border border-slate-200 bg-slate-950">
-        <video className="max-h-[620px] w-full" controls src={previewUrl}>
+      <div className="overflow-hidden rounded-2xl border border-slate-200 bg-slate-950" onContextMenu={handleContextMenu}>
+        <video
+          className="max-h-[620px] w-full"
+          controls
+          controlsList={disableDownloadControls ? "nodownload" : undefined}
+          disablePictureInPicture={disableDownloadControls}
+          src={previewUrl}
+        >
           {t("common:materials.videoUnsupported", {
             defaultValue: "Your browser does not support inline video playback.",
           })}
@@ -186,8 +210,16 @@ export function MaterialPreviewPanel({
 
   if (previewKind === "audio") {
     return (
-      <div className="flex min-h-[320px] items-center justify-center rounded-2xl border border-slate-200 bg-slate-50 px-6 py-10">
-        <audio className="w-full max-w-xl" controls src={previewUrl}>
+      <div
+        className="flex min-h-[320px] items-center justify-center rounded-2xl border border-slate-200 bg-slate-50 px-6 py-10"
+        onContextMenu={handleContextMenu}
+      >
+        <audio
+          className="w-full max-w-xl"
+          controls
+          controlsList={disableDownloadControls ? "nodownload" : undefined}
+          src={previewUrl}
+        >
           {t("common:materials.audioUnsupported", {
             defaultValue: "Your browser does not support inline audio playback.",
           })}
@@ -198,7 +230,7 @@ export function MaterialPreviewPanel({
 
   if (previewKind === "text") {
     return (
-      <div className="overflow-hidden rounded-2xl border border-slate-200 bg-slate-950">
+      <div className="overflow-hidden rounded-2xl border border-slate-200 bg-slate-950" onContextMenu={handleContextMenu}>
         <pre className="max-h-[620px] overflow-auto p-5 text-sm whitespace-pre-wrap break-words text-slate-100">
           {previewState.status === "ready" ? previewState.text : ""}
         </pre>
@@ -207,7 +239,7 @@ export function MaterialPreviewPanel({
   }
 
   return (
-    <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
+    <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white" onContextMenu={handleContextMenu}>
       <div
         className="max-h-[620px] overflow-auto px-6 py-5 text-sm text-slate-700 [&_h1]:mb-4 [&_h1]:text-2xl [&_h1]:font-semibold [&_h2]:mb-3 [&_h2]:text-xl [&_h2]:font-semibold [&_h3]:mb-2 [&_h3]:text-lg [&_h3]:font-semibold [&_ol]:ml-5 [&_ol]:list-decimal [&_p]:mb-3 [&_table]:w-full [&_table]:border-collapse [&_td]:border [&_td]:border-slate-200 [&_td]:p-2 [&_th]:border [&_th]:border-slate-200 [&_th]:bg-slate-50 [&_th]:p-2 [&_ul]:ml-5 [&_ul]:list-disc"
         dangerouslySetInnerHTML={{ __html: previewState.status === "ready" ? previewState.html ?? "" : "" }}

@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import { Link } from "react-router";
+import { useTranslation } from "react-i18next";
 import {
   Calendar,
   Clock3,
@@ -26,6 +27,7 @@ import { useDebouncedValue } from "../hooks/useDebouncedValue";
 import { apiRequest, type PaginatedResponse } from "../lib/http";
 import {
   type CandidateAssignedExam,
+  getExamAvailabilityLabelForState,
   formatExamSchedule,
   getExamAvailabilityLabel,
   getExamAvailabilityState,
@@ -36,6 +38,7 @@ import {
 const PAGE_SIZE = 100;
 
 export function MyExams() {
+  const { t, i18n } = useTranslation("common");
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [subjectFilter, setSubjectFilter] = useState("all");
@@ -70,14 +73,16 @@ export function MyExams() {
     });
   }, [debouncedSearch, exams, statusFilter, subjectFilter]);
 
+  const locale = i18n.resolvedLanguage ?? i18n.language;
+
   return (
     <div>
       <PageHeader
-        title="My Exams"
-        description="Track assigned exams, readiness details, and active sessions from one place."
+        title={t("myExams.pageTitle")}
+        description={t("myExams.pageDescription")}
         action={
           <Button variant="outline" asChild>
-            <Link to="/candidate/dashboard">Back to Dashboard</Link>
+            <Link to="/candidate/dashboard">{t("myExams.backToDashboard")}</Link>
           </Button>
         }
       />
@@ -95,31 +100,31 @@ export function MyExams() {
             <Input
               value={searchQuery}
               onChange={(event) => setSearchQuery(event.target.value)}
-              placeholder="Search exams or subjects..."
+              placeholder={t("myExams.searchPlaceholder")}
               className="pl-10"
             />
           </div>
 
           <Select value={statusFilter} onValueChange={setStatusFilter}>
             <SelectTrigger>
-              <SelectValue placeholder="Filter by status" />
+            <SelectValue placeholder={t("myExams.statusPlaceholder")} />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">All Status</SelectItem>
-              <SelectItem value="available">Available</SelectItem>
-              <SelectItem value="upcoming">Upcoming</SelectItem>
-              <SelectItem value="resume">In Progress</SelectItem>
-              <SelectItem value="closed">Closed</SelectItem>
-              <SelectItem value="locked">Attempts Used</SelectItem>
+              <SelectItem value="all">{t("myExams.allStatus")}</SelectItem>
+              <SelectItem value="available">{getExamAvailabilityLabelForState("available", locale)}</SelectItem>
+              <SelectItem value="upcoming">{getExamAvailabilityLabelForState("upcoming", locale)}</SelectItem>
+              <SelectItem value="resume">{getExamAvailabilityLabelForState("resume", locale)}</SelectItem>
+              <SelectItem value="closed">{getExamAvailabilityLabelForState("closed", locale)}</SelectItem>
+              <SelectItem value="locked">{getExamAvailabilityLabelForState("locked", locale)}</SelectItem>
             </SelectContent>
           </Select>
 
           <Select value={subjectFilter} onValueChange={setSubjectFilter}>
             <SelectTrigger>
-              <SelectValue placeholder="Filter by subject" />
+              <SelectValue placeholder={t("myExams.subjectPlaceholder")} />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">All Subjects</SelectItem>
+              <SelectItem value="all">{t("myExams.allSubjects")}</SelectItem>
               {subjects.map((subject) => (
                 <SelectItem key={subject} value={subject}>
                   {subject}
@@ -132,12 +137,12 @@ export function MyExams() {
 
       {examsList.isLoading ? (
         <Card>
-          <CardContent className="p-10 text-center text-sm text-slate-500">Loading exams...</CardContent>
+          <CardContent className="p-10 text-center text-sm text-slate-500">{t("myExams.loadingList")}</CardContent>
         </Card>
       ) : filteredExams.length ? (
         <div className="grid gap-4">
           {filteredExams.map((exam) => {
-            const action = getExamPrimaryAction(exam);
+            const action = getExamPrimaryAction(exam, { locale });
             const availability = getExamAvailabilityState(exam);
 
             return (
@@ -148,50 +153,48 @@ export function MyExams() {
                       <div className="mb-3 flex flex-wrap items-center gap-2">
                         <Badge variant="outline">{exam.subject.name}</Badge>
                         <Badge variant="outline" className={getExamAvailabilityTone(exam)}>
-                          {getExamAvailabilityLabel(exam)}
+                          {getExamAvailabilityLabel(exam, { locale })}
                         </Badge>
                         {exam.enable_proctoring ? (
                           <Badge variant="outline" className="border-amber-200 bg-amber-50 text-amber-800">
-                            Proctored
+                            {t("myExams.proctored")}
                           </Badge>
                         ) : null}
                       </div>
 
                       <CardTitle className="text-xl text-slate-950">{exam.name}</CardTitle>
                       <p className="mt-2 text-sm text-slate-600">
-                        {exam.description || "No description provided for this exam."}
+                        {exam.description || t("myExams.noDescription")}
                       </p>
 
                       <div className="mt-5 grid gap-3 text-sm text-slate-600 md:grid-cols-2 xl:grid-cols-4">
                         <div className="flex items-center gap-2">
                           <Calendar className="h-4 w-4 text-slate-400" />
-                          <span>{formatExamSchedule(exam.schedule.opens_at, exam.schedule.closes_at)}</span>
+                          <span>{formatExamSchedule(exam.schedule.opens_at, exam.schedule.closes_at, locale)}</span>
                         </div>
                         <div className="flex items-center gap-2">
                           <Clock3 className="h-4 w-4 text-slate-400" />
-                          <span>{exam.duration_minutes} minutes</span>
+                          <span>{t("myExams.duration", { minutes: exam.duration_minutes })}</span>
                         </div>
                         <div className="flex items-center gap-2">
                           <FileText className="h-4 w-4 text-slate-400" />
-                          <span>{exam.question_count} questions</span>
+                          <span>{t("myExams.questionCount", { count: exam.question_count })}</span>
                         </div>
                         <div className="flex items-center gap-2">
                           <Shield className="h-4 w-4 text-slate-400" />
-                          <span>
-                            Attempts {exam.attempts_used}/{exam.max_attempts}
-                          </span>
+                          <span>{t("myExams.attempts", { used: exam.attempts_used, total: exam.max_attempts })}</span>
                         </div>
                       </div>
 
                       {availability === "upcoming" ? (
                         <div className="mt-4 rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-800">
-                          This exam is scheduled for a future window. Open the details page to review instructions before it starts.
+                          {t("myExams.upcomingHint")}
                         </div>
                       ) : null}
 
                       {availability === "locked" ? (
                         <div className="mt-4 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
-                          You have used all allowed attempts for this exam.
+                          {t("myExams.lockedHint")}
                         </div>
                       ) : null}
                     </div>
@@ -223,8 +226,8 @@ export function MyExams() {
         <Card>
           <CardContent className="p-10 text-center">
             <FileText className="mx-auto h-12 w-12 text-slate-300" />
-            <p className="mt-4 text-base font-medium text-slate-900">No exams matched the current filters.</p>
-            <p className="mt-1 text-sm text-slate-500">Try another search keyword or clear one of the filters.</p>
+            <p className="mt-4 text-base font-medium text-slate-900">{t("myExams.noMatchesTitle")}</p>
+            <p className="mt-1 text-sm text-slate-500">{t("myExams.noMatchesDescription")}</p>
           </CardContent>
         </Card>
       )}

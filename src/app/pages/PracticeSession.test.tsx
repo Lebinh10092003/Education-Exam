@@ -3,6 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import i18n from "../i18n";
 import { PracticeSession } from "./PracticeSession";
 
 const mockApiRequest = vi.fn();
@@ -74,7 +75,8 @@ describe("PracticeSession", () => {
     vi.clearAllMocks();
   });
 
-  beforeEach(() => {
+  beforeEach(async () => {
+    await i18n.changeLanguage("en");
     mockNotifyConfirm.mockResolvedValue(true);
     mockApiRequest.mockImplementation(async (path: string, options?: { method?: string }) => {
       if (path === "/api/v1/practice/sessions/44/") {

@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import { Link, useLocation, useNavigate, useParams } from "react-router";
+import { useTranslation } from "react-i18next";
 import {
   AlertTriangle,
   ArrowLeft,
@@ -34,6 +35,7 @@ const emptyExamResponse: PaginatedResponse<CandidateAssignedExam> = {
 };
 
 export function ExamInstructions() {
+  const { t, i18n } = useTranslation("common");
   const { id } = useParams();
   const location = useLocation();
   const navigate = useNavigate();
@@ -69,7 +71,7 @@ export function ExamInstructions() {
     return (
       <Card>
         <CardContent className="p-10 text-center text-sm text-slate-500">
-          Loading exam instructions...
+          {t("examInstructions.loading")}
         </CardContent>
       </Card>
     );
@@ -80,10 +82,10 @@ export function ExamInstructions() {
       <Card>
         <CardContent className="p-10 text-center">
           <FileText className="mx-auto h-12 w-12 text-slate-300" />
-          <p className="mt-4 text-base font-medium text-slate-900">Exam details could not be found.</p>
-          <p className="mt-1 text-sm text-slate-500">Return to My Exams and open the assignment again.</p>
+          <p className="mt-4 text-base font-medium text-slate-900">{t("examInstructions.notFoundTitle")}</p>
+          <p className="mt-1 text-sm text-slate-500">{t("examInstructions.notFoundDescription")}</p>
           <Button asChild className="mt-6">
-            <Link to="/candidate/exams">Back to My Exams</Link>
+            <Link to="/candidate/exams">{t("examInstructions.backToMyExams")}</Link>
           </Button>
         </CardContent>
       </Card>
@@ -95,13 +97,13 @@ export function ExamInstructions() {
       <Button variant="ghost" className="mb-4 px-0 text-slate-600 hover:bg-transparent" asChild>
         <Link to="/candidate/exams">
           <ArrowLeft className="h-4 w-4" />
-          Back to My Exams
+          {t("examInstructions.backToMyExams")}
         </Link>
       </Button>
 
       <PageHeader
         title={exam.name}
-        description="Review the exam window, rules, and readiness checklist before entering the live exam session."
+        description={t("examInstructions.pageDescription")}
       />
 
       {fallbackExams.error ? (
@@ -116,48 +118,59 @@ export function ExamInstructions() {
             <div className="flex flex-wrap items-center gap-2">
               <Badge variant="outline">{exam.subject.name}</Badge>
               <Badge variant="outline" className={getExamAvailabilityTone(exam)}>
-                {getExamAvailabilityLabel(exam)}
+                {getExamAvailabilityLabel(exam, { locale: i18n.resolvedLanguage ?? i18n.language })}
               </Badge>
               {exam.enable_proctoring ? (
                 <Badge variant="outline" className="border-amber-200 bg-amber-50 text-amber-800">
-                  Proctored
+                  {t("examInstructions.proctored")}
                 </Badge>
               ) : null}
             </div>
-            <CardTitle className="text-2xl text-slate-950">Exam Readiness</CardTitle>
+            <CardTitle className="text-2xl text-slate-950">{t("examInstructions.readinessTitle")}</CardTitle>
           </CardHeader>
           <CardContent className="space-y-6">
             <div className="grid gap-4 md:grid-cols-2">
               <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
                 <div className="flex items-center gap-2 text-sm font-medium text-slate-700">
                   <Calendar className="h-4 w-4 text-blue-600" />
-                  Schedule
+                  {t("examInstructions.schedule")}
                 </div>
                 <p className="mt-2 text-sm text-slate-600">
-                  {formatExamSchedule(exam.schedule.opens_at, exam.schedule.closes_at)}
+                  {formatExamSchedule(
+                    exam.schedule.opens_at,
+                    exam.schedule.closes_at,
+                    i18n.resolvedLanguage ?? i18n.language,
+                  )}
                 </p>
               </div>
               <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
                 <div className="flex items-center gap-2 text-sm font-medium text-slate-700">
                   <Clock3 className="h-4 w-4 text-blue-600" />
-                  Duration
+                  {t("examInstructions.duration")}
                 </div>
-                <p className="mt-2 text-sm text-slate-600">{exam.duration_minutes} minutes</p>
+                <p className="mt-2 text-sm text-slate-600">
+                  {t("myExams.duration", { minutes: exam.duration_minutes })}
+                </p>
               </div>
               <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
                 <div className="flex items-center gap-2 text-sm font-medium text-slate-700">
                   <FileText className="h-4 w-4 text-blue-600" />
-                  Question Set
+                  {t("examInstructions.questionSet")}
                 </div>
-                <p className="mt-2 text-sm text-slate-600">{exam.question_count} questions</p>
+                <p className="mt-2 text-sm text-slate-600">
+                  {t("myExams.questionCount", { count: exam.question_count })}
+                </p>
               </div>
               <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
                 <div className="flex items-center gap-2 text-sm font-medium text-slate-700">
                   <Shield className="h-4 w-4 text-blue-600" />
-                  Attempts
+                  {t("examInstructions.attempts")}
                 </div>
                 <p className="mt-2 text-sm text-slate-600">
-                  {exam.attempts_used}/{exam.max_attempts} used
+                  {t("examInstructions.attemptsUsed", {
+                    used: exam.attempts_used,
+                    total: exam.max_attempts,
+                  })}
                 </p>
               </div>
             </div>
@@ -166,9 +179,9 @@ export function ExamInstructions() {
               <div className="flex items-start gap-3">
                 <AlertTriangle className="mt-0.5 h-5 w-5 text-amber-600" />
                 <div className="space-y-2 text-sm text-amber-900">
-                  <p className="font-semibold">Before you begin</p>
-                  <p>Stay on a stable network, keep only one exam tab open, and avoid refreshing the page during the session.</p>
-                  <p>If proctoring is enabled, camera and fullscreen requirements may be enforced after launch.</p>
+                  <p className="font-semibold">{t("examInstructions.beforeBeginTitle")}</p>
+                  <p>{t("examInstructions.beforeBeginNetwork")}</p>
+                  <p>{t("examInstructions.beforeBeginProctoring")}</p>
                 </div>
               </div>
             </div>
@@ -176,10 +189,10 @@ export function ExamInstructions() {
             <div className="space-y-3">
               {(
                 [
-                  ["device", "My device is charged and ready for the full exam duration."],
-                  ["internet", "My internet connection is stable enough for a continuous session."],
-                  ["rules", "I understand the exam rules and attempt policy."],
-                  ["workspace", "My workspace is quiet and free from interruptions."],
+                  ["device", t("examInstructions.checklist.device")],
+                  ["internet", t("examInstructions.checklist.internet")],
+                  ["rules", t("examInstructions.checklist.rules")],
+                  ["workspace", t("examInstructions.checklist.workspace")],
                 ] as const
               ).map(([key, label]) => (
                 <label
@@ -202,31 +215,37 @@ export function ExamInstructions() {
 
         <Card className="border-slate-200">
           <CardHeader>
-            <CardTitle>Launch Summary</CardTitle>
+            <CardTitle>{t("examInstructions.launchSummary")}</CardTitle>
           </CardHeader>
           <CardContent className="space-y-5">
             <div className="rounded-2xl bg-slate-950 px-5 py-6 text-white">
-              <p className="text-sm text-slate-300">Subject</p>
+              <p className="text-sm text-slate-300">{t("examInstructions.subject")}</p>
               <p className="mt-1 text-xl font-semibold">{exam.subject.name}</p>
-              <p className="mt-4 text-sm text-slate-300">Passing score</p>
+              <p className="mt-4 text-sm text-slate-300">{t("examInstructions.passingScore")}</p>
               <p className="mt-1 text-lg font-medium">{exam.passing_score}</p>
             </div>
 
             <div className="space-y-3 text-sm text-slate-600">
               <div className="flex items-center justify-between gap-4">
-                <span>Status</span>
-                <span className="font-medium text-slate-900">{getExamAvailabilityLabel(exam)}</span>
-              </div>
-              <div className="flex items-center justify-between gap-4">
-                <span>Window</span>
-                <span className="text-right text-slate-900">
-                  {availability === "available" || availability === "resume" ? "Open now" : getExamAvailabilityLabel(exam)}
+                <span>{t("examInstructions.status")}</span>
+                <span className="font-medium text-slate-900">
+                  {getExamAvailabilityLabel(exam, { locale: i18n.resolvedLanguage ?? i18n.language })}
                 </span>
               </div>
               <div className="flex items-center justify-between gap-4">
-                <span>Checklist</span>
+                <span>{t("examInstructions.window")}</span>
+                <span className="text-right text-slate-900">
+                  {availability === "available" || availability === "resume"
+                    ? t("examInstructions.openNow")
+                    : getExamAvailabilityLabel(exam, { locale: i18n.resolvedLanguage ?? i18n.language })}
+                </span>
+              </div>
+              <div className="flex items-center justify-between gap-4">
+                <span>{t("examInstructions.checklistLabel")}</span>
                 <span className="font-medium text-slate-900">
-                  {Object.values(checklist).filter(Boolean).length}/4 confirmed
+                  {t("examInstructions.checklistConfirmed", {
+                    count: Object.values(checklist).filter(Boolean).length,
+                  })}
                 </span>
               </div>
             </div>
@@ -235,12 +254,12 @@ export function ExamInstructions() {
               <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
                 <div className="flex items-start gap-2">
                   <CheckCircle2 className="mt-0.5 h-4 w-4" />
-                  <span>Complete the checklist to enable the final launch button.</span>
+                  <span>{t("examInstructions.launchReadyHint")}</span>
                 </div>
               </div>
             ) : (
               <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
-                This exam cannot be launched yet. Review the details here and return when the window opens.
+                {t("examInstructions.launchUnavailableHint")}
               </div>
             )}
 
@@ -250,7 +269,7 @@ export function ExamInstructions() {
               disabled={!canLaunchExam(exam) || !allChecked}
               onClick={() => navigate(`/candidate/exam/${exam.id}`)}
             >
-              {availability === "resume" ? "Resume Exam" : "Start Exam"}
+              {availability === "resume" ? t("examInstructions.resumeExam") : t("examInstructions.startExam")}
             </Button>
           </CardContent>
         </Card>

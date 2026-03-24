@@ -17,7 +17,7 @@ const normalizeLocale = (value: string | undefined): AppLocale =>
 
 export function LanguageSwitcher() {
   const { t, i18n } = useTranslation("common");
-  const currentLocale = normalizeLocale(i18n.language ?? i18n.resolvedLanguage);
+  const currentLocale = normalizeLocale(i18n.resolvedLanguage ?? i18n.language);
 
   const handleChange = async (locale: string) => {
     if (locale !== "vi" && locale !== "en") {
@@ -35,7 +35,7 @@ export function LanguageSwitcher() {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="outline" size="sm" className="gap-2">
+        <Button variant="outline" size="sm" className="gap-2" data-legacy-i18n-ignore="true">
           <Languages className="h-4 w-4" />
           {currentLocale.toUpperCase()}
         </Button>

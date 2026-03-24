@@ -46,4 +46,23 @@ describe("proctoringMedia", () => {
       ),
     ).rejects.toThrow(/docker compose up -d livekit/i);
   });
+
+  it("surfaces the same local setup hint when the peer connection cannot be established", async () => {
+    mockConnect.mockRejectedValue(new Error("could not establish pc connection"));
+
+    const { connectViewerRoom } = await import("./proctoringMedia");
+
+    await expect(
+      connectViewerRoom(
+        {
+          provider: "livekit",
+          server_url: "ws://127.0.0.1:7880",
+          room_name: "room",
+          participant_name: "proctor-1-session-1",
+          access_token: "token",
+          expires_at: "2026-03-23T00:00:00Z",
+        },
+      ),
+    ).rejects.toThrow(/docker compose up -d livekit/i);
+  });
 });

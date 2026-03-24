@@ -1,7 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router";
+import { useTranslation } from "react-i18next";
 import { notify } from "../lib/notify";
 import {
+  AlertTriangle,
   CheckCircle2,
   ChevronLeft,
   ChevronRight,
@@ -102,6 +104,11 @@ interface SubmissionSummary {
 }
 
 type ConnectionStatus = "stable" | "offline" | "unstable";
+type ViolationNotice = {
+  severity: "warning" | "critical";
+  message: string;
+  occurredAt: string;
+};
 
 type NavigatorConnectionInfo = {
   effectiveType?: string;
@@ -119,8 +126,13 @@ const formatTime = (seconds: number) => {
   return `${hours}:${minutes.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`;
 };
 
-const formatDateTime = (value: string) =>
-  new Intl.DateTimeFormat("en-GB", { dateStyle: "medium", timeStyle: "short" }).format(new Date(value));
+const normalizeCandidateLocale = (locale: string) => (locale.toLowerCase().startsWith("vi") ? "vi-VN" : "en-GB");
+
+const formatDateTime = (value: string, locale: string) =>
+  new Intl.DateTimeFormat(normalizeCandidateLocale(locale), {
+    dateStyle: "medium",
+    timeStyle: "short",
+  }).format(new Date(value));
 
 const assignPreviewStream = (
   element: (HTMLVideoElement & { srcObject?: MediaStream | null }) | null,
@@ -157,9 +169,11 @@ const getCandidateConnectionStatus = (failedHeartbeatCount: number): ConnectionS
 };
 
 export function TakeExam() {
+  const { t, i18n } = useTranslation("common");
   const { id } = useParams();
   const navigate = useNavigate();
   const examId = Number(id);
+  const locale = i18n.resolvedLanguage ?? i18n.language;
 
   const [session, setSession] = useState<CandidateSession | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -173,6 +187,7 @@ export function TakeExam() {
   const [proctoringReady, setProctoringReady] = useState(false);
   const [isProctoringSetupPending, setIsProctoringSetupPending] = useState(false);
   const [localPreviewStream, setLocalPreviewStream] = useState<MediaStream | null>(null);
+  const [latestViolationNotice, setLatestViolationNotice] = useState<ViolationNotice | null>(null);
   const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>(
     navigator.onLine ? "stable" : "offline",
   );
@@ -251,7 +266,7 @@ export function TakeExam() {
       setLastSavedAt(response.updated_at);
       dirtyEssayQuestionIdsRef.current.delete(questionId);
     } catch (saveError) {
-      const message = saveError instanceof Error ? saveError.message : "Unable to save answer.";
+      const message = saveError instanceof Error ? saveError.message : t("examSession.saveAnswerError");
       notify.error(message);
       throw saveError;
     } finally {
@@ -291,14 +306,14 @@ export function TakeExam() {
 
   const ensureFullscreenMode = async () => {
     if (!document.fullscreenEnabled) {
-      throw new Error("Fullscreen mode is required to start this exam.");
+      throw new Error(t("examSession.fullscreenRequired"));
     }
     if (document.fullscreenElement) {
       return;
     }
     const requestFullscreen = document.documentElement.requestFullscreen?.bind(document.documentElement);
     if (!requestFullscreen) {
-      throw new Error("Fullscreen mode is not supported in this browser.");
+      throw new Error(t("examSession.fullscreenUnsupported"));
     }
     await requestFullscreen();
   };
@@ -346,10 +361,26 @@ export function TakeExam() {
           metadata: { message },
         }),
       );
+      const violationMessage =
+        typeof event.metadata?.message === "string" && event.metadata.message.trim().length > 0
+          ? event.metadata.message
+          : message;
+      if (severity === "warning" || severity === "critical") {
+        setLatestViolationNotice({
+          severity,
+          message: violationMessage,
+          occurredAt: event.occurred_at,
+        });
+        if (severity === "critical") {
+          notify.error(`${t("examSession.criticalAlertRecorded")} ${violationMessage}`);
+        } else {
+          notify.warning(`${t("examSession.warningAlertRecorded")} ${violationMessage}`);
+        }
+      }
       await captureViolationEvidence(event, message);
     } catch (violationError) {
       const errorMessage =
-        violationError instanceof Error ? violationError.message : "Unable to capture proctoring evidence.";
+        violationError instanceof Error ? violationError.message : t("examSession.captureEvidenceError");
       notify.error(errorMessage);
     } finally {
       violationCapturePendingRef.current = false;
@@ -358,7 +389,7 @@ export function TakeExam() {
 
   const loadSession = async () => {
     if (!examId) {
-      setError("Invalid exam identifier.");
+      setError(t("examSession.unavailableDescription"));
       setIsLoading(false);
       return;
     }
@@ -371,6 +402,7 @@ export function TakeExam() {
         method: "POST",
       });
       setSession(nextSession);
+      setLatestViolationNotice(null);
       setProctoringBlockReason(null);
       setProctoringReady(!nextSession.enable_proctoring);
       setIsProctoringSetupPending(false);
@@ -381,7 +413,7 @@ export function TakeExam() {
       );
       setCurrentQuestionIndex(nextIndex === -1 ? 0 : nextIndex);
     } catch (loadError) {
-      setError(loadError instanceof Error ? loadError.message : "Unable to load exam session.");
+      setError(loadError instanceof Error ? loadError.message : t("examSession.unavailableDescription"));
     } finally {
       setIsLoading(false);
     }
@@ -449,7 +481,7 @@ export function TakeExam() {
               metadata: { reason: "screen_share_ended" },
             }),
           ).catch(() => undefined);
-          void reportViolation("manual_alert", "critical", "Screen sharing ended during the exam.");
+          void reportViolation("manual_alert", "critical", t("examSession.screenShareEnded"));
         };
         screenEndedHandlerRef.current = onScreenShareEnded;
         captureResources.screenTrack.addEventListener("ended", onScreenShareEnded);
@@ -463,10 +495,10 @@ export function TakeExam() {
         const message =
           fullscreenError instanceof Error
             ? fullscreenError.message
-            : "Fullscreen mode is required to start this exam.";
+            : t("examSession.fullscreenRequired");
         setProctoringBlockReason(
           captureResourcesRef.current
-            ? "Camera, microphone, and screen are ready. Click again to re-enter fullscreen and start the exam."
+            ? t("examSession.permissionsReadyRetry")
             : message,
         );
         return;
@@ -520,7 +552,7 @@ export function TakeExam() {
       const message =
         proctoringError instanceof Error
           ? proctoringError.message
-          : "Camera, microphone, and screen access are required.";
+          : t("examSession.protectedSetupDescription");
       capabilityRegisteredSessionIdRef.current = null;
       setProctoringReady(false);
       setProctoringBlockReason(message);
@@ -642,13 +674,13 @@ export function TakeExam() {
 
     const handleVisibilityChange = () => {
       if (document.hidden) {
-        void reportViolation("tab_switch", "warning", "Candidate switched away from the exam tab.");
+        void reportViolation("tab_switch", "warning", t("examSession.tabSwitchWarning"));
       }
     };
 
     const handleFullscreenChange = () => {
       if (session.enable_proctoring && document.fullscreenEnabled && !document.fullscreenElement) {
-        void reportViolation("fullscreen_exit", "warning", "Candidate exited fullscreen mode.");
+        void reportViolation("fullscreen_exit", "warning", t("examSession.fullscreenExitWarning"));
       }
     };
 
@@ -757,9 +789,9 @@ export function TakeExam() {
             }
           : current,
       );
-      notify.success("Exam submitted.");
+      notify.success(t("examSession.submitSuccess"));
     } catch (submitError) {
-      const message = submitError instanceof Error ? submitError.message : "Unable to submit exam.";
+      const message = submitError instanceof Error ? submitError.message : t("examSession.submitUnavailable");
       notify.error(message);
     } finally {
       setIsSubmitting(false);
@@ -772,20 +804,20 @@ export function TakeExam() {
     }
 
     const confirmed = await notify.confirm({
-      title: "Submit exam now?",
+      title: t("examSession.confirmSubmitTitle"),
       html: `
         <div style="text-align:left">
-          <p style="margin:0 0 12px;">Review your progress before final submission. This action cannot be undone.</p>
+          <p style="margin:0 0 12px;">${t("examSession.confirmSubmitDescription")}</p>
           <div style="display:grid;gap:8px;">
-            <div><strong>Total questions:</strong> ${session.questions.length}</div>
-            <div><strong>Answered:</strong> ${answeredCount}</div>
-            <div><strong>Unanswered:</strong> ${session.questions.length - answeredCount}</div>
-            ${markedCount > 0 ? `<div><strong>Marked for review:</strong> ${markedCount}</div>` : ""}
+            <div><strong>${t("examSession.confirmSubmitTotalQuestions")}:</strong> ${session.questions.length}</div>
+            <div><strong>${t("examSession.confirmSubmitAnswered")}:</strong> ${answeredCount}</div>
+            <div><strong>${t("examSession.confirmSubmitUnanswered")}:</strong> ${session.questions.length - answeredCount}</div>
+            ${markedCount > 0 ? `<div><strong>${t("examSession.confirmSubmitMarked")}:</strong> ${markedCount}</div>` : ""}
           </div>
         </div>
       `,
-      confirmText: "Submit Exam",
-      cancelText: "Go Back",
+      confirmText: t("examSession.submitExam"),
+      cancelText: t("examSession.goBack"),
       confirmButtonColor: "#2563eb",
     });
 
@@ -799,7 +831,7 @@ export function TakeExam() {
   if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <p className="text-sm text-gray-500">Loading exam session...</p>
+        <p className="text-sm text-gray-500">{t("examSession.loading")}</p>
       </div>
     );
   }
@@ -809,10 +841,10 @@ export function TakeExam() {
       <div className="min-h-screen flex items-center justify-center bg-gray-50 px-6">
         <Card className="w-full max-w-lg">
           <CardContent className="p-8 text-center">
-            <h1 className="text-xl font-semibold text-gray-900 mb-2">Unable to open exam</h1>
-            <p className="text-sm text-gray-600 mb-6">{error ?? "This exam session is unavailable."}</p>
+            <h1 className="text-xl font-semibold text-gray-900 mb-2">{t("examSession.unavailableTitle")}</h1>
+            <p className="text-sm text-gray-600 mb-6">{error ?? t("examSession.unavailableDescription")}</p>
             <Button asChild>
-              <Link to="/candidate/exams">Back to My Exams</Link>
+              <Link to="/candidate/exams">{t("examInstructions.backToMyExams")}</Link>
             </Button>
           </CardContent>
         </Card>
@@ -826,27 +858,24 @@ export function TakeExam() {
         <Card className="w-full max-w-xl">
           <CardContent className="p-8">
             <div className="text-center mb-8">
-              <h1 className="text-xl font-semibold text-gray-900 mb-2">Protected Exam Setup</h1>
+              <h1 className="text-xl font-semibold text-gray-900 mb-2">{t("examSession.protectedSetupTitle")}</h1>
               <p className="text-sm text-gray-600">
-                Grant camera, microphone, screen, and fullscreen access before the exam starts.
+                {t("examSession.protectedSetupDescription")}
               </p>
             </div>
 
             <div className="rounded-xl border border-blue-200 bg-blue-50 p-4 text-sm text-blue-900">
-              <p className="font-medium">This step unlocks the exam interface.</p>
-              <p className="mt-2">
-                Fullscreen keeps the exam locked in focus, while webcam live plus screen evidence are required for
-                proctoring.
-              </p>
+              <p className="font-medium">{t("examSession.protectedSetupIntroTitle")}</p>
+              <p className="mt-2">{t("examSession.protectedSetupIntroDescription")}</p>
             </div>
 
             <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700">
-              <p className="font-medium text-slate-900">Permissions requested</p>
+              <p className="font-medium text-slate-900">{t("examSession.permissionsRequested")}</p>
               <ul className="mt-2 list-disc space-y-1 pl-5">
-                <li>Camera for live invigilation</li>
-                <li>Microphone permission for protected-exam verification</li>
-                <li>Screen access for violation evidence capture</li>
-                <li>Browser fullscreen before the first question appears</li>
+                <li>{t("examSession.permissionCamera")}</li>
+                <li>{t("examSession.permissionMicrophone")}</li>
+                <li>{t("examSession.permissionScreen")}</li>
+                <li>{t("examSession.permissionFullscreen")}</li>
               </ul>
             </div>
 
@@ -860,17 +889,15 @@ export function TakeExam() {
               <div className="mt-4 rounded-xl border border-sky-200 bg-sky-50 p-4">
                 <div className="mb-3 flex items-center justify-between gap-3">
                   <div>
-                    <p className="text-sm font-semibold text-slate-900">Your Webcam Preview</p>
-                    <p className="text-xs text-slate-600">
-                      Permissions are ready. Fullscreen still has to remain active before the exam unlocks.
-                    </p>
+                    <p className="text-sm font-semibold text-slate-900">{t("examSession.webcamPreviewTitle")}</p>
+                    <p className="text-xs text-slate-600">{t("examSession.webcamPreviewSetup")}</p>
                   </div>
-                  <Badge variant="outline">Preview</Badge>
+                  <Badge variant="outline">{t("examSession.previewBadge")}</Badge>
                 </div>
                 <div className="overflow-hidden rounded-xl border border-slate-200 bg-slate-950">
                   <video
                     ref={setupPreviewRef}
-                    aria-label="Your webcam preview"
+                    aria-label={t("examSession.webcamPreviewLabel")}
                     autoPlay
                     muted
                     playsInline
@@ -883,13 +910,13 @@ export function TakeExam() {
             <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:justify-center">
               <Button onClick={() => void beginProtectedExam()} disabled={isProctoringSetupPending}>
                 {isProctoringSetupPending
-                  ? "Starting Monitoring..."
+                  ? t("examSession.startMonitoring")
                   : localPreviewStream
-                    ? "Enter Fullscreen and Start Exam"
-                    : "Grant Permissions and Start Monitoring"}
+                    ? t("examSession.enterFullscreenAndStart")
+                    : t("examSession.grantPermissionsAndStart")}
               </Button>
               <Button asChild>
-                <Link to="/candidate/exams">Back to My Exams</Link>
+                <Link to="/candidate/exams">{t("examInstructions.backToMyExams")}</Link>
               </Button>
             </div>
           </CardContent>
@@ -907,40 +934,44 @@ export function TakeExam() {
               <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-green-100">
                 <CheckCircle2 className="h-7 w-7 text-green-600" />
               </div>
-              <h1 className="text-2xl font-semibold text-gray-900">Exam Submitted</h1>
+              <h1 className="text-2xl font-semibold text-gray-900">{t("examSession.submittedTitle")}</h1>
               <p className="mt-2 text-sm text-gray-600">
-                {session.exam_name} was submitted at{" "}
-                {session.submitted_at ? formatDateTime(session.submitted_at) : "just now"}.
+                {t("examSession.submittedAt", {
+                  exam: session.exam_name,
+                  time: session.submitted_at
+                    ? formatDateTime(session.submitted_at, locale)
+                    : t("examSession.justNow"),
+                })}
               </p>
             </div>
 
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 mb-6">
               <div className="rounded-lg border border-gray-200 p-4">
-                <p className="text-sm text-gray-500">Objective Score</p>
+                <p className="text-sm text-gray-500">{t("examSession.objectiveScore")}</p>
                 <p className="mt-1 text-2xl font-semibold text-gray-900">
                   {session.objective_score}/{session.max_score}
                 </p>
               </div>
               <div className="rounded-lg border border-gray-200 p-4">
-                <p className="text-sm text-gray-500">Evaluation Status</p>
+                <p className="text-sm text-gray-500">{t("examSession.evaluationStatus")}</p>
                 <p className="mt-1 text-2xl font-semibold text-gray-900">
-                  {session.manual_grading_required ? "Pending grading" : "Finalized"}
+                  {session.manual_grading_required ? t("examSession.pendingGrading") : t("examSession.finalized")}
                 </p>
               </div>
             </div>
 
             <div className="rounded-lg border border-blue-200 bg-blue-50 p-4 text-sm text-blue-800 mb-6">
               {session.show_results_immediately && !session.manual_grading_required
-                ? "Results are available immediately for this exam."
-                : "Results will appear after manual grading and publication."}
+                ? t("examSession.resultsImmediate")
+                : t("examSession.resultsLater")}
             </div>
 
             <div className="flex flex-col gap-3 sm:flex-row sm:justify-end">
               <Button variant="outline" onClick={() => navigate(0)}>
-                Refresh
+                {t("examSession.refresh")}
               </Button>
               <Button asChild>
-                <Link to="/candidate/exams">Back to My Exams</Link>
+                <Link to="/candidate/exams">{t("examInstructions.backToMyExams")}</Link>
               </Button>
             </div>
           </CardContent>
@@ -956,7 +987,11 @@ export function TakeExam() {
           <div className="min-w-0">
             <h1 className="font-bold text-lg text-gray-900">{session.exam_name}</h1>
             <p className="text-sm text-gray-600">
-              Question {currentQuestionIndex + 1} of {session.questions.length} • Attempt {session.attempt_number}
+              {t("examSession.questionAttemptLine", {
+                current: currentQuestionIndex + 1,
+                total: session.questions.length,
+                attempt: session.attempt_number,
+              })}
             </p>
           </div>
 
@@ -971,13 +1006,17 @@ export function TakeExam() {
                       : "text-yellow-600"
                 }`}
               />
-              <span className="text-sm text-gray-600 capitalize">{connectionStatus}</span>
+              <span className="text-sm text-gray-600 capitalize">{t(`examSession.connection.${connectionStatus}`)}</span>
             </div>
 
             <div className="flex min-w-[10rem] items-center gap-2">
               <CheckCircle2 className={`w-4 h-4 ${lastSavedAt ? "text-green-600" : "text-gray-400"}`} />
               <span className="text-sm text-gray-600">
-                {lastSavedAt ? `Saved ${new Date(lastSavedAt).toLocaleTimeString("en-GB")}` : "Autosave pending"}
+                {lastSavedAt
+                  ? t("examSession.savedAt", {
+                      time: new Date(lastSavedAt).toLocaleTimeString(normalizeCandidateLocale(locale)),
+                    })
+                  : t("examSession.autosavePending")}
               </span>
             </div>
 
@@ -987,7 +1026,7 @@ export function TakeExam() {
             </div>
 
             <Button className="w-full sm:w-auto" onClick={() => void confirmSubmit()} disabled={isSubmitting}>
-              Submit Exam
+              {t("examSession.submitExam")}
             </Button>
           </div>
         </div>
@@ -996,6 +1035,32 @@ export function TakeExam() {
       <div className="flex-1 p-4 sm:p-6">
         <div className="mx-auto grid max-w-7xl grid-cols-1 gap-6 lg:grid-cols-4">
           <div className="lg:col-span-3">
+            {latestViolationNotice ? (
+              <div
+                className={`mb-4 rounded-xl border px-4 py-4 text-sm ${
+                  latestViolationNotice.severity === "critical"
+                    ? "border-red-200 bg-red-50 text-red-800"
+                    : "border-amber-200 bg-amber-50 text-amber-900"
+                }`}
+              >
+                <div className="flex items-start gap-3">
+                  <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0" />
+                  <div>
+                    <p className="font-semibold">
+                      {latestViolationNotice.severity === "critical"
+                        ? t("examSession.criticalAlertRecorded")
+                        : t("examSession.warningAlertRecorded")}
+                    </p>
+                    <p className="mt-1">{latestViolationNotice.message}</p>
+                    <p className="mt-2 text-xs opacity-80">
+                      {t("examSession.recordedAt", {
+                        time: formatDateTime(latestViolationNotice.occurredAt, locale),
+                      })}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            ) : null}
             <Card>
               <CardContent className="p-4 sm:p-6 lg:p-8">
                 <div className="mb-6">
@@ -1003,16 +1068,16 @@ export function TakeExam() {
                     <div>
                       <div className="mb-2 flex flex-wrap items-center gap-2">
                         <h2 className="text-xl font-semibold text-gray-900">
-                          Question {currentQuestionIndex + 1}
+                          {t("examSession.questionHeading", { number: currentQuestionIndex + 1 })}
                         </h2>
                         <Badge variant="outline">{currentQuestion.difficulty}</Badge>
                         <Badge variant="outline">{currentQuestion.question_type.replace(/_/g, " ")}</Badge>
                       </div>
-                      <p className="text-xs text-gray-500">{currentQuestion.points} points</p>
+                      <p className="text-xs text-gray-500">{t("examSession.points", { points: currentQuestion.points })}</p>
                     </div>
                     <Button variant="outline" size="sm" className="w-full gap-2 sm:w-auto" onClick={() => void toggleMarked()}>
                       <Flag className="w-4 h-4" />
-                      {currentQuestion.is_marked_for_review ? "Unmark" : "Mark for Review"}
+                      {currentQuestion.is_marked_for_review ? t("examSession.unmark") : t("examSession.markForReview")}
                     </Button>
                   </div>
                   <p className="text-base leading-relaxed text-gray-800 sm:text-lg">{currentQuestion.question_text}</p>
@@ -1024,7 +1089,7 @@ export function TakeExam() {
                     value={currentQuestion.answer_text}
                     onChange={(event) => handleEssayChange(event.target.value)}
                     onBlur={() => void persistEssayAnswer()}
-                    placeholder="Enter your answer here..."
+                    placeholder={t("examSession.answerPlaceholder")}
                   />
                 ) : (
                   <div className="space-y-3">
@@ -1058,14 +1123,14 @@ export function TakeExam() {
                 <div className="mt-8 flex flex-col gap-3 border-t border-gray-200 pt-6 sm:flex-row sm:items-center sm:justify-between">
                   <Button className="w-full sm:w-auto" variant="outline" onClick={() => void goToQuestion(currentQuestionIndex - 1)} disabled={currentQuestionIndex === 0}>
                     <ChevronLeft className="w-4 h-4 mr-2" />
-                    Previous
+                    {t("examSession.previous")}
                   </Button>
                   <Button
                     className="w-full sm:w-auto"
                     onClick={() => void goToQuestion(currentQuestionIndex + 1)}
                     disabled={currentQuestionIndex === session.questions.length - 1}
                   >
-                    Next
+                    {t("examSession.next")}
                     <ChevronRight className="w-4 h-4 ml-2" />
                   </Button>
                 </div>
@@ -1076,24 +1141,24 @@ export function TakeExam() {
           <div className="lg:col-span-1">
             <Card className="lg:sticky lg:top-24">
               <CardContent className="p-4 sm:p-6">
-                <h3 className="font-semibold text-gray-900 mb-4">Question Navigator</h3>
+                <h3 className="font-semibold text-gray-900 mb-4">{t("examSession.questionNavigator")}</h3>
 
                 {session.enable_proctoring ? (
                   <div className="mb-4 rounded-xl border border-sky-200 bg-sky-50 p-3">
                     <div className="mb-3 flex items-center justify-between gap-3">
                       <div>
-                        <p className="text-sm font-semibold text-slate-900">Your Webcam Preview</p>
+                        <p className="text-sm font-semibold text-slate-900">{t("examSession.webcamPreviewTitle")}</p>
                         <p className="text-xs text-slate-600">
-                          {proctoringReady ? "Monitoring active" : "Preview will appear after monitoring starts"}
+                          {proctoringReady ? t("examSession.monitoringActive") : t("examSession.monitoringPending")}
                         </p>
                       </div>
-                      <Badge variant="outline">{proctoringReady ? "Live" : "Pending"}</Badge>
+                      <Badge variant="outline">{proctoringReady ? t("examSession.liveBadge") : t("examSession.pendingBadge")}</Badge>
                     </div>
                     <div className="overflow-hidden rounded-xl border border-slate-200 bg-slate-950">
                       {proctoringReady && localPreviewStream ? (
                         <video
                           ref={examPreviewRef}
-                          aria-label="Your webcam preview"
+                          aria-label={t("examSession.webcamPreviewLabel")}
                           autoPlay
                           muted
                           playsInline
@@ -1101,7 +1166,7 @@ export function TakeExam() {
                         />
                       ) : (
                         <div className="flex aspect-video items-center justify-center px-4 text-center text-xs text-slate-200">
-                          Webcam preview will appear here once monitoring is ready.
+                          {t("examSession.webcamPreviewWaiting")}
                         </div>
                       )}
                     </div>
@@ -1110,17 +1175,17 @@ export function TakeExam() {
 
                 <div className="space-y-2 mb-4 pb-4 border-b border-gray-200">
                   <div className="flex items-center justify-between text-sm">
-                    <span className="text-gray-600">Answered:</span>
+                    <span className="text-gray-600">{t("examSession.answered")}:</span>
                     <span className="font-semibold text-green-600">
                       {answeredCount}/{session.questions.length}
                     </span>
                   </div>
                   <div className="flex items-center justify-between text-sm">
-                    <span className="text-gray-600">Marked:</span>
+                    <span className="text-gray-600">{t("examSession.marked")}:</span>
                     <span className="font-semibold text-orange-600">{markedCount}</span>
                   </div>
                   <div className="flex items-center justify-between text-sm">
-                    <span className="text-gray-600">Unanswered:</span>
+                    <span className="text-gray-600">{t("examSession.unanswered")}:</span>
                     <span className="font-semibold text-red-600">
                       {session.questions.length - answeredCount}
                     </span>
@@ -1152,21 +1217,21 @@ export function TakeExam() {
                 <div className="mt-4 pt-4 border-t border-gray-200 space-y-2">
                   <div className="flex items-center gap-2 text-xs">
                     <div className="w-4 h-4 bg-green-100 rounded" />
-                    <span className="text-gray-600">Answered</span>
+                    <span className="text-gray-600">{t("examSession.answered")}</span>
                   </div>
                   <div className="flex items-center gap-2 text-xs">
                     <div className="w-4 h-4 bg-gray-100 rounded" />
-                    <span className="text-gray-600">Not Answered</span>
+                    <span className="text-gray-600">{t("examSession.unanswered")}</span>
                   </div>
                   <div className="flex items-center gap-2 text-xs">
                     <div className="w-4 h-4 bg-blue-600 rounded" />
-                    <span className="text-gray-600">Current</span>
+                    <span className="text-gray-600">{t("examSession.current")}</span>
                   </div>
                   <div className="flex items-center gap-2 text-xs">
                     <Flag className="w-4 h-4 text-orange-500 fill-orange-500" />
-                    <span className="text-gray-600">Marked</span>
+                    <span className="text-gray-600">{t("examSession.marked")}</span>
                   </div>
-                  {isSaving ? <p className="text-xs text-blue-600 pt-2">Saving answer...</p> : null}
+                  {isSaving ? <p className="text-xs text-blue-600 pt-2">{t("examSession.savingAnswer")}</p> : null}
                 </div>
               </CardContent>
             </Card>

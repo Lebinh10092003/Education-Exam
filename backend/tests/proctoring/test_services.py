@@ -81,6 +81,37 @@ def test_record_proctor_event_creates_admin_notification(subject, admin_user, ca
 
 
 @pytest.mark.django_db
+def test_record_proctor_event_creates_candidate_notification(subject, admin_user, candidate_user):
+    from apps.notifications.models import Notification
+    from apps.proctoring.services import record_proctor_event
+
+    _, session = build_active_session(
+        subject=subject,
+        admin_user=admin_user,
+        candidate_user=candidate_user,
+    )
+
+    event = record_proctor_event(
+        session=session,
+        event_type="tab_switch",
+        severity="warning",
+        metadata={"count": 1, "message": "Candidate switched away from the exam tab."},
+        reported_by=candidate_user,
+    )
+
+    notification = Notification.objects.filter(
+        recipient=candidate_user,
+        category=Notification.Category.ALERT,
+        metadata__event_id=event.id,
+    ).first()
+
+    assert notification is not None
+    assert notification.priority == Notification.Priority.MEDIUM
+    assert notification.action_url == "/candidate/notifications"
+    assert notification.message == "Candidate switched away from the exam tab."
+
+
+@pytest.mark.django_db
 def test_build_exam_monitoring_snapshot_returns_candidate_statuses_and_alerts(subject, admin_user, candidate_user):
     from apps.proctoring.services import build_exam_monitoring_snapshot, record_heartbeat, record_proctor_event
 

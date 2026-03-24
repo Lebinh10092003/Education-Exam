@@ -46,4 +46,18 @@ describe("apiRequest locale propagation", () => {
       status: 404,
     });
   });
+
+  it("uses the first array error message without leaking numeric indexes", async () => {
+    global.fetch = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify(["Phiên luyện tập này đã hết hạn."]), {
+        status: 400,
+        headers: { "content-type": "application/json" },
+      }),
+    );
+
+    await expect(apiRequest("/api/v1/practice/sessions/1/", { auth: false })).rejects.toMatchObject<ApiError>({
+      message: "Phiên luyện tập này đã hết hạn.",
+      status: 400,
+    });
+  });
 });

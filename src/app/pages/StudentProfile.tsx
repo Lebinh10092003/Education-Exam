@@ -1,7 +1,6 @@
 import { useMemo, useState } from "react";
-import { Languages, Lock, Monitor, Moon, Phone, School, Sun, User } from "lucide-react";
+import { Lock, Phone, School, User } from "lucide-react";
 import { useTranslation } from "react-i18next";
-import { useTheme } from "next-themes";
 
 import { useAuth } from "../auth/useAuth";
 import { PageHeader } from "../components/PageHeader";
@@ -12,32 +11,15 @@ import { Input } from "../components/ui/input";
 import { Label } from "../components/ui/label";
 import { apiRequest } from "../lib/http";
 import { notify } from "../lib/notify";
-import { setStoredLocale, type AppLocale } from "../lib/storage";
 import { useMutationState } from "../hooks/useMutationState";
 
-type ThemePreference = "light" | "dark" | "system";
-
-const normalizeTheme = (value: string | undefined): ThemePreference => {
-  if (value === "dark" || value === "system") {
-    return value;
-  }
-  return "light";
-};
-
-const normalizeLocale = (value: string | undefined): AppLocale =>
-  value?.toLowerCase().startsWith("en") ? "en" : "vi";
-
 export function StudentProfile() {
-  const { t, i18n } = useTranslation(["common", "profile"]);
-  const { theme, setTheme } = useTheme();
+  const { t } = useTranslation(["common", "profile"]);
   const { profile } = useAuth();
   const passwordMutation = useMutationState();
 
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
-
-  const currentTheme = normalizeTheme(theme);
-  const currentLocale = normalizeLocale(i18n.language ?? i18n.resolvedLanguage);
 
   const initials = useMemo(() => {
     const name = profile?.full_name || t("profile:student.userFallback");
@@ -83,34 +65,6 @@ export function StudentProfile() {
       notify.error(message);
     }
   };
-
-  const updateThemePreference = (nextTheme: ThemePreference) => {
-    if (nextTheme === currentTheme) {
-      return;
-    }
-
-    setTheme(nextTheme);
-  };
-
-  const updateLocalePreference = async (nextLocale: AppLocale) => {
-    if (nextLocale === currentLocale) {
-      return;
-    }
-
-    setStoredLocale(nextLocale);
-    await i18n.changeLanguage(nextLocale);
-  };
-
-  const themeOptions: Array<{ value: ThemePreference; label: string; icon: typeof Sun }> = [
-    { value: "light", label: t("profile:student.themes.light"), icon: Sun },
-    { value: "dark", label: t("profile:student.themes.dark"), icon: Moon },
-    { value: "system", label: t("profile:student.themes.system"), icon: Monitor },
-  ];
-
-  const localeOptions: Array<{ value: AppLocale; label: string; icon: typeof Languages }> = [
-    { value: "vi", label: t("common:locale.vietnamese"), icon: Languages },
-    { value: "en", label: t("common:locale.english"), icon: Languages },
-  ];
 
   return (
     <div>
@@ -244,72 +198,6 @@ export function StudentProfile() {
                     ? t("profile:student.buttons.updatingPassword")
                     : t("profile:student.buttons.updatePassword")}
                 </Button>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="border-slate-200 dark:border-slate-800 dark:bg-slate-950/70">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Monitor className="h-5 w-5 text-blue-600" />
-                {t("profile:student.sections.systemSettings")}
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-6 p-6">
-              <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300">
-                {t("profile:student.messages.settingsSaved")}
-              </div>
-
-              <div className="space-y-3">
-                <Label>{t("profile:student.labels.appearanceTheme")}</Label>
-                <div className="grid gap-3 md:grid-cols-3">
-                  {themeOptions.map((option) => {
-                    const active = option.value === currentTheme;
-                    return (
-                      <Button
-                        key={option.value}
-                        type="button"
-                        variant="outline"
-                        aria-pressed={active}
-                        className={
-                          active
-                            ? "justify-start border-blue-600 bg-blue-600 text-white hover:bg-blue-600 hover:text-white"
-                            : "justify-start"
-                        }
-                        onClick={() => updateThemePreference(option.value)}
-                      >
-                        <option.icon className="h-4 w-4" />
-                        {option.label}
-                      </Button>
-                    );
-                  })}
-                </div>
-              </div>
-
-              <div className="space-y-3">
-                <Label>{t("profile:student.labels.defaultLanguage")}</Label>
-                <div className="grid gap-3 md:grid-cols-2">
-                  {localeOptions.map((option) => {
-                    const active = option.value === currentLocale;
-                    return (
-                      <Button
-                        key={option.value}
-                        type="button"
-                        variant="outline"
-                        aria-pressed={active}
-                        className={
-                          active
-                            ? "justify-start border-blue-600 bg-blue-600 text-white hover:bg-blue-600 hover:text-white"
-                            : "justify-start"
-                        }
-                        onClick={() => void updateLocalePreference(option.value)}
-                      >
-                        <option.icon className="h-4 w-4" />
-                        {option.label}
-                      </Button>
-                    );
-                  })}
-                </div>
               </div>
             </CardContent>
           </Card>

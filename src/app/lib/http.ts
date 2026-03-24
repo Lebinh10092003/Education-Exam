@@ -69,6 +69,13 @@ const toUrl = (path: string, query?: Record<string, QueryValue | QueryValue[]>) 
 };
 
 const getErrorMessage = (payload: unknown, fallback: string) => {
+  if (Array.isArray(payload)) {
+    const firstMessage = payload.find((value): value is string => typeof value === "string" && value.trim().length > 0);
+    if (firstMessage) {
+      return firstMessage;
+    }
+  }
+
   if (payload && typeof payload === "object") {
     const detail = (payload as { detail?: unknown }).detail;
     if (typeof detail === "string" && detail.trim()) {

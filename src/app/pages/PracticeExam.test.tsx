@@ -3,6 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import i18n from "../i18n";
 import { PracticeExam } from "./PracticeExam";
 
 const mockApiRequest = vi.fn();
@@ -39,7 +40,8 @@ describe("PracticeExam", () => {
     vi.clearAllMocks();
   });
 
-  beforeEach(() => {
+  beforeEach(async () => {
+    await i18n.changeLanguage("en");
     mockApiRequest.mockImplementation(async (path: string, options?: { method?: string }) => {
       if (path === "/api/v1/practice/catalog/") {
         return {
@@ -123,6 +125,9 @@ describe("PracticeExam", () => {
 
     expect(await screen.findByRole("heading", { name: "Quick Practice" })).toBeInTheDocument();
     expect(screen.getAllByText("Mathematics")[0]).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Start A Practice Set" })).toBeInTheDocument();
+    expect(screen.queryByLabelText("Duration (minutes)")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Easy questions")).not.toBeInTheDocument();
     expect(screen.getByText("Resume session")).toBeInTheDocument();
     expect(screen.getByText("Latest practice history")).toBeInTheDocument();
   });
@@ -140,9 +145,6 @@ describe("PracticeExam", () => {
     );
 
     expect(await screen.findByRole("heading", { name: "Quick Practice" })).toBeInTheDocument();
-
-    await user.clear(screen.getByLabelText("Easy questions"));
-    await user.type(screen.getByLabelText("Easy questions"), "4");
     await user.click(screen.getByRole("button", { name: /start practice/i }));
 
     await waitFor(() => {
@@ -151,14 +153,27 @@ describe("PracticeExam", () => {
 
     expect(mockApiRequest).toHaveBeenCalledWith(
       "/api/v1/practice/sessions/",
-      expect.objectContaining({
+      {
         method: "POST",
-        body: expect.objectContaining({
+        body: {
           subject_id: 1,
-          duration_minutes: 20,
-          difficulty_counts: { easy: 4, medium: 0, hard: 0 },
-        }),
-      }),
+        },
+      },
     );
+  });
+
+  it("renders the practice catalog in Vietnamese when locale is vi", async () => {
+    await i18n.changeLanguage("vi");
+
+    render(
+      <MemoryRouter>
+        <PracticeExam />
+      </MemoryRouter>,
+    );
+
+    expect(await screen.findByRole("heading", { name: "Luyện tập nhanh" })).toBeInTheDocument();
+    expect(screen.getByText("Bắt đầu một bộ luyện tập")).toBeInTheDocument();
+    expect(screen.getByText("Tiếp tục phiên")).toBeInTheDocument();
+    expect(screen.getByText("Lịch sử luyện tập gần nhất")).toBeInTheDocument();
   });
 });

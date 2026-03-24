@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Link, useNavigate, useParams } from "react-router";
 import { ArrowLeft, CheckCircle2, Clock3, Flag, Save } from "lucide-react";
 
@@ -17,9 +18,10 @@ import type {
   PracticeSessionRecord,
   PracticeSubmitResponse,
 } from "./practiceShared";
-import { difficultyLabels, formatPracticeTimer } from "./practiceShared";
+import { formatPracticeDateTime, formatPracticeTimer } from "./practiceShared";
 
 export function PracticeSession() {
+  const { t, i18n } = useTranslation("practice");
   const { id } = useParams();
   const navigate = useNavigate();
   const sessionId = Number(id);
@@ -52,7 +54,7 @@ export function PracticeSession() {
 
   const loadSession = async () => {
     if (!sessionId) {
-      setError("Invalid practice session.");
+      setError(t("session.invalidSession"));
       setIsLoading(false);
       return;
     }
@@ -66,7 +68,7 @@ export function PracticeSession() {
       const nextIndex = Math.max(payload.questions.findIndex((question) => !question.is_answered), 0);
       setCurrentQuestionIndex(nextIndex === -1 ? 0 : nextIndex);
     } catch (loadError) {
-      setError(loadError instanceof Error ? loadError.message : "Unable to load practice session.");
+      setError(loadError instanceof Error ? loadError.message : t("session.loadFailed"));
     } finally {
       setIsLoading(false);
     }
@@ -170,9 +172,9 @@ export function PracticeSession() {
         is_marked_for_review: response.is_marked_for_review,
       });
       setLastSavedAt(response.updated_at);
-      notify.success("Practice answer saved.");
+      notify.success(t("session.saveSuccess"));
     } catch (saveError) {
-      notify.error(saveError instanceof Error ? saveError.message : "Unable to save practice answer.");
+      notify.error(saveError instanceof Error ? saveError.message : t("session.saveFailed"));
       throw saveError;
     } finally {
       setIsSaving(false);
@@ -217,10 +219,10 @@ export function PracticeSession() {
     }
 
     const confirmed = await notify.confirm({
-      title: "Submit practice now?",
-      text: "The practice session will be scored immediately and opened in review mode.",
-      confirmText: "Submit Practice",
-      cancelText: "Keep Working",
+      title: t("session.submitNowTitle"),
+      text: t("session.submitNowDescription"),
+      confirmText: t("session.submitAction"),
+      cancelText: t("session.keepWorking"),
       confirmButtonColor: "#2563eb",
     });
     if (!confirmed) {
@@ -248,7 +250,7 @@ export function PracticeSession() {
       );
       navigate(`/candidate/practice/sessions/${session.id}/review`);
     } catch (submitError) {
-      notify.error(submitError instanceof Error ? submitError.message : "Unable to submit practice session.");
+      notify.error(submitError instanceof Error ? submitError.message : t("session.submitFailed"));
     } finally {
       setIsSubmitting(false);
     }
@@ -259,7 +261,7 @@ export function PracticeSession() {
       <div className="min-h-screen bg-slate-50 px-6 py-16">
         <Card className="mx-auto max-w-xl">
           <CardContent className="p-10 text-center text-sm text-slate-500">
-            Loading practice session...
+            {t("session.loading")}
           </CardContent>
         </Card>
       </div>
@@ -271,10 +273,10 @@ export function PracticeSession() {
       <div className="min-h-screen bg-slate-50 px-6 py-16">
         <Card className="mx-auto max-w-xl">
           <CardContent className="p-10 text-center">
-            <p className="text-lg font-semibold text-slate-950">Unable to open practice</p>
-            <p className="mt-2 text-sm text-slate-500">{error ?? "This practice session is unavailable."}</p>
+            <p className="text-lg font-semibold text-slate-950">{t("session.unableToOpen")}</p>
+            <p className="mt-2 text-sm text-slate-500">{error ?? t("session.unavailable")}</p>
             <Button className="mt-6" asChild>
-              <Link to="/candidate/practice">Back to Practice</Link>
+              <Link to="/candidate/practice">{t("session.backToPractice")}</Link>
             </Button>
           </CardContent>
         </Card>
@@ -289,7 +291,7 @@ export function PracticeSession() {
           <Button variant="ghost" className="px-0" asChild>
             <Link to="/candidate/practice">
               <ArrowLeft className="h-4 w-4" />
-              Back to Practice
+              {t("session.backToPractice")}
             </Link>
           </Button>
           <div className="flex items-center gap-3">
@@ -300,7 +302,7 @@ export function PracticeSession() {
             </Badge>
             <Button onClick={handleSubmit} disabled={isSubmitting}>
               <CheckCircle2 className="mr-2 h-4 w-4" />
-              {isSubmitting ? "Submitting..." : "Submit Practice"}
+              {isSubmitting ? t("session.submitting") : t("session.submitAction")}
             </Button>
           </div>
         </div>
@@ -308,12 +310,12 @@ export function PracticeSession() {
         <div className="grid gap-6 xl:grid-cols-[280px,minmax(0,1fr)]">
           <Card className="h-fit">
             <CardHeader>
-              <CardTitle>Practice Session</CardTitle>
+              <CardTitle>{t("session.title")}</CardTitle>
             </CardHeader>
             <CardContent className="space-y-5">
               <div>
                 <div className="mb-2 flex items-center justify-between text-sm text-slate-600">
-                  <span>Answered</span>
+                  <span>{t("session.answered")}</span>
                   <span>
                     {answeredCount}/{session.total_questions}
                   </span>
@@ -322,9 +324,13 @@ export function PracticeSession() {
               </div>
 
               <div className="space-y-2 text-sm text-slate-600">
-                <p>Duration: {session.duration_minutes} minutes</p>
-                <p>Marked: {session.questions.filter((question) => question.is_marked_for_review).length}</p>
-                <p>Last saved: {lastSavedAt ? new Date(lastSavedAt).toLocaleTimeString("en-GB") : "Pending"}</p>
+                <p>{t("session.duration", { minutes: session.duration_minutes })}</p>
+                <p>{t("session.marked", { count: session.questions.filter((question) => question.is_marked_for_review).length })}</p>
+                <p>
+                  {t("session.lastSaved", {
+                    time: lastSavedAt ? formatPracticeDateTime(lastSavedAt, i18n.language) : t("session.pending"),
+                  })}
+                </p>
               </div>
 
               <div className="grid grid-cols-5 gap-2">
@@ -355,14 +361,14 @@ export function PracticeSession() {
             <CardHeader>
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div>
-                  <CardTitle>Question {currentQuestion.sort_order}</CardTitle>
+                  <CardTitle>{t("session.question", { number: currentQuestion.sort_order })}</CardTitle>
                   <p className="mt-1 text-sm text-slate-500">
-                    {difficultyLabels[currentQuestion.difficulty] ?? currentQuestion.difficulty}
+                    {t(`shared.difficulty.${currentQuestion.difficulty}`, { defaultValue: currentQuestion.difficulty })}
                   </p>
                 </div>
                 <Button variant="outline" onClick={() => void toggleMarked()} disabled={isSaving}>
                   <Flag className="mr-2 h-4 w-4" />
-                  {currentQuestion.is_marked_for_review ? "Unmark" : "Mark Review"}
+                  {currentQuestion.is_marked_for_review ? t("session.unmark") : t("session.markReview")}
                 </Button>
               </div>
             </CardHeader>
@@ -405,11 +411,11 @@ export function PracticeSession() {
                   onClick={() => setCurrentQuestionIndex((current) => Math.max(current - 1, 0))}
                   disabled={currentQuestionIndex === 0}
                 >
-                  Previous
+                  {t("session.previous")}
                 </Button>
                 <div className="flex items-center gap-2 text-sm text-slate-500">
                   <Save className="h-4 w-4" />
-                  {isSaving ? "Saving..." : "Objective answers save immediately"}
+                  {isSaving ? t("session.saving") : t("session.immediateSave")}
                 </div>
                 <Button
                   variant="outline"
@@ -418,7 +424,7 @@ export function PracticeSession() {
                   }
                   disabled={currentQuestionIndex === session.questions.length - 1}
                 >
-                  Next
+                  {t("session.next")}
                 </Button>
               </div>
             </CardContent>

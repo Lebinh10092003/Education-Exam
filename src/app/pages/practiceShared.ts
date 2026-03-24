@@ -123,17 +123,13 @@ export interface PracticeReviewRecord {
   questions: PracticeReviewQuestion[];
 }
 
-export const difficultyLabels: Record<string, string> = {
-  easy: "Easy",
-  medium: "Medium",
-  hard: "Hard",
-};
+const normalizePracticeLocale = (locale: string) => (locale.toLowerCase().startsWith("vi") ? "vi-VN" : "en-GB");
 
-export const formatPracticeDateTime = (value: string | null) => {
+export const formatPracticeDateTime = (value: string | null, locale = "en") => {
   if (!value) {
-    return "Not available";
+    return "";
   }
-  return new Intl.DateTimeFormat("en-GB", {
+  return new Intl.DateTimeFormat(normalizePracticeLocale(locale), {
     dateStyle: "medium",
     timeStyle: "short",
   }).format(new Date(value));
@@ -152,9 +148,13 @@ export const formatPracticeTimer = (seconds: number) => {
 export const sumDifficultyCounts = (counts: Record<string, number>) =>
   Object.values(counts).reduce((sum, value) => sum + value, 0);
 
-export const getSelectedOptionLabel = (options: PracticeQuestionOption[], selectedKeys: string[]) => {
+export const getSelectedOptionLabel = (
+  options: PracticeQuestionOption[],
+  selectedKeys: string[],
+  emptyLabel: string,
+) => {
   if (!selectedKeys.length) {
-    return "No answer";
+    return emptyLabel;
   }
   return selectedKeys
     .map((selectedKey) => {

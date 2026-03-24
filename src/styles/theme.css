@@ -39,43 +39,81 @@
   --sidebar-accent-foreground: oklch(0.205 0 0);
   --sidebar-border: oklch(0.922 0 0);
   --sidebar-ring: oklch(0.708 0 0);
+  --shell-background: #f8fafc;
+  --shell-panel: #ffffff;
+  --shell-surface: #ffffff;
+  --shell-elevated: #f8fafc;
+  --shell-overlay: rgba(15, 23, 42, 0.45);
 }
 
 .dark {
-  --background: oklch(0.145 0 0);
-  --foreground: oklch(0.985 0 0);
-  --card: oklch(0.145 0 0);
-  --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.145 0 0);
-  --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.985 0 0);
-  --primary-foreground: oklch(0.205 0 0);
-  --secondary: oklch(0.269 0 0);
-  --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.269 0 0);
-  --muted-foreground: oklch(0.708 0 0);
-  --accent: oklch(0.269 0 0);
-  --accent-foreground: oklch(0.985 0 0);
-  --destructive: oklch(0.396 0.141 25.723);
-  --destructive-foreground: oklch(0.637 0.237 25.331);
-  --border: oklch(0.269 0 0);
-  --input: oklch(0.269 0 0);
-  --ring: oklch(0.439 0 0);
+  --background: #0f1115;
+  --foreground: #e5e7eb;
+  --card: #1b212b;
+  --card-foreground: #e5e7eb;
+  --popover: #1b212b;
+  --popover-foreground: #e5e7eb;
+  --primary: #3b82f6;
+  --primary-foreground: #ffffff;
+  --secondary: #232b37;
+  --secondary-foreground: #e5e7eb;
+  --muted: #161c26;
+  --muted-foreground: #9ca3af;
+  --accent: #232b37;
+  --accent-foreground: #f3f4f6;
+  --destructive: #ef4444;
+  --destructive-foreground: #ffffff;
+  --border: #2a2f3a;
+  --input: #232b37;
+  --input-background: #161c26;
+  --switch-background: #344052;
+  --ring: #60a5fa;
   --font-weight-medium: 500;
   --font-weight-normal: 400;
-  --chart-1: oklch(0.488 0.243 264.376);
-  --chart-2: oklch(0.696 0.17 162.48);
-  --chart-3: oklch(0.769 0.188 70.08);
-  --chart-4: oklch(0.627 0.265 303.9);
-  --chart-5: oklch(0.645 0.246 16.439);
-  --sidebar: oklch(0.205 0 0);
-  --sidebar-foreground: oklch(0.985 0 0);
-  --sidebar-primary: oklch(0.488 0.243 264.376);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.269 0 0);
-  --sidebar-accent-foreground: oklch(0.985 0 0);
-  --sidebar-border: oklch(0.269 0 0);
-  --sidebar-ring: oklch(0.439 0 0);
+  --chart-1: #60a5fa;
+  --chart-2: #22c55e;
+  --chart-3: #f59e0b;
+  --chart-4: #a855f7;
+  --chart-5: #ef4444;
+  --sidebar: #161a22;
+  --sidebar-foreground: #e5e7eb;
+  --sidebar-primary: #3b82f6;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #232b37;
+  --sidebar-accent-foreground: #e5e7eb;
+  --sidebar-border: #2a2f3a;
+  --sidebar-ring: #60a5fa;
+  --legacy-surface-1: #1b212b;
+  --legacy-surface-2: #202733;
+  --legacy-surface-3: #27303f;
+  --legacy-border-1: #303844;
+  --legacy-text-strong: #e5e7eb;
+  --legacy-text-body: #cbd5e1;
+  --legacy-text-muted: #9ca3af;
+  --legacy-text-faint: #6b7280;
+  --legacy-blue-surface: rgba(59, 130, 246, 0.15);
+  --legacy-blue-border: rgba(96, 165, 250, 0.3);
+  --legacy-blue-text: #93c5fd;
+  --legacy-green-surface: rgba(34, 197, 94, 0.14);
+  --legacy-green-border: rgba(34, 197, 94, 0.3);
+  --legacy-green-text: #86efac;
+  --legacy-amber-surface: rgba(245, 158, 11, 0.14);
+  --legacy-amber-border: rgba(245, 158, 11, 0.3);
+  --legacy-amber-text: #fcd34d;
+  --legacy-red-surface: rgba(239, 68, 68, 0.14);
+  --legacy-red-border: rgba(239, 68, 68, 0.3);
+  --legacy-red-text: #fca5a5;
+  --legacy-purple-surface: rgba(168, 85, 247, 0.14);
+  --legacy-purple-border: rgba(192, 132, 252, 0.3);
+  --legacy-purple-text: #d8b4fe;
+  --legacy-orange-surface: rgba(249, 115, 22, 0.14);
+  --legacy-orange-border: rgba(251, 146, 60, 0.3);
+  --legacy-orange-text: #fdba74;
+  --shell-background: #0f1115;
+  --shell-panel: #161a22;
+  --shell-surface: #1b212b;
+  --shell-elevated: #232b37;
+  --shell-overlay: rgba(8, 11, 17, 0.72);
 }
 
 @theme inline {
@@ -126,6 +164,120 @@
 
   body {
     @apply bg-background text-foreground;
+  }
+
+  /*
+   * Dark-mode compatibility layer for legacy pages that still hard-code
+   * light palette utility classes instead of semantic tokens.
+   * This keeps the UI readable across the app while those pages are migrated.
+   */
+  .dark :is(.bg-white, .bg-gray-50, .bg-slate-50) {
+    background-color: var(--legacy-surface-1) !important;
+  }
+
+  .dark :is(.bg-gray-100, .bg-gray-200, .bg-slate-100, .bg-slate-200) {
+    background-color: var(--legacy-surface-2) !important;
+  }
+
+  .dark :is(.bg-gray-300, .bg-slate-300, .bg-slate-900, .bg-slate-950, .dark\\:bg-slate-900, .dark\\:bg-slate-950) {
+    background-color: var(--legacy-surface-3) !important;
+  }
+
+  .dark :is(.border-gray-100, .border-gray-200, .border-gray-300, .border-slate-100, .border-slate-200, .border-slate-300, .dark\\:border-slate-800, .dark\\:border-slate-900) {
+    border-color: var(--legacy-border-1) !important;
+  }
+
+  .dark :is(.text-gray-900, .text-gray-800, .text-gray-700, .text-slate-950, .text-slate-900, .text-slate-800, .text-slate-700) {
+    color: var(--legacy-text-strong) !important;
+  }
+
+  .dark :is(.text-gray-600, .text-slate-600) {
+    color: var(--legacy-text-body) !important;
+  }
+
+  .dark :is(.text-gray-500, .text-slate-500, .text-slate-400, .dark\\:text-slate-400, .dark\\:text-slate-300) {
+    color: var(--legacy-text-muted) !important;
+  }
+
+  .dark :is(.text-gray-400, .text-gray-300, .text-slate-300, .dark\\:text-slate-500) {
+    color: var(--legacy-text-faint) !important;
+  }
+
+  .dark .placeholder\\:text-gray-400::placeholder,
+  .dark .placeholder\\:text-slate-400::placeholder {
+    color: var(--legacy-text-faint) !important;
+  }
+
+  .dark :is(.hover\\:bg-gray-50:hover, .hover\\:bg-gray-100:hover, .hover\\:bg-gray-200:hover, .hover\\:bg-slate-50:hover, .hover\\:bg-slate-100:hover, .hover\\:bg-slate-900:hover, .dark\\:hover\\:bg-slate-800:hover, .dark\\:hover\\:bg-slate-900:hover) {
+    background-color: var(--legacy-surface-3) !important;
+  }
+
+  .dark :is(.hover\\:border-gray-200:hover, .hover\\:border-gray-300:hover, .hover\\:border-slate-200:hover, .hover\\:border-slate-300:hover) {
+    border-color: var(--legacy-border-1) !important;
+  }
+
+  .dark :is(.bg-blue-50, .bg-blue-100) {
+    background-color: var(--legacy-blue-surface) !important;
+  }
+
+  .dark :is(.border-blue-100, .border-blue-200, .border-blue-300) {
+    border-color: var(--legacy-blue-border) !important;
+  }
+
+  .dark :is(.text-blue-900, .text-blue-800, .text-blue-700, .text-blue-600) {
+    color: var(--legacy-blue-text) !important;
+  }
+
+  .dark :is(.bg-green-50, .bg-green-100) {
+    background-color: var(--legacy-green-surface) !important;
+  }
+
+  .dark :is(.border-green-200, .border-green-300) {
+    border-color: var(--legacy-green-border) !important;
+  }
+
+  .dark :is(.text-green-800, .text-green-700, .text-green-600) {
+    color: var(--legacy-green-text) !important;
+  }
+
+  .dark :is(.bg-amber-50, .bg-amber-100) {
+    background-color: var(--legacy-amber-surface) !important;
+  }
+
+  .dark :is(.border-amber-200, .border-amber-300) {
+    border-color: var(--legacy-amber-border) !important;
+  }
+
+  .dark :is(.text-amber-900, .text-amber-800, .text-amber-700, .text-amber-600) {
+    color: var(--legacy-amber-text) !important;
+  }
+
+  .dark :is(.bg-red-50, .bg-red-100) {
+    background-color: var(--legacy-red-surface) !important;
+  }
+
+  .dark :is(.border-red-200, .border-red-300) {
+    border-color: var(--legacy-red-border) !important;
+  }
+
+  .dark :is(.text-red-800, .text-red-700, .text-red-600, .text-red-500) {
+    color: var(--legacy-red-text) !important;
+  }
+
+  .dark .bg-purple-100 {
+    background-color: var(--legacy-purple-surface) !important;
+  }
+
+  .dark .text-purple-600 {
+    color: var(--legacy-purple-text) !important;
+  }
+
+  .dark .bg-orange-100 {
+    background-color: var(--legacy-orange-surface) !important;
+  }
+
+  .dark :is(.text-orange-600, .text-orange-500) {
+    color: var(--legacy-orange-text) !important;
   }
 
   /**

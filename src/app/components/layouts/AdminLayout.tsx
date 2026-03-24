@@ -227,8 +227,8 @@ export function AdminLayout() {
         title={compact ? label : undefined}
         className={`flex items-center gap-3 rounded-lg transition-colors ${
           isActive
-            ? "bg-blue-50 text-blue-600"
-            : "text-gray-700 hover:bg-gray-50"
+            ? "bg-blue-50 text-blue-600 dark:bg-blue-500/16 dark:text-blue-100 dark:ring-1 dark:ring-blue-400/25"
+            : "text-gray-700 hover:bg-gray-50 dark:text-slate-300 dark:hover:bg-[var(--shell-elevated)] dark:hover:text-slate-50"
         } ${paddingClass}`}
       >
         <item.icon className="h-5 w-5 flex-shrink-0" />
@@ -261,8 +261,8 @@ export function AdminLayout() {
             mobile ? "px-4 py-3" : sidebarCollapsed ? "justify-center px-3 py-3" : "px-6 py-3"
           } ${
             isActive || isExpanded
-              ? "bg-blue-50 text-blue-600"
-              : "text-gray-700 hover:bg-gray-50"
+              ? "bg-blue-50 text-blue-600 dark:bg-blue-500/16 dark:text-blue-100 dark:ring-1 dark:ring-blue-400/25"
+              : "text-gray-700 hover:bg-gray-50 dark:text-slate-300 dark:hover:bg-[var(--shell-elevated)] dark:hover:text-slate-50"
           }`}
           title={!mobile && sidebarCollapsed ? label : undefined}
         >
@@ -276,8 +276,8 @@ export function AdminLayout() {
           <div
             className={
               mobile
-                ? "ml-4 mt-1 space-y-1 border-l border-gray-200 pl-3"
-                : "ml-9 mt-1 space-y-1 border-l border-gray-200 pl-3"
+                ? "ml-4 mt-1 space-y-1 border-l border-gray-200 pl-3 dark:border-white/[0.08]"
+                : "ml-9 mt-1 space-y-1 border-l border-gray-200 pl-3 dark:border-white/[0.08]"
             }
           >
             {entry.children.map((child) =>
@@ -294,32 +294,32 @@ export function AdminLayout() {
   };
 
   return (
-    <div className="flex min-h-screen bg-gray-50">
+    <div className="flex min-h-screen bg-gray-50 text-gray-900 dark:bg-[var(--shell-background)] dark:text-slate-100">
       {mobileSidebarOpen ? (
         <button
           type="button"
           aria-label="Close navigation"
-          className="fixed inset-0 z-40 bg-black/40 lg:hidden"
+          className="fixed inset-0 z-40 bg-black/40 dark:bg-[var(--shell-overlay)] lg:hidden"
           onClick={() => setMobileSidebarOpen(false)}
         />
       ) : null}
 
       <aside
         data-legacy-i18n-ignore="true"
-        className={`fixed inset-y-0 left-0 z-50 flex w-72 max-w-[85vw] flex-col border-r border-gray-200 bg-white transition-transform duration-300 lg:hidden ${
+        className={`fixed inset-y-0 left-0 z-50 flex w-72 max-w-[85vw] flex-col border-r border-gray-200 bg-white transition-transform duration-300 dark:border-white/[0.08] dark:bg-[var(--shell-panel)] lg:hidden ${
           mobileSidebarOpen ? "translate-x-0" : "-translate-x-full"
         }`}
       >
-        <div className="flex h-16 items-center justify-between border-b border-gray-200 px-4">
+        <div className="flex h-16 items-center justify-between border-b border-gray-200 px-4 dark:border-white/[0.08]">
           <Link to="/" className="flex items-center gap-2">
             <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-600">
               <span className="text-lg font-bold text-white">E</span>
             </div>
-            <span className="text-xl font-bold text-gray-800">EduExam</span>
+            <span className="text-xl font-bold text-gray-800 dark:text-slate-100">EduExam</span>
           </Link>
           <button
             type="button"
-            className="rounded-lg p-2 text-gray-700 transition-colors hover:bg-gray-100"
+            className="rounded-lg p-2 text-gray-700 transition-colors hover:bg-gray-100 dark:text-slate-300 dark:hover:bg-[var(--shell-elevated)]"
             onClick={() => setMobileSidebarOpen(false)}
           >
             <X className="h-5 w-5" />
@@ -335,15 +335,15 @@ export function AdminLayout() {
         data-legacy-i18n-ignore="true"
         className={`${
           sidebarCollapsed ? "w-20" : "w-64"
-        } hidden border-r border-gray-200 bg-white transition-all duration-300 lg:flex lg:flex-col`}
+        } hidden border-r border-gray-200 bg-white transition-all duration-300 dark:border-white/[0.08] dark:bg-[var(--shell-panel)] lg:flex lg:flex-col`}
       >
-        <div className="flex h-16 items-center justify-between border-b border-gray-200 px-6">
+        <div className="flex h-16 items-center justify-between border-b border-gray-200 px-6 dark:border-white/[0.08]">
           {!sidebarCollapsed ? (
             <Link to="/" className="flex items-center gap-2">
               <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-600">
                 <span className="text-lg font-bold text-white">E</span>
               </div>
-              <span className="text-xl font-bold text-gray-800">EduExam</span>
+              <span className="text-xl font-bold text-gray-800 dark:text-slate-100">EduExam</span>
             </Link>
           ) : (
             <div className="mx-auto flex h-8 w-8 items-center justify-center rounded-lg bg-blue-600">
@@ -359,15 +359,15 @@ export function AdminLayout() {
         <button
           type="button"
           onClick={() => setSidebarCollapsed((previous) => !previous)}
-          className="border-t border-gray-200 p-4 transition-colors hover:bg-gray-50"
+          className="border-t border-gray-200 p-4 transition-colors hover:bg-gray-50 dark:border-white/[0.08] dark:hover:bg-[var(--shell-elevated)]"
         >
-          <Menu className="mx-auto h-5 w-5 text-gray-700" />
+          <Menu className="mx-auto h-5 w-5 text-gray-700 dark:text-slate-300" />
         </button>
       </aside>
 
       <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
         <header
-          className="border-b border-gray-200 bg-white px-4 py-3 sm:px-6"
+          className="border-b border-gray-200 bg-white px-4 py-3 dark:border-white/[0.08] dark:bg-[var(--shell-panel)] sm:px-6"
           data-legacy-i18n-ignore="true"
         >
           <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
@@ -381,22 +381,22 @@ export function AdminLayout() {
               </button>
               <div className="min-w-0">
                 <div className="hidden items-center gap-2 text-sm sm:flex">
-                  <span className="text-gray-500">{t("common:app.name")}</span>
-                  <span className="text-gray-300">/</span>
-                  <span className="font-medium text-gray-900">{currentLabel}</span>
+                  <span className="text-gray-500 dark:text-slate-400">{t("common:app.name")}</span>
+                  <span className="text-gray-300 dark:text-slate-600">/</span>
+                  <span className="font-medium text-gray-900 dark:text-slate-100">{currentLabel}</span>
                 </div>
                 <div className="sm:hidden">
-                  <p className="text-xs uppercase tracking-wide text-gray-500">{t("navigation:currentPage")}</p>
-                  <p className="truncate text-sm font-semibold text-gray-900">{currentLabel}</p>
+                  <p className="text-xs uppercase tracking-wide text-gray-500 dark:text-slate-400">{t("navigation:currentPage")}</p>
+                  <p className="truncate text-sm font-semibold text-gray-900 dark:text-slate-100">{currentLabel}</p>
                 </div>
               </div>
               <div className="hidden max-w-md flex-1 md:block">
                 <div className="relative">
-                  <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+                  <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400 dark:text-slate-500" />
                   <input
                     type="text"
                     placeholder={t("navigation:searchPlaceholder")}
-                    className="w-full rounded-lg border border-gray-300 py-2 pl-10 pr-4 focus:border-transparent focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full rounded-lg border border-gray-300 bg-white py-2 pl-10 pr-4 text-gray-900 focus:border-transparent focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-white/[0.08] dark:bg-[var(--shell-surface)] dark:text-slate-100 dark:placeholder:text-slate-500"
                   />
                 </div>
               </div>
@@ -404,8 +404,8 @@ export function AdminLayout() {
 
             <div className="flex items-center justify-between gap-3 sm:justify-end">
               <LanguageSwitcher />
-              <Link to="/notifications" className="relative rounded-lg p-2 transition-colors hover:bg-gray-100">
-                <Bell className="h-5 w-5 text-gray-700" />
+              <Link to="/notifications" className="relative rounded-lg p-2 transition-colors hover:bg-gray-100 dark:hover:bg-[var(--shell-elevated)]">
+                <Bell className="h-5 w-5 text-gray-700 dark:text-slate-300" />
                 {unreadCount > 0 ? (
                   <span className="absolute -right-1 -top-1 min-w-[1.1rem] rounded-full bg-red-500 px-1 text-center text-[10px] font-semibold text-white">
                     {unreadCount > 99 ? "99+" : unreadCount}
@@ -414,15 +414,15 @@ export function AdminLayout() {
               </Link>
 
               <DropdownMenu>
-                <DropdownMenuTrigger className="flex min-w-0 items-center gap-3 rounded-lg px-2 py-2 transition-colors hover:bg-gray-50 sm:px-3">
+                <DropdownMenuTrigger className="flex min-w-0 items-center gap-3 rounded-lg border border-transparent px-2 py-2 transition-colors hover:bg-gray-50 dark:border-white/[0.06] dark:bg-[var(--shell-surface)] dark:hover:bg-[var(--shell-elevated)] sm:px-3">
                   <Avatar className="h-8 w-8">
                     <AvatarFallback>{initials}</AvatarFallback>
                   </Avatar>
                   <div className="hidden min-w-0 text-left sm:block">
-                    <div className="truncate text-sm font-medium text-gray-900">{displayName}</div>
-                    <div className="truncate text-xs text-gray-500">{translatedRole}</div>
+                    <div className="truncate text-sm font-medium text-gray-900 dark:text-slate-100">{displayName}</div>
+                    <div className="truncate text-xs text-gray-500 dark:text-slate-400">{translatedRole}</div>
                   </div>
-                  <ChevronDown className="h-4 w-4 text-gray-500" />
+                  <ChevronDown className="h-4 w-4 text-gray-500 dark:text-slate-400" />
                 </DropdownMenuTrigger>
                 <DropdownMenuContent
                   align="end"
@@ -430,7 +430,7 @@ export function AdminLayout() {
                   data-legacy-i18n-ignore="true"
                 >
                   <DropdownMenuLabel>{t("navigation:myAccount")}</DropdownMenuLabel>
-                  <div className="px-2 pb-2 text-xs text-gray-500">{email}</div>
+                  <div className="px-2 pb-2 text-xs text-gray-500 dark:text-slate-400">{email}</div>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem asChild>
                     <Link to="/profile">{t("common:actions.profile")}</Link>
@@ -445,17 +445,17 @@ export function AdminLayout() {
 
           <div className="mt-3 md:hidden">
             <div className="relative">
-              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400 dark:text-slate-500" />
               <input
                 type="text"
                 placeholder={t("navigation:searchPlaceholder")}
-                className="w-full rounded-lg border border-gray-300 py-2 pl-10 pr-4 focus:border-transparent focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full rounded-lg border border-gray-300 bg-white py-2 pl-10 pr-4 text-gray-900 focus:border-transparent focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-white/[0.08] dark:bg-[var(--shell-surface)] dark:text-slate-100 dark:placeholder:text-slate-500"
               />
             </div>
           </div>
         </header>
 
-        <main className="flex-1 overflow-y-auto p-4 sm:p-6">
+        <main className="flex-1 overflow-y-auto p-4 dark:bg-[var(--shell-background)] sm:p-6">
           <Suspense fallback={<RouteContentLoader />}>
             <Outlet />
           </Suspense>

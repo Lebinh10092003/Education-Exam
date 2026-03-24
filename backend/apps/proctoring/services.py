@@ -12,7 +12,7 @@ from rest_framework.exceptions import PermissionDenied, ValidationError
 from apps.exam_authoring.models import Exam, ExamAssignment
 from apps.exam_delivery.models import ExamSession
 from apps.notifications.models import Notification
-from apps.notifications.services import create_notifications_for_permission
+from apps.notifications.services import create_notification, create_notifications_for_permission
 from apps.platform_core.audit import record_audit_event
 from apps.platform_core.i18n import t
 
@@ -261,6 +261,27 @@ def record_proctor_event(*, session, event_type, severity="info", metadata=None,
                 "event_id": event.id,
                 "event_type": event.event_type,
                 "severity": severity,
+            },
+        )
+        create_notification(
+            recipient=session.candidate,
+            title="Exam monitoring alert recorded",
+            message=(metadata or {}).get("message") or event.get_event_type_display(),
+            category=Notification.Category.ALERT,
+            priority=(
+                Notification.Priority.HIGH
+                if severity == ProctorEvent.Severity.CRITICAL
+                else Notification.Priority.MEDIUM
+            ),
+            action_url="/candidate/notifications",
+            metadata={
+                "session_id": session.id,
+                "exam_id": session.exam_id,
+                "candidate_id": session.candidate_id,
+                "event_id": event.id,
+                "event_type": event.event_type,
+                "severity": severity,
+                "audience": "candidate",
             },
         )
     _broadcast_exam_monitoring_update(

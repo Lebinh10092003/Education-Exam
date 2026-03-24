@@ -2,6 +2,7 @@ import { render, screen } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import i18n from "../i18n";
 import { PracticeReview } from "./PracticeReview";
 
 const mockApiRequest = vi.fn();
@@ -19,7 +20,8 @@ describe("PracticeReview", () => {
     vi.clearAllMocks();
   });
 
-  beforeEach(() => {
+  beforeEach(async () => {
+    await i18n.changeLanguage("en");
     mockApiRequest.mockImplementation(async (path: string) => {
       if (path === "/api/v1/practice/sessions/44/review/") {
         return {
