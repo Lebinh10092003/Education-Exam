@@ -6,6 +6,8 @@ from django.contrib.auth import get_user_model
 
 _NON_ALNUM_PATTERN = re.compile(r"[^a-z0-9]+")
 _MULTI_DOT_PATTERN = re.compile(r"\.+")
+STUDENT_SELF_SERVICE_ROLE_SLUGS = {"candidate", "student"}
+STAFF_ROLE_SLUGS = {"administrator", "examiner", "proctor"}
 
 
 def normalize_username_segment(value: str) -> str:
@@ -48,3 +50,12 @@ def ensure_unique_username(base: str, *, exclude_user_id: int | None = None) -> 
         if not queryset.exists():
             return lookup_value
         suffix += 1
+
+
+def is_student_self_service_locked(user) -> bool:
+    active_role_slugs = set(
+        user.user_roles.filter(is_active=True).values_list("role__slug", flat=True)
+    )
+    return bool(active_role_slugs & STUDENT_SELF_SERVICE_ROLE_SLUGS) and not bool(
+        active_role_slugs & STAFF_ROLE_SLUGS
+    )

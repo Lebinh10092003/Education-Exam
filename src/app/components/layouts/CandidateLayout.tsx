@@ -1,5 +1,6 @@
 import { Suspense, useEffect, useMemo, useState } from "react";
 import { Link, Outlet, useLocation } from "react-router";
+import { useTranslation } from "react-i18next";
 import {
   Award,
   Bell,
@@ -12,30 +13,38 @@ import {
   Play,
   User,
   X,
+  type LucideIcon,
 } from "lucide-react";
 
 import { useAuth } from "../../auth/useAuth";
 import { useAsyncList } from "../../hooks/useAsyncList";
 import { apiRequest, isApiError } from "../../lib/http";
 import { NOTIFICATION_STATE_CHANGED_EVENT } from "../../lib/notifications";
+import { LanguageSwitcher } from "../LanguageSwitcher";
 import { RouteContentLoader } from "../RouteContentLoader";
 import { Avatar, AvatarFallback } from "../ui/avatar";
 import { Badge } from "../ui/badge";
 import { Button } from "../ui/button";
 import { cn } from "../ui/utils";
 
-const primaryNavItems = [
-  { path: "/candidate", label: "Dashboard", icon: Home },
-  { path: "/candidate/exams", label: "My Exams", icon: FileText },
-  { path: "/candidate/practice", label: "Practice", icon: Play },
-  { path: "/candidate/materials", label: "Materials", icon: BookOpen },
-  { path: "/candidate/results", label: "Results", icon: Award },
-  { path: "/candidate/notifications", label: "Notifications", icon: Bell },
+type CandidateNavItem = {
+  path: string;
+  labelKey: string;
+  icon: LucideIcon;
+};
+
+const primaryNavItems: CandidateNavItem[] = [
+  { path: "/candidate", labelKey: "candidate.dashboard", icon: Home },
+  { path: "/candidate/exams", labelKey: "candidate.exams", icon: FileText },
+  { path: "/candidate/practice", labelKey: "candidate.practice", icon: Play },
+  { path: "/candidate/materials", labelKey: "candidate.materials", icon: BookOpen },
+  { path: "/candidate/results", labelKey: "candidate.results", icon: Award },
+  { path: "/candidate/notifications", labelKey: "candidate.notifications", icon: Bell },
 ];
 
-const secondaryNavItems = [
-  { path: "/candidate/help", label: "Help", icon: CircleHelp },
-  { path: "/candidate/profile", label: "Profile", icon: User },
+const secondaryNavItems: CandidateNavItem[] = [
+  { path: "/candidate/help", labelKey: "candidate.help", icon: CircleHelp },
+  { path: "/candidate/profile", labelKey: "candidate.profile", icon: User },
 ];
 
 const loadUnreadCount = async () => {
@@ -49,29 +58,30 @@ const loadUnreadCount = async () => {
   }
 };
 
-const findActiveLabel = (pathname: string) => {
+const findActiveLabelKey = (pathname: string) => {
   if (pathname === "/candidate" || pathname === "/candidate/dashboard") {
-    return "Dashboard";
+    return "candidate.dashboard";
   }
 
   const matchedPrimary = primaryNavItems.find(
     (item) => pathname === item.path || pathname.startsWith(`${item.path}/`),
   );
   if (matchedPrimary) {
-    return matchedPrimary.label;
+    return matchedPrimary.labelKey;
   }
 
   const matchedSecondary = secondaryNavItems.find(
     (item) => pathname === item.path || pathname.startsWith(`${item.path}/`),
   );
   if (matchedSecondary) {
-    return matchedSecondary.label;
+    return matchedSecondary.labelKey;
   }
 
-  return "Student Portal";
+  return "candidate.portal";
 };
 
 export function CandidateLayout() {
+  const { t } = useTranslation(["common", "navigation"]);
   const location = useLocation();
   const { logout, profile } = useAuth();
   const unreadCount = useAsyncList(loadUnreadCount, []);
@@ -86,10 +96,6 @@ export function CandidateLayout() {
     return () => window.removeEventListener(NOTIFICATION_STATE_CHANGED_EVENT, refreshUnreadCount);
   }, [unreadCount.reload]);
 
-  useEffect(() => {
-    setMobileSidebarOpen(false);
-  }, [location.pathname]);
-
   if (
     location.pathname.startsWith("/candidate/exam/") ||
     location.pathname.startsWith("/candidate/practice/sessions/")
@@ -101,7 +107,7 @@ export function CandidateLayout() {
     );
   }
 
-  const displayName = profile?.full_name?.trim() || profile?.email || "Candidate";
+  const displayName = profile?.full_name?.trim() || t("common:fallback.candidateUser");
   const schoolName = profile?.school?.name ?? "";
   const initials =
     displayName
@@ -110,7 +116,8 @@ export function CandidateLayout() {
       .slice(0, 2)
       .map((part) => part[0]?.toUpperCase())
       .join("") || "ST";
-  const activeLabel = useMemo(() => findActiveLabel(location.pathname), [location.pathname]);
+  const activeLabelKey = useMemo(() => findActiveLabelKey(location.pathname), [location.pathname]);
+  const activeLabel = t(activeLabelKey, { ns: "navigation" });
 
   const isActive = (path: string) => {
     if (path === "/candidate") {
@@ -120,11 +127,12 @@ export function CandidateLayout() {
   };
 
   const renderNavLink = (
-    item: { path: string; label: string; icon: typeof Home },
+    item: CandidateNavItem,
     options: { compact?: boolean } = {},
   ) => {
     const active = isActive(item.path);
     const badgeValue = item.path === "/candidate/notifications" ? unreadCount.data?.unread_count ?? 0 : 0;
+    const label = t(item.labelKey, { ns: "navigation" });
 
     return (
       <Link
@@ -134,12 +142,12 @@ export function CandidateLayout() {
           "flex items-center gap-3 rounded-2xl px-3 py-3 text-sm font-medium transition-colors",
           active
             ? "bg-blue-600 text-white shadow-sm"
-            : "text-slate-700 hover:bg-slate-100 hover:text-slate-950",
+            : "text-slate-700 hover:bg-slate-100 hover:text-slate-950 dark:text-slate-300 dark:hover:bg-slate-900 dark:hover:text-slate-50",
           options.compact ? "px-4" : "",
         )}
       >
         <item.icon className="h-4 w-4 shrink-0" />
-        <span className="truncate">{item.label}</span>
+        <span className="truncate">{label}</span>
         {badgeValue > 0 ? (
           <Badge className={cn(
             "ml-auto min-w-5 rounded-full px-1.5 py-0 text-[11px]",
@@ -153,7 +161,7 @@ export function CandidateLayout() {
   };
 
   return (
-    <div className="flex min-h-screen bg-[linear-gradient(180deg,#eff6ff_0%,#f8fafc_14%,#f8fafc_100%)]">
+    <div className="flex min-h-screen bg-[linear-gradient(180deg,#eff6ff_0%,#f8fafc_14%,#f8fafc_100%)] text-slate-900 dark:bg-[linear-gradient(180deg,#020617_0%,#0f172a_18%,#020617_100%)] dark:text-slate-100">
       {mobileSidebarOpen ? (
         <button
           type="button"
@@ -164,23 +172,26 @@ export function CandidateLayout() {
       ) : null}
 
       <aside
-        className={`fixed inset-y-0 left-0 z-50 flex w-72 max-w-[85vw] flex-col border-r border-slate-200 bg-white transition-transform duration-300 lg:hidden ${
+        className={`fixed inset-y-0 left-0 z-50 flex w-72 max-w-[85vw] flex-col border-r border-slate-200 bg-white transition-transform duration-300 dark:border-slate-800 dark:bg-slate-950 lg:hidden ${
           mobileSidebarOpen ? "translate-x-0" : "-translate-x-full"
         }`}
       >
-        <div className="flex h-16 items-center justify-between border-b border-slate-200 px-4">
+        <div className="flex h-16 items-center justify-between border-b border-slate-200 px-4 dark:border-slate-800">
           <Link to="/candidate" className="flex items-center gap-3">
             <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-blue-600 shadow-sm">
               <span className="text-lg font-bold text-white">E</span>
             </div>
             <div>
-              <p className="text-base font-semibold text-slate-950">EduExam</p>
-              <p className="text-[11px] uppercase tracking-[0.22em] text-slate-500">Student Portal</p>
+              <p className="text-base font-semibold text-slate-950 dark:text-slate-100">EduExam</p>
+              <p className="text-[11px] uppercase tracking-[0.22em] text-slate-500 dark:text-slate-400">
+                {t("candidate.portal", { ns: "navigation" })}
+              </p>
             </div>
           </Link>
           <button
             type="button"
-            className="rounded-xl p-2 text-slate-600 transition-colors hover:bg-slate-100"
+            aria-label="Close navigation panel"
+            className="rounded-xl p-2 text-slate-600 transition-colors hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-900"
             onClick={() => setMobileSidebarOpen(false)}
           >
             <X className="h-5 w-5" />
@@ -198,40 +209,43 @@ export function CandidateLayout() {
             {primaryNavItems.map((item) => renderNavLink(item, { compact: true }))}
           </div>
 
-          <div className="mt-6 border-t border-slate-200 pt-4">
-            <p className="px-4 text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-400">Account</p>
+          <div className="mt-6 border-t border-slate-200 pt-4 dark:border-slate-800">
+            <p className="px-4 text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-400 dark:text-slate-500">
+              {t("candidate.account", { ns: "navigation" })}
+            </p>
             <div className="mt-2 space-y-1">
               {secondaryNavItems.map((item) => renderNavLink(item, { compact: true }))}
             </div>
           </div>
         </div>
 
-        <div className="border-t border-slate-200 p-4">
-          <div className="mb-3 flex items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-3">
+        <div className="border-t border-slate-200 p-4 dark:border-slate-800">
+          <div className="mb-3 flex items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-3 dark:border-slate-800 dark:bg-slate-900">
             <Avatar className="h-10 w-10">
               <AvatarFallback>{initials}</AvatarFallback>
             </Avatar>
             <div className="min-w-0">
-              <p className="truncate text-sm font-medium text-slate-900">{displayName}</p>
-              <p className="truncate text-xs text-slate-500">{profile?.email ?? ""}</p>
+              <p className="truncate text-sm font-medium text-slate-900 dark:text-slate-100">{displayName}</p>
             </div>
           </div>
           <Button className="w-full" variant="outline" onClick={logout}>
             <LogOut className="h-4 w-4" />
-            Logout
+            {t("common:actions.logout")}
           </Button>
         </div>
       </aside>
 
-      <aside className="hidden w-72 shrink-0 border-r border-slate-200 bg-white lg:flex lg:flex-col">
-        <div className="border-b border-slate-200 px-6 py-5">
+      <aside className="hidden w-72 shrink-0 border-r border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-950 lg:flex lg:flex-col">
+        <div className="border-b border-slate-200 px-6 py-5 dark:border-slate-800">
           <Link to="/candidate" className="flex items-center gap-3">
             <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-blue-600 shadow-sm">
               <span className="text-lg font-bold text-white">E</span>
             </div>
             <div>
-              <p className="text-lg font-semibold text-slate-950">EduExam</p>
-              <p className="text-[11px] uppercase tracking-[0.24em] text-slate-500">Student Portal</p>
+              <p className="text-lg font-semibold text-slate-950 dark:text-slate-100">EduExam</p>
+              <p className="text-[11px] uppercase tracking-[0.24em] text-slate-500 dark:text-slate-400">
+                {t("candidate.portal", { ns: "navigation" })}
+              </p>
             </div>
           </Link>
           {schoolName ? (
@@ -246,65 +260,69 @@ export function CandidateLayout() {
             {primaryNavItems.map((item) => renderNavLink(item))}
           </div>
 
-          <div className="mt-6 border-t border-slate-200 pt-4">
-            <p className="px-3 text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-400">Account</p>
+          <div className="mt-6 border-t border-slate-200 pt-4 dark:border-slate-800">
+            <p className="px-3 text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-400 dark:text-slate-500">
+              {t("candidate.account", { ns: "navigation" })}
+            </p>
             <div className="mt-2 space-y-1">
               {secondaryNavItems.map((item) => renderNavLink(item))}
             </div>
           </div>
         </div>
 
-        <div className="border-t border-slate-200 p-4">
-          <div className="mb-3 flex items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-3">
+        <div className="border-t border-slate-200 p-4 dark:border-slate-800">
+          <div className="mb-3 flex items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-3 dark:border-slate-800 dark:bg-slate-900">
             <Avatar className="h-10 w-10">
               <AvatarFallback>{initials}</AvatarFallback>
             </Avatar>
             <div className="min-w-0">
-              <p className="truncate text-sm font-medium text-slate-900">{displayName}</p>
-              <p className="truncate text-xs text-slate-500">{profile?.email ?? ""}</p>
+              <p className="truncate text-sm font-medium text-slate-900 dark:text-slate-100">{displayName}</p>
             </div>
           </div>
           <Button className="w-full" variant="outline" onClick={logout}>
             <LogOut className="h-4 w-4" />
-            Logout
+            {t("common:actions.logout")}
           </Button>
         </div>
       </aside>
 
       <div className="flex min-w-0 flex-1 flex-col">
-        <header className="border-b border-slate-200/80 bg-white/95 px-4 py-4 backdrop-blur sm:px-6">
+        <header className="border-b border-slate-200/80 bg-white/95 px-4 py-4 backdrop-blur dark:border-slate-800/80 dark:bg-slate-950/95 sm:px-6">
           <div className="flex items-center justify-between gap-4">
             <div className="flex min-w-0 items-center gap-3">
               <button
                 type="button"
-                className="rounded-xl p-2 text-slate-600 transition-colors hover:bg-slate-100 lg:hidden"
+                aria-label="Open navigation"
+                className="rounded-xl p-2 text-slate-600 transition-colors hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-900 lg:hidden"
                 onClick={() => setMobileSidebarOpen(true)}
               >
                 <Menu className="h-5 w-5" />
               </button>
               <div className="min-w-0">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-400">Current Section</p>
-                <p className="truncate text-lg font-semibold text-slate-950">{activeLabel}</p>
+                <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-400 dark:text-slate-500">
+                  {t("currentSection", { ns: "navigation" })}
+                </p>
+                <p className="truncate text-lg font-semibold text-slate-950 dark:text-slate-100">{activeLabel}</p>
               </div>
             </div>
 
             <div className="flex items-center gap-3">
+              <LanguageSwitcher />
               {!isActive("/candidate/notifications") && (unreadCount.data?.unread_count ?? 0) > 0 ? (
                 <Link
                   to="/candidate/notifications"
-                  className="inline-flex items-center gap-2 rounded-full border border-red-200 bg-red-50 px-3 py-2 text-sm font-medium text-red-700"
+                  className="inline-flex items-center gap-2 rounded-full border border-red-200 bg-red-50 px-3 py-2 text-sm font-medium text-red-700 dark:border-red-900/60 dark:bg-red-950/70 dark:text-red-200"
                 >
                   <Bell className="h-4 w-4" />
                   {unreadCount.data?.unread_count}
                 </Link>
               ) : null}
-              <div className="hidden items-center gap-3 rounded-full border border-slate-200 bg-white px-3 py-1.5 sm:flex">
+              <div className="hidden items-center gap-3 rounded-full border border-slate-200 bg-white px-3 py-1.5 dark:border-slate-800 dark:bg-slate-900 sm:flex">
                 <Avatar className="h-9 w-9">
                   <AvatarFallback>{initials}</AvatarFallback>
                 </Avatar>
                 <div className="min-w-0">
-                  <p className="truncate text-sm font-medium text-slate-900">{displayName}</p>
-                  <p className="truncate text-xs text-slate-500">{profile?.email ?? ""}</p>
+                  <p className="truncate text-sm font-medium text-slate-900 dark:text-slate-100">{displayName}</p>
                 </div>
               </div>
             </div>

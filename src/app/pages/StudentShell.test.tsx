@@ -1,10 +1,12 @@
-import { render, screen } from "@testing-library/react";
+import { cleanup, render, screen } from "@testing-library/react";
 import type { ContextType } from "react";
-import { MemoryRouter } from "react-router";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { MemoryRouter, Route, Routes } from "react-router";
+import userEvent from "@testing-library/user-event";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { AuthContext, type AuthProfile } from "../auth/AuthContext";
 import { CandidateLayout } from "../components/layouts/CandidateLayout";
+import i18n from "../i18n";
 
 type AuthContextValue = NonNullable<ContextType<typeof AuthContext>>;
 
@@ -38,7 +40,12 @@ const buildAuthValue = (overrides: Partial<AuthContextValue> = {}): AuthContextV
 });
 
 describe("CandidateLayout", () => {
+  beforeEach(async () => {
+    await i18n.changeLanguage("en");
+  });
+
   afterEach(() => {
+    cleanup();
     vi.clearAllMocks();
   });
 
@@ -46,7 +53,9 @@ describe("CandidateLayout", () => {
     render(
       <AuthContext.Provider value={buildAuthValue()}>
         <MemoryRouter initialEntries={["/candidate/dashboard"]}>
-          <CandidateLayout />
+          <Routes>
+            <Route path="/candidate/*" element={<CandidateLayout />} />
+          </Routes>
         </MemoryRouter>
       </AuthContext.Provider>,
     );
@@ -57,5 +66,31 @@ describe("CandidateLayout", () => {
     expect(screen.getAllByText("Help").length).toBeGreaterThan(0);
     expect(screen.getAllByText("EduExam Academy").length).toBeGreaterThan(0);
     expect(screen.getByText("Current Section")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "EN" })).toBeInTheDocument();
+  });
+
+  it("keeps the mobile navigation drawer open while switching candidate menu items", async () => {
+    const user = userEvent.setup();
+
+    render(
+      <AuthContext.Provider value={buildAuthValue()}>
+        <MemoryRouter initialEntries={["/candidate/dashboard"]}>
+          <Routes>
+            <Route path="/candidate/*" element={<CandidateLayout />} />
+          </Routes>
+        </MemoryRouter>
+      </AuthContext.Provider>,
+    );
+
+    await user.click(screen.getByLabelText("Open navigation"));
+    expect(screen.getByLabelText("Close navigation")).toBeInTheDocument();
+    expect(screen.getAllByText("Candidate User").length).toBeGreaterThan(0);
+    expect(screen.queryByText("candidate@example.com")).not.toBeInTheDocument();
+
+    await user.click(screen.getAllByRole("link", { name: "Materials" })[0]);
+
+    expect(screen.getByLabelText("Close navigation")).toBeInTheDocument();
+    expect(screen.getAllByText("Candidate User").length).toBeGreaterThan(0);
+    expect(screen.queryByText("candidate@example.com")).not.toBeInTheDocument();
   });
 });

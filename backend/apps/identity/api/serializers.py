@@ -5,6 +5,7 @@ from drf_spectacular.utils import extend_schema_field
 from django.contrib.auth.password_validation import validate_password
 
 from apps.identity.models import Permission, Profile, Role, User
+from apps.identity.utils import is_student_self_service_locked
 from apps.institutions.models import School
 from apps.platform_core.i18n import t
 
@@ -57,6 +58,7 @@ class SchoolSummarySerializer(serializers.Serializer):
 
 class ProfileSerializer(serializers.ModelSerializer):
     username = serializers.CharField(read_only=True)
+    email = serializers.SerializerMethodField()
     phone_number = serializers.SerializerMethodField()
     school = serializers.SerializerMethodField()
     roles = serializers.SerializerMethodField()
@@ -76,6 +78,13 @@ class ProfileSerializer(serializers.ModelSerializer):
             "roles",
             "avatar_url",
         )
+
+    def get_email(self, obj) -> str:
+        request = self.context.get("request")
+        request_user = getattr(request, "user", None)
+        if request_user is not None and request_user.pk == obj.pk and is_student_self_service_locked(obj):
+            return ""
+        return obj.email
 
     def get_phone_number(self, obj) -> str:
         profile = getattr(obj, "profile", None)

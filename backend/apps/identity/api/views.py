@@ -10,6 +10,7 @@ from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 from apps.identity.models import Permission, Role, User, UserRole
 from apps.identity.permissions import HasAPIPermissionCode
 from apps.identity.services import request_password_reset, reset_password_with_token
+from apps.identity.utils import is_student_self_service_locked
 from apps.platform_core.audit import record_audit_event
 from apps.platform_core.i18n import t
 
@@ -60,6 +61,16 @@ class ProfileView(generics.RetrieveUpdateAPIView):
 
     def update(self, request, *args, **kwargs):
         user = self.get_object()
+        if is_student_self_service_locked(user):
+            return Response(
+                {
+                    "detail": t(
+                        vi="Thông tin đăng ký của học sinh được khóa theo danh sách đã import.",
+                        en="Student registration details are locked to the imported roster.",
+                    )
+                },
+                status=status.HTTP_403_FORBIDDEN,
+            )
         serializer = self.get_serializer(user, data=request.data, partial=request.method == "PATCH")
         serializer.is_valid(raise_exception=True)
         serializer.save()
