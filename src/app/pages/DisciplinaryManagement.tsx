@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Link } from "react-router";
 import { Download, ExternalLink, Search, Shield } from "lucide-react";
 
@@ -14,11 +15,14 @@ import { apiRequest, type PaginatedResponse } from "../lib/http";
 import { notify } from "../lib/notify";
 import {
   type DisciplinaryExamSummaryRecord,
+  formatCertificateStatus,
   downloadDisciplineWorkbook,
   formatDisciplineDate,
+  formatResultSyncStatus,
 } from "./disciplineShared";
 
 export function DisciplinaryManagement() {
+  const { t } = useTranslation("common");
   const [searchQuery, setSearchQuery] = useState("");
   const debouncedSearch = useDebouncedValue(searchQuery, 250);
   const mutation = useMutationState();
@@ -46,17 +50,17 @@ export function DisciplinaryManagement() {
           `eduexam-discipline-summary-exam-${exam.id}.xlsx`,
         ),
       );
-      notify.success("Disciplinary summary exported.");
+      notify.success(t("discipline.overview.exportSuccess"));
     } catch (error) {
-      notify.error(error instanceof Error ? error.message : "Unable to export disciplinary summary.");
+      notify.error(error instanceof Error ? error.message : t("discipline.overview.exportError"));
     }
   };
 
   return (
     <div>
       <PageHeader
-        title="Discipline & Certificates"
-        description="Review violating candidates by exam, apply penalties, and keep certificates aligned with penalized scores."
+        title={t("discipline.overview.pageTitle")}
+        description={t("discipline.overview.pageDescription")}
       />
 
       {(examList.error || mutation.error) ? (
@@ -72,7 +76,7 @@ export function DisciplinaryManagement() {
             <Input
               value={searchQuery}
               onChange={(event) => setSearchQuery(event.target.value)}
-              placeholder="Search by exam or subject..."
+              placeholder={t("discipline.overview.searchPlaceholder")}
               className="pl-10"
             />
           </div>
@@ -83,26 +87,26 @@ export function DisciplinaryManagement() {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Shield className="h-5 w-5 text-amber-600" />
-            Exam Discipline Summary
+            {t("discipline.overview.tableTitle")}
           </CardTitle>
         </CardHeader>
         <CardContent className="p-0">
           {examList.isLoading ? (
-            <div className="px-6 py-12 text-center text-sm text-gray-500">Loading disciplinary exams...</div>
+            <div className="px-6 py-12 text-center text-sm text-gray-500">{t("discipline.overview.loading")}</div>
           ) : filteredExams.length ? (
             <div className="overflow-x-auto">
               <table className="w-full min-w-[980px]">
                 <thead>
                   <tr className="border-b border-gray-200 bg-slate-50 text-left text-xs uppercase tracking-wide text-gray-500">
-                    <th className="px-4 py-3 font-semibold">Exam</th>
-                    <th className="px-4 py-3 font-semibold">Violating Candidates</th>
-                    <th className="px-4 py-3 font-semibold">Cases</th>
-                    <th className="px-4 py-3 font-semibold">Approved</th>
-                    <th className="px-4 py-3 font-semibold">Pending</th>
-                    <th className="px-4 py-3 font-semibold">Result Sync</th>
-                    <th className="px-4 py-3 font-semibold">Certificate</th>
-                    <th className="px-4 py-3 font-semibold">Last Updated</th>
-                    <th className="px-4 py-3 font-semibold">Actions</th>
+                    <th className="px-4 py-3 font-semibold">{t("discipline.overview.columns.exam")}</th>
+                    <th className="px-4 py-3 font-semibold">{t("discipline.overview.columns.violatingCandidates")}</th>
+                    <th className="px-4 py-3 font-semibold">{t("discipline.overview.columns.cases")}</th>
+                    <th className="px-4 py-3 font-semibold">{t("discipline.overview.columns.approved")}</th>
+                    <th className="px-4 py-3 font-semibold">{t("discipline.overview.columns.pending")}</th>
+                    <th className="px-4 py-3 font-semibold">{t("discipline.overview.columns.resultSync")}</th>
+                    <th className="px-4 py-3 font-semibold">{t("discipline.overview.columns.certificate")}</th>
+                    <th className="px-4 py-3 font-semibold">{t("discipline.overview.columns.lastUpdated")}</th>
+                    <th className="px-4 py-3 font-semibold">{t("discipline.overview.columns.actions")}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -117,11 +121,11 @@ export function DisciplinaryManagement() {
                       <td className="px-4 py-4 text-sm text-gray-700">{exam.approved_records}</td>
                       <td className="px-4 py-4 text-sm text-gray-700">{exam.pending_review_count}</td>
                       <td className="px-4 py-4">
-                        <Badge variant="outline">{exam.result_sync_status}</Badge>
+                        <Badge variant="outline">{formatResultSyncStatus(exam.result_sync_status)}</Badge>
                       </td>
                       <td className="px-4 py-4">
                         <Badge variant={exam.certificate_status === "configured" ? "default" : "outline"}>
-                          {exam.certificate_status}
+                          {formatCertificateStatus(exam.certificate_status)}
                         </Badge>
                       </td>
                       <td className="px-4 py-4 text-sm text-gray-600">{formatDisciplineDate(exam.last_updated)}</td>
@@ -130,7 +134,7 @@ export function DisciplinaryManagement() {
                           <Button size="sm" variant="outline" asChild>
                             <Link to={`/discipline/exams/${exam.id}`}>
                               <ExternalLink className="mr-2 h-4 w-4" />
-                              Open Sheet
+                              {t("discipline.overview.openSheet")}
                             </Link>
                           </Button>
                           <Button size="sm" variant="ghost" onClick={() => void exportExam(exam)}>
@@ -145,7 +149,7 @@ export function DisciplinaryManagement() {
             </div>
           ) : (
             <div className="px-6 py-12 text-center text-sm text-gray-500">
-              No exams with disciplinary data matched the current search.
+              {t("discipline.overview.empty")}
             </div>
           )}
         </CardContent>

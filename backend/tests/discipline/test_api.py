@@ -112,5 +112,30 @@ def test_admin_can_export_exam_disciplinary_summary_to_excel(
     assert response.status_code == 200
     workbook = load_workbook(BytesIO(response.content))
     sheet = workbook.active
-    assert sheet.title == "Disciplinary Summary"
+    assert sheet.title == "Tổng hợp kỷ luật"
     assert sheet["A2"].value == exam.name
+
+
+@pytest.mark.django_db
+def test_case_api_localizes_existing_case_title_and_summary_for_vietnamese_locale(
+    api_client,
+    admin_token,
+    subject,
+    admin_user,
+    candidate_user,
+):
+    exam = _build_exam(subject=subject, admin_user=admin_user, candidates=[candidate_user], max_attempts=1)
+    session = _submit_attempt(exam=exam, candidate=candidate_user, correct_count=1)
+    _create_violation_case(
+        session=session,
+        candidate=candidate_user,
+        message="Candidate exited fullscreen during a protected exam.",
+    )
+
+    api_client.credentials(HTTP_AUTHORIZATION=f"Bearer {admin_token}", HTTP_ACCEPT_LANGUAGE="vi")
+    response = api_client.get(f"/api/v1/discipline/exams/{exam.id}/cases/")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["results"][0]["title"] == "Thoát toàn màn hình"
+    assert payload["results"][0]["summary"] == "Thí sinh đã thoát chế độ toàn màn hình trong một kỳ thi được bảo vệ."

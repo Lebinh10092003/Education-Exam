@@ -3,6 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import i18n from "../i18n";
 import { DisciplinaryExamSheet } from "./DisciplinaryExamSheet";
 
 const mockApiRequest = vi.fn();
@@ -173,7 +174,9 @@ vi.mock("../lib/notify", () => ({
 }));
 
 describe("DisciplinaryExamSheet", () => {
-  beforeEach(() => {
+  beforeEach(async () => {
+    window.localStorage.clear();
+    await i18n.changeLanguage("vi");
     const state = createState();
 
     mockApiRequest.mockImplementation(async (path: string, options?: { method?: string; body?: Record<string, unknown> }) => {
@@ -246,16 +249,16 @@ describe("DisciplinaryExamSheet", () => {
   it("renders original score, penalty percent, and penalized score columns", async () => {
     renderPage();
 
-    expect(await screen.findByRole("heading", { name: /mathematics mock exam discipline sheet/i })).toBeInTheDocument();
-    expect(screen.getByText("Original Score")).toBeInTheDocument();
-    expect(screen.getByText("Penalty %")).toBeInTheDocument();
-    expect(screen.getByText("Penalized Score")).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: /bảng xử lý kỷ luật mathematics mock exam/i })).toBeInTheDocument();
+    expect(screen.getByText("Điểm gốc")).toBeInTheDocument();
+    expect(screen.getByText("Mức phạt %")).toBeInTheDocument();
+    expect(screen.getByText("Điểm sau phạt")).toBeInTheDocument();
     const candidateCell = screen.getByText("Nguyen Ngoc Em");
     const row = candidateCell.closest("tr");
     expect(row).not.toBeNull();
     expect(within(row as HTMLTableRowElement).getAllByText("80.00 (80.00%)").length).toBe(2);
     expect(within(row as HTMLTableRowElement).getByText("0.00%")).toBeInTheDocument();
-    expect(within(row as HTMLTableRowElement).getByText("Silver")).toBeInTheDocument();
+    expect(within(row as HTMLTableRowElement).getByText("Bạc")).toBeInTheDocument();
   });
 
   it("supports inline editing of draft penalties and single-row approval", async () => {
@@ -263,11 +266,13 @@ describe("DisciplinaryExamSheet", () => {
 
     renderPage();
 
-    await user.click(await screen.findByRole("button", { name: /toggle cases for nguyen ngoc em/i }));
-    const input = await screen.findByLabelText(/penalty percent for case 51/i);
+    await user.click(await screen.findByRole("button", { name: /mở hoặc đóng danh sách case của nguyen ngoc em/i }));
+    expect(await screen.findByText("Chuyển tab")).toBeInTheDocument();
+    expect(screen.getByText("Thí sinh đã chuyển sang tab khác khỏi bài thi.")).toBeInTheDocument();
+    const input = await screen.findByLabelText(/mức phạt cho case 51/i);
     await user.clear(input);
     await user.type(input, "25");
-    await user.click(screen.getByRole("button", { name: /^approve$/i }));
+    await user.click(screen.getByRole("button", { name: /^duyệt$/i }));
 
     await waitFor(() => {
       expect(mockApiRequest).toHaveBeenCalledWith(
@@ -290,13 +295,13 @@ describe("DisciplinaryExamSheet", () => {
 
     renderPage();
 
-    await user.click(await screen.findByRole("button", { name: /toggle cases for nguyen ngoc em/i }));
-    await user.click(await screen.findByLabelText(/select case 51/i));
+    await user.click(await screen.findByRole("button", { name: /mở hoặc đóng danh sách case của nguyen ngoc em/i }));
+    await user.click(await screen.findByLabelText(/chọn case 51/i));
 
-    const bulkInput = screen.getByLabelText(/bulk penalty percent/i);
+    const bulkInput = screen.getByLabelText(/mức phạt hàng loạt/i);
     await user.clear(bulkInput);
     await user.type(bulkInput, "40");
-    await user.click(screen.getByRole("button", { name: /approve selected/i }));
+    await user.click(screen.getByRole("button", { name: /duyệt đã chọn/i }));
 
     await waitFor(() => {
       expect(mockApiRequest).toHaveBeenCalledWith(

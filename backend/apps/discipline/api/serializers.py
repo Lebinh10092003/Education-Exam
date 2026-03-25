@@ -3,6 +3,7 @@ from rest_framework import serializers
 from apps.grading.api.serializers import ResultExamSummarySerializer, ResultUserSummarySerializer
 
 from ..models import ExamCertificateAward, ExamCertificatePolicy, ExamDisciplinaryRecord, ViolationPenaltyProposal
+from ..presentation import localize_discipline_case_summary, localize_discipline_case_title
 
 
 class DisciplinaryExamSummarySerializer(serializers.Serializer):
@@ -98,13 +99,13 @@ class ExamDisciplinaryRecordSerializer(serializers.ModelSerializer):
 
 class DisciplinaryCaseSerializer(serializers.Serializer):
     id = serializers.IntegerField()
-    session_id = serializers.IntegerField(source="session_id")
+    session_id = serializers.IntegerField()
     candidate = ResultUserSummarySerializer(source="session.candidate", read_only=True)
     exam = serializers.SerializerMethodField()
     severity = serializers.CharField()
     status = serializers.CharField()
-    title = serializers.CharField()
-    summary = serializers.CharField()
+    title = serializers.SerializerMethodField()
+    summary = serializers.SerializerMethodField()
     created_at = serializers.DateTimeField()
     evidence_count = serializers.SerializerMethodField()
     proposal = ViolationPenaltyProposalSerializer(source="penalty_proposal", allow_null=True, read_only=True)
@@ -119,6 +120,12 @@ class DisciplinaryCaseSerializer(serializers.Serializer):
             "name": exam.name,
             "subject_name": exam.subject.name,
         }
+
+    def get_title(self, obj):
+        return localize_discipline_case_title(obj.title)
+
+    def get_summary(self, obj):
+        return localize_discipline_case_summary(obj.summary)
 
 
 class PenaltyProposalMutationSerializer(serializers.Serializer):

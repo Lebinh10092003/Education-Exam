@@ -648,6 +648,12 @@ const EXTRA_VI_EXACT_TRANSLATIONS: Record<string, string> = {
   "Candidate exited fullscreen mode.": "Thí sinh đã thoát chế độ toàn màn hình.",
   "Candidate exited fullscreen during a protected exam.":
     "Thí sinh đã thoát chế độ toàn màn hình trong một kỳ thi được bảo vệ.",
+  "Tab Switch": "Chuyển tab",
+  "Fullscreen Exit": "Thoát toàn màn hình",
+  "Connection Unstable": "Kết nối không ổn định",
+  "Webcam Capture": "Ghi nhận webcam",
+  "Screen Capture": "Ghi nhận màn hình",
+  "Manual Alert": "Cảnh báo thủ công",
   "Candidate switched away from the exam tab once.":
     "Thí sinh đã chuyển sang tab khác khỏi bài thi một lần.",
   "Candidate switched away from the exam tab.":

@@ -69,9 +69,11 @@ const isPathActive = (path: string, location: NavLocation) => {
 };
 
 const isExamMonitoringHubActive = (location: NavLocation) => location.pathname === "/exams/monitoring";
+const isDisciplineActive = (location: NavLocation) =>
+  location.pathname === "/discipline" || location.pathname.startsWith("/discipline/");
 
 const isExamListActive = (location: NavLocation) => {
-  if (isExamMonitoringHubActive(location)) {
+  if (isExamMonitoringHubActive(location) || isDisciplineActive(location)) {
     return false;
   }
 
@@ -92,7 +94,7 @@ const navEntries: NavEntry[] = [
     type: "group",
     icon: FileCheck,
     labelKey: "admin.exams",
-    isActive: (location) => isExamListActive(location) || isExamMonitoringHubActive(location),
+    isActive: (location) => isExamListActive(location) || isExamMonitoringHubActive(location) || isDisciplineActive(location),
     children: [
       {
         type: "item",
@@ -108,12 +110,18 @@ const navEntries: NavEntry[] = [
         path: "/exams/monitoring",
         isActive: isExamMonitoringHubActive,
       },
+      {
+        type: "item",
+        icon: Shield,
+        labelKey: "admin.discipline",
+        path: "/discipline",
+        isActive: isDisciplineActive,
+      },
     ],
   },
   { type: "item", icon: GraduationCap, labelKey: "admin.manualGrading", path: "/manual-grading" },
   { type: "item", icon: BookMarked, labelKey: "admin.materials", path: "/materials" },
   { type: "item", icon: BarChart3, labelKey: "admin.results", path: "/results" },
-  { type: "item", icon: Shield, labelKey: "admin.discipline", path: "/discipline" },
   { type: "item", icon: Shield, labelKey: "admin.roles", path: "/roles-permissions" },
   { type: "item", icon: Bell, labelKey: "admin.notifications", path: "/notifications" },
   { type: "item", icon: Activity, labelKey: "admin.audit", path: "/audit" },

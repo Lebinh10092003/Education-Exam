@@ -8,6 +8,7 @@ from rest_framework.views import APIView
 
 from apps.exam_authoring.models import Exam
 from apps.identity.permissions import HasAPIPermissionCode
+from apps.platform_core.i18n import t
 from apps.proctoring.models import ViolationCase
 
 from ..exporters import (
@@ -166,7 +167,15 @@ class CasePenaltyApproveView(APIView):
                 request=request,
             )
         elif proposal is None:
-            return Response({"detail": "Penalty proposal is required before approval."}, status=status.HTTP_400_BAD_REQUEST)
+            return Response(
+                {
+                    "detail": t(
+                        vi="Cần có đề xuất mức phạt trước khi duyệt.",
+                        en="Penalty proposal is required before approval.",
+                    )
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
         approve_penalty_proposal(proposal=proposal, approved_by=request.user, request=request)
         return Response({"status": proposal.status})
 
@@ -179,7 +188,15 @@ class CasePenaltyRejectView(APIView):
         case = generics.get_object_or_404(ViolationCase.objects.select_related("penalty_proposal"), pk=case_id)
         proposal = getattr(case, "penalty_proposal", None)
         if proposal is None:
-            return Response({"detail": "Penalty proposal is required before rejection."}, status=status.HTTP_400_BAD_REQUEST)
+            return Response(
+                {
+                    "detail": t(
+                        vi="Cần có đề xuất mức phạt trước khi bác bỏ.",
+                        en="Penalty proposal is required before rejection.",
+                    )
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
         reject_penalty_proposal(proposal=proposal, rejected_by=request.user, request=request)
         return Response({"status": proposal.status})
 
@@ -271,7 +288,15 @@ class ExamCertificatePolicyView(APIView):
         exam = _get_exam_or_404(exam_id)
         policy = getattr(exam, "certificate_policy", None)
         if policy is None:
-            return Response({"detail": "Certificate policy not configured."}, status=status.HTTP_404_NOT_FOUND)
+            return Response(
+                {
+                    "detail": t(
+                        vi="Chưa cấu hình chính sách xét giải.",
+                        en="Certificate policy is not configured.",
+                    )
+                },
+                status=status.HTTP_404_NOT_FOUND,
+            )
         return Response(CertificatePolicySerializer(policy).data)
 
 

@@ -97,12 +97,14 @@ describe("AdminLayout", () => {
     expect(examSectionButton).toHaveAttribute("aria-expanded", "false");
     expect(screen.queryByText("Danh sách kỳ thi")).not.toBeInTheDocument();
     expect(screen.queryByText("Giám sát trực tiếp")).not.toBeInTheDocument();
+    expect(screen.queryByText("Kỷ luật và chứng chỉ")).not.toBeInTheDocument();
 
     await user.click(examSectionButton!);
 
     expect((await screen.findAllByRole("button", { name: "Quản lý kỳ thi" })).at(-1)).toHaveAttribute("aria-expanded", "true");
     expect(screen.getAllByText("Danh sách kỳ thi").length).toBeGreaterThan(0);
     expect(screen.getAllByText("Giám sát trực tiếp").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Kỷ luật và chứng chỉ").length).toBeGreaterThan(0);
 
     await user.click((await screen.findAllByRole("button", { name: "Quản lý kỳ thi" })).at(-1)!);
 
@@ -131,6 +133,15 @@ describe("AdminLayout", () => {
 
     expect(screen.getAllByText("Exam List").length).toBeGreaterThan(0);
     expect(screen.getAllByText("Live Monitoring").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Discipline & Certificates").length).toBeGreaterThan(0);
+  });
+
+  it("keeps the exam group active for discipline routes", async () => {
+    renderLayout("/discipline");
+
+    const examSectionButton = (await screen.findAllByRole("button", { name: "Quản lý kỳ thi" })).at(-1);
+    expect(examSectionButton).toHaveAttribute("aria-expanded", "true");
+    expect(screen.getAllByText("Kỷ luật và chứng chỉ").length).toBeGreaterThan(0);
   });
 
   it("keeps the admin shell fully localized when the legacy bridge is mounted", async () => {

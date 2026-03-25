@@ -2,6 +2,7 @@ import { cleanup, render, screen, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import i18n from "../i18n";
 import { DisciplinaryManagement } from "./DisciplinaryManagement";
 
 const mockApiRequest = vi.fn();
@@ -25,7 +26,9 @@ vi.mock("../lib/notify", () => ({
 }));
 
 describe("DisciplinaryManagement", () => {
-  beforeEach(() => {
+  beforeEach(async () => {
+    window.localStorage.clear();
+    await i18n.changeLanguage("vi");
     mockApiRequest.mockImplementation(async (path: string) => {
       if (path === "/api/v1/discipline/exams/") {
         return {
@@ -65,7 +68,7 @@ describe("DisciplinaryManagement", () => {
       </MemoryRouter>,
     );
 
-    expect(await screen.findByRole("heading", { name: /discipline & certificates/i })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: /kỷ luật và chứng chỉ/i })).toBeInTheDocument();
     const examName = await screen.findByText("Mathematics Mock Exam");
     const row = examName.closest("tr");
     expect(row).not.toBeNull();
@@ -81,7 +84,20 @@ describe("DisciplinaryManagement", () => {
       </MemoryRouter>,
     );
 
-    const link = await screen.findByRole("link", { name: /open sheet/i });
+    const link = await screen.findByRole("link", { name: /mở bảng xử lý/i });
     expect(link).toHaveAttribute("href", "/discipline/exams/11");
+  });
+
+  it("switches copy when the locale changes to English", async () => {
+    await i18n.changeLanguage("en");
+
+    render(
+      <MemoryRouter>
+        <DisciplinaryManagement />
+      </MemoryRouter>,
+    );
+
+    expect(await screen.findByRole("heading", { name: /discipline & certificates/i })).toBeInTheDocument();
+    expect(screen.getByPlaceholderText(/search by exam or subject/i)).toBeInTheDocument();
   });
 });

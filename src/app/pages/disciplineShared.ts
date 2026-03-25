@@ -1,4 +1,6 @@
 import { buildApiUrl } from "../lib/env";
+import i18n from "../i18n";
+import { translateLegacyUiText } from "../i18n/legacyUiFallback";
 import { getStoredLocale, getStoredTokens } from "../lib/storage";
 
 export interface DisciplinaryExamSummaryRecord {
@@ -89,9 +91,12 @@ export interface CertificatePolicyRecord {
   encouragement_config: Record<string, string | number>;
 }
 
+const resolveDateLocale = () => (i18n.language?.startsWith("vi") ? "vi-VN" : "en-GB");
+const resolveLegacyLocale = () => (i18n.language?.startsWith("vi") ? "vi" : "en");
+
 export const formatDisciplineDate = (value: string | null) =>
   value
-    ? new Intl.DateTimeFormat("en-GB", {
+    ? new Intl.DateTimeFormat(resolveDateLocale(), {
         dateStyle: "medium",
         timeStyle: "short",
       }).format(new Date(value))
@@ -100,41 +105,92 @@ export const formatDisciplineDate = (value: string | null) =>
 export const formatCertificateLevel = (value: string | null | undefined) => {
   switch (value) {
     case "gold":
-      return "Gold";
+      return i18n.t("common:discipline.certificateLevels.gold");
     case "silver":
-      return "Silver";
+      return i18n.t("common:discipline.certificateLevels.silver");
     case "bronze":
-      return "Bronze";
+      return i18n.t("common:discipline.certificateLevels.bronze");
     case "encouragement":
-      return "Encouragement";
+      return i18n.t("common:discipline.certificateLevels.encouragement");
     case "participation":
-      return "Participation";
+      return i18n.t("common:discipline.certificateLevels.participation");
     default:
-      return "-";
+      return i18n.t("common:discipline.certificateLevels.unknown");
   }
 };
 
 export const formatReviewStatus = (value: string) => {
   switch (value) {
     case "penalty_applied":
-      return "Penalty Applied";
+      return i18n.t("common:discipline.reviewStatus.penalty_applied");
     case "reviewed":
-      return "Reviewed";
+      return i18n.t("common:discipline.reviewStatus.reviewed");
     case "clear":
-      return "Clear";
+      return i18n.t("common:discipline.reviewStatus.clear");
     default:
-      return "Pending Review";
+      return i18n.t("common:discipline.reviewStatus.pending_review");
   }
+};
+
+export const formatResultSyncStatus = (value: string) => {
+  switch (value) {
+    case "synced":
+      return i18n.t("common:discipline.resultSyncStatus.synced");
+    default:
+      return i18n.t("common:discipline.resultSyncStatus.pending");
+  }
+};
+
+export const formatCertificateStatus = (value: string) => {
+  switch (value) {
+    case "configured":
+      return i18n.t("common:discipline.certificateStatus.configured");
+    default:
+      return i18n.t("common:discipline.certificateStatus.not_configured");
+  }
+};
+
+export const formatProposalStatus = (value: string | null | undefined) => {
+  switch (value) {
+    case "draft":
+      return i18n.t("common:discipline.proposalStatus.draft");
+    case "approved":
+      return i18n.t("common:discipline.proposalStatus.approved");
+    case "rejected":
+      return i18n.t("common:discipline.proposalStatus.rejected");
+    case "no_penalty":
+      return i18n.t("common:discipline.proposalStatus.no_penalty");
+    default:
+      return i18n.t("common:discipline.proposalStatus.unknown");
+  }
+};
+
+export const formatSeverity = (value: string) => {
+  switch (value) {
+    case "critical":
+      return i18n.t("common:discipline.severity.critical");
+    case "info":
+      return i18n.t("common:discipline.severity.info");
+    default:
+      return i18n.t("common:discipline.severity.warning");
+  }
+};
+
+export const formatDisciplineCaseText = (value: string | null | undefined) => {
+  if (!value) {
+    return "";
+  }
+  return translateLegacyUiText(resolveLegacyLocale(), value);
 };
 
 const summarizeErrorPayload = async (response: Response) => {
   const contentType = response.headers.get("content-type") ?? "";
   if (contentType.includes("application/json")) {
     const payload = (await response.json()) as { detail?: string } | null;
-    return payload?.detail || `Export failed with status ${response.status}`;
+    return payload?.detail || i18n.t("common:discipline.exportFailedStatus", { status: response.status });
   }
   const text = await response.text();
-  return text.trim() || `Export failed with status ${response.status}`;
+  return text.trim() || i18n.t("common:discipline.exportFailedStatus", { status: response.status });
 };
 
 export const downloadDisciplineWorkbook = async (path: string, fileName: string) => {
