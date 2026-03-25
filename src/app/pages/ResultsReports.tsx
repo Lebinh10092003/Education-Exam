@@ -38,6 +38,7 @@ import { apiRequest, type PaginatedResponse } from "../lib/http";
 import { useAsyncList } from "../hooks/useAsyncList";
 import { useDebouncedValue } from "../hooks/useDebouncedValue";
 import { useMutationState } from "../hooks/useMutationState";
+import { formatCertificateLevel } from "./disciplineShared";
 
 interface ExamOption {
   id: number;
@@ -59,8 +60,12 @@ interface ResultRecord {
   workflow_status: string;
   publish_state: string;
   score: string;
+  original_score: string;
   total_marks: string;
   percentage: string;
+  original_percentage: string;
+  penalty_percent_applied: string;
+  certificate_level: string;
   result_status: string;
   passed: boolean;
   completed_date: string | null;
@@ -103,8 +108,12 @@ const exportResultsCsv = (results: ResultRecord[]) => {
     "Exam",
     "Subject",
     "Score",
+    "Original Score",
     "Total Marks",
     "Percentage",
+    "Original Percentage",
+    "Penalty Percent",
+    "Certificate",
     "Workflow Status",
     "Publish State",
     "Completed Date",
@@ -116,8 +125,12 @@ const exportResultsCsv = (results: ResultRecord[]) => {
     result.exam.name,
     result.exam.subject_name,
     result.score,
+    result.original_score,
     result.total_marks,
     result.percentage,
+    result.original_percentage,
+    result.penalty_percent_applied,
+    result.certificate_level,
     result.workflow_status,
     result.publish_state,
     result.completed_date ?? "",
@@ -356,6 +369,7 @@ export function ResultsReports() {
                     <div>
                       <p className="text-xs uppercase tracking-wide text-gray-400">Score</p>
                       <p>{result.score}/{result.total_marks}</p>
+                      <p className="text-xs text-gray-500">Original {result.original_score}</p>
                     </div>
                     <div>
                       <p className="text-xs uppercase tracking-wide text-gray-400">Time Taken</p>
@@ -372,6 +386,12 @@ export function ResultsReports() {
                           style={{ width: `${Math.min(100, Math.max(0, percentage))}%` }}
                         />
                       </div>
+                    </div>
+                    <div className="sm:col-span-2">
+                      <p className="text-xs uppercase tracking-wide text-gray-400">Penalty / Certificate</p>
+                      <p>
+                        {result.penalty_percent_applied}% penalty, {formatCertificateLevel(result.certificate_level)}
+                      </p>
                     </div>
                     <div className="sm:col-span-2">
                       <p className="text-xs uppercase tracking-wide text-gray-400">Completed</p>
@@ -411,7 +431,9 @@ export function ResultsReports() {
                   <th className="text-left py-3 px-4 text-sm font-semibold text-gray-700">Candidate</th>
                   <th className="text-left py-3 px-4 text-sm font-semibold text-gray-700">Exam</th>
                   <th className="text-left py-3 px-4 text-sm font-semibold text-gray-700">Score</th>
+                  <th className="text-left py-3 px-4 text-sm font-semibold text-gray-700">Penalty</th>
                   <th className="text-left py-3 px-4 text-sm font-semibold text-gray-700">Percentage</th>
+                  <th className="text-left py-3 px-4 text-sm font-semibold text-gray-700">Certificate</th>
                   <th className="text-left py-3 px-4 text-sm font-semibold text-gray-700">Workflow</th>
                   <th className="text-left py-3 px-4 text-sm font-semibold text-gray-700">Publish</th>
                   <th className="text-left py-3 px-4 text-sm font-semibold text-gray-700">Date</th>
@@ -433,7 +455,11 @@ export function ResultsReports() {
                         <p className="text-xs text-gray-500">{result.exam.subject_name}</p>
                       </td>
                       <td className="py-4 px-4 text-sm text-gray-900">
-                        {result.score}/{result.total_marks}
+                        <div>{result.score}/{result.total_marks}</div>
+                        <div className="text-xs text-gray-500">Orig. {result.original_score}</div>
+                      </td>
+                      <td className="py-4 px-4 text-sm text-gray-600">
+                        {result.penalty_percent_applied}%
                       </td>
                       <td className="py-4 px-4">
                         <div className="flex items-center gap-2">
@@ -448,6 +474,7 @@ export function ResultsReports() {
                           <span className="text-sm text-gray-900">{percentage.toFixed(2)}%</span>
                         </div>
                       </td>
+                      <td className="py-4 px-4 text-sm text-gray-600">{formatCertificateLevel(result.certificate_level)}</td>
                       <td className="py-4 px-4">
                         <StatusBadge status={result.result_status} />
                       </td>
@@ -476,7 +503,7 @@ export function ResultsReports() {
                 })}
                 {!resultsList.isLoading && !results.length ? (
                   <tr>
-                    <td className="px-4 py-8 text-center text-sm text-gray-500" colSpan={9}>
+                    <td className="px-4 py-8 text-center text-sm text-gray-500" colSpan={11}>
                       No results found for the current filters.
                     </td>
                   </tr>
@@ -520,18 +547,22 @@ export function ResultsReports() {
                   <p className="font-semibold text-gray-900">
                     {selectedResult.score}/{selectedResult.total_marks}
                   </p>
+                  <p className="text-xs text-gray-500">Original: {selectedResult.original_score}</p>
                 </div>
                 <div className="rounded-lg border border-gray-200 p-3">
                   <p className="text-gray-500">Percentage</p>
                   <p className="font-semibold text-gray-900">{Number(selectedResult.percentage).toFixed(2)}%</p>
+                  <p className="text-xs text-gray-500">Original: {selectedResult.original_percentage}%</p>
                 </div>
                 <div className="rounded-lg border border-gray-200 p-3">
                   <p className="text-gray-500">Workflow</p>
                   <p className="font-semibold text-gray-900">{selectedResult.workflow_status}</p>
                 </div>
                 <div className="rounded-lg border border-gray-200 p-3">
-                  <p className="text-gray-500">Publish State</p>
-                  <p className="font-semibold text-gray-900">{selectedResult.publish_state}</p>
+                  <p className="text-gray-500">Penalty / Certificate</p>
+                  <p className="font-semibold text-gray-900">
+                    {selectedResult.penalty_percent_applied}% / {formatCertificateLevel(selectedResult.certificate_level)}
+                  </p>
                 </div>
               </div>
               <div className="rounded-lg border border-gray-200 bg-gray-50 p-4 text-sm text-gray-700">

@@ -16,6 +16,7 @@ urlpatterns = [
     path("api/v1/", include("apps.exam_authoring.api.urls")),
     path("api/v1/", include("apps.exam_delivery.api.urls")),
     path("api/v1/", include("apps.grading.api.urls")),
+    path("api/v1/", include("apps.discipline.api.urls")),
     path("api/v1/", include("apps.proctoring.api.urls")),
     path("api/v1/", include("apps.materials.api.urls")),
     path("api/v1/", include("apps.notifications.api.urls")),

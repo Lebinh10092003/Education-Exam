@@ -11,6 +11,7 @@ const navigation = {
     manualGrading: "Chấm tự luận",
     materials: "Thư viện tài liệu",
     results: "Kết quả và báo cáo",
+    discipline: "Kỷ luật và chứng chỉ",
     roles: "Vai trò và quyền",
     notifications: "Thông báo",
     audit: "Audit và bảo mật",

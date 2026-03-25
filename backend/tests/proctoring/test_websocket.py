@@ -21,7 +21,7 @@ def test_monitoring_consumer_rejects_invalid_token():
 
 
 @pytest.mark.django_db(transaction=True)
-def test_monitoring_consumer_receives_event_broadcast_for_exam(subject, admin_user, candidate_user):
+def test_monitoring_consumer_receives_event_broadcast_for_exam(subject, admin_user, candidate_user, fake_redis):
     from apps.proctoring.services import record_proctor_event
 
     exam, session = build_active_session(
@@ -52,6 +52,41 @@ def test_monitoring_consumer_receives_event_broadcast_for_exam(subject, admin_us
         broadcast_message = await communicator.receive_json_from()
         assert broadcast_message["type"] == "proctor_event"
         assert broadcast_message["payload"]["event_type"] == "tab_switch"
+        await communicator.disconnect()
+
+    asyncio.run(scenario())
+
+
+@pytest.mark.django_db(transaction=True)
+def test_candidate_control_consumer_receives_live_request_updates(subject, admin_user, candidate_user, fake_redis):
+    from apps.proctoring.services import issue_admin_view_token
+
+    _, session = build_active_session(
+        subject=subject,
+        admin_user=admin_user,
+        candidate_user=candidate_user,
+    )
+    candidate_token = str(RefreshToken.for_user(candidate_user).access_token)
+
+    async def scenario():
+        communicator = WebsocketCommunicator(
+            application,
+            f"/ws/proctoring/sessions/{session.id}/control/?token={candidate_token}",
+        )
+        connected, _ = await communicator.connect()
+        assert connected is True
+
+        initial_message = await communicator.receive_json_from()
+        assert initial_message["type"] == "live_request"
+        assert initial_message["payload"]["enabled"] is False
+
+        await sync_to_async(issue_admin_view_token)(
+            session=session,
+            user=admin_user,
+        )
+        broadcast_message = await communicator.receive_json_from()
+        assert broadcast_message["type"] == "live_request"
+        assert broadcast_message["payload"]["enabled"] is True
         await communicator.disconnect()
 
     asyncio.run(scenario())

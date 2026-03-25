@@ -11,6 +11,13 @@ const mockNotifyError = vi.fn();
 const mockNotifySuccess = vi.fn();
 const mockConnectViewerRoom = vi.fn();
 const mockDisconnectRoom = vi.fn();
+const websocketInstances: Array<{
+  onopen: (() => void) | null;
+  onmessage: ((event: { data: string }) => void) | null;
+  onerror: (() => void) | null;
+  onclose: (() => void) | null;
+  close: ReturnType<typeof vi.fn>;
+}> = [];
 const attachedVideoElement = document.createElement("video");
 attachedVideoElement.setAttribute("data-testid", "live-webcam-track");
 
@@ -63,12 +70,20 @@ describe("LiveMonitoring", () => {
       onclose: (() => void) | null = null;
 
       close = vi.fn();
+
+      constructor(_url: string) {
+        websocketInstances.push(this);
+        queueMicrotask(() => {
+          this.onopen?.();
+        });
+      }
     }
 
     Object.defineProperty(window, "WebSocket", {
       writable: true,
       value: WebSocketMock,
     });
+    websocketInstances.length = 0;
 
     mockConnectViewerRoom.mockResolvedValue({ disconnect: mockDisconnectRoom });
     mockApiRequest.mockImplementation(async (path: string, options?: { method?: string }) => {
@@ -96,9 +111,11 @@ describe("LiveMonitoring", () => {
               connection_status: "stable",
               last_activity_at: "2026-03-23T08:05:00Z",
               media: {
-                webcam_publish_status: "publishing",
+                webcam_publish_status: "idle",
                 screen_capture_status: "ready",
                 last_publish_at: "2026-03-23T08:00:00Z",
+                live_request_enabled: false,
+                live_slot_active: false,
               },
             },
           ],
@@ -181,11 +198,14 @@ describe("LiveMonitoring", () => {
           expires_at: "2026-03-23T08:15:00Z",
         };
       }
+      if (path === "/api/v1/proctoring/sessions/77/media/view-token/" && options?.method === "DELETE") {
+        return null;
+      }
       throw new Error(`Unhandled apiRequest path: ${path}`);
     });
   });
 
-  it("shows media availability and opens live view on demand", async () => {
+  it("shows local-only webcam readiness and opens live view on demand", async () => {
     const user = userEvent.setup();
 
     render(
@@ -198,7 +218,7 @@ describe("LiveMonitoring", () => {
 
     await user.click(await screen.findByRole("tab", { name: /candidate status/i }));
 
-    expect((await screen.findAllByText(/webcam live available/i)).length).toBeGreaterThan(0);
+    expect((await screen.findAllByText(/webcam local only/i)).length).toBeGreaterThan(0);
     expect(screen.getAllByText(/screen evidence ready/i).length).toBeGreaterThan(0);
 
     await user.click(screen.getAllByRole("button", { name: /open webcam/i })[0]);
@@ -257,8 +277,14 @@ describe("LiveMonitoring", () => {
     await user.click((await screen.findAllByRole("button", { name: /view violation/i }))[0]);
 
     expect(await screen.findByText(/violation detail/i)).toBeInTheDocument();
+    expect(screen.getByText("Bằng chứng webcam")).toBeInTheDocument();
+    expect(screen.getByText("Bằng chứng màn hình")).toBeInTheDocument();
     expect(await screen.findByAltText(/webcam evidence/i)).toBeInTheDocument();
     expect(screen.getByAltText(/screen evidence/i)).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /bằng chứng webcam source/i })).toHaveAttribute(
+      "href",
+      "https://example.com/webcam.png",
+    );
   });
 
   it("opens the selected violation detail from a live alert", async () => {
@@ -302,37 +328,46 @@ describe("LiveMonitoring", () => {
     expect(sheetContent).toHaveClass("px-6", "py-6");
   });
 
-  it("refreshes monitoring data automatically without a full page reload", async () => {
-    vi.useFakeTimers();
-    try {
-      render(
-        <MemoryRouter initialEntries={["/exams/1/monitor"]}>
-          <Routes>
-            <Route path="/exams/:id/monitor" element={<LiveMonitoring />} />
-          </Routes>
-        </MemoryRouter>,
-      );
+  it("applies websocket media deltas without reloading the full snapshot", async () => {
+    const user = userEvent.setup();
 
-      await act(async () => {
-        await Promise.resolve();
-        await Promise.resolve();
+    render(
+      <MemoryRouter initialEntries={["/exams/1/monitor"]}>
+        <Routes>
+          <Route path="/exams/:id/monitor" element={<LiveMonitoring />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    await user.click(await screen.findByRole("tab", { name: /candidate status/i }));
+    await screen.findByText(/webcam local only/i);
+
+    const initialMonitoringCalls = mockApiRequest.mock.calls.filter(
+      ([path]) => path === "/api/v1/proctoring/exams/1/monitoring/",
+    ).length;
+
+    await act(async () => {
+      websocketInstances[0].onmessage?.({
+        data: JSON.stringify({
+          type: "media_state",
+          payload: {
+            session_id: 77,
+            webcam_publish_status: "publishing",
+            screen_capture_status: "ready",
+            last_publish_at: "2026-03-23T08:06:00Z",
+            live_request_enabled: true,
+            live_slot_active: true,
+          },
+        }),
       });
+      await Promise.resolve();
+    });
 
-      const initialMonitoringCalls = mockApiRequest.mock.calls.filter(
-        ([path]) => path === "/api/v1/proctoring/exams/1/monitoring/",
-      ).length;
-
-      await act(async () => {
-        await vi.advanceTimersByTimeAsync(6000);
-      });
-
-      const nextMonitoringCalls = mockApiRequest.mock.calls.filter(
-        ([path]) => path === "/api/v1/proctoring/exams/1/monitoring/",
-      ).length;
-      expect(nextMonitoringCalls).toBeGreaterThan(initialMonitoringCalls);
-    } finally {
-      vi.useRealTimers();
-    }
+    expect(await screen.findByText(/webcam live available/i)).toBeInTheDocument();
+    const nextMonitoringCalls = mockApiRequest.mock.calls.filter(
+      ([path]) => path === "/api/v1/proctoring/exams/1/monitoring/",
+    ).length;
+    expect(nextMonitoringCalls).toBe(initialMonitoringCalls);
   });
 
   it("defines an unstable connection filter that matches backend statuses", () => {

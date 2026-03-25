@@ -177,6 +177,17 @@ def create_autosave_snapshot(*, session, payload=None):
     return snapshot
 
 
+def build_autosave_receipt(*, session, payload=None):
+    now = _assert_session_is_active(session)
+    return {
+        "id": None,
+        "answered_count": session.questions.filter(answer__is_answered=True).count(),
+        "marked_count": session.questions.filter(is_marked_for_review=True).count(),
+        "payload": payload or {},
+        "created_at": now,
+    }
+
+
 @transaction.atomic
 def submit_session(*, session, submitted_by):
     if hasattr(session, "submission"):

@@ -8,7 +8,7 @@ from apps.materials.api.serializers import MaterialSerializer
 from apps.platform_core.i18n import t
 from apps.question_bank.models import QuestionOption
 
-from ..models import AutosaveSnapshot, ExamSession, SessionAnswer, SessionQuestion
+from ..models import ExamSession, SessionAnswer, SessionQuestion
 from ..services import get_remaining_seconds
 
 
@@ -220,10 +220,12 @@ class AutosaveSnapshotWriteSerializer(serializers.Serializer):
     payload = serializers.JSONField(required=False)
 
 
-class AutosaveSnapshotSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = AutosaveSnapshot
-        fields = ("id", "answered_count", "marked_count", "payload", "created_at")
+class AutosaveSnapshotSerializer(serializers.Serializer):
+    id = serializers.IntegerField(allow_null=True)
+    answered_count = serializers.IntegerField()
+    marked_count = serializers.IntegerField()
+    payload = serializers.JSONField()
+    created_at = serializers.DateTimeField()
 
 
 class SessionSubmissionSummarySerializer(serializers.ModelSerializer):

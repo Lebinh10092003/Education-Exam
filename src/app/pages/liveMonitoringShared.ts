@@ -16,6 +16,8 @@ export interface CandidateMonitoringStatus {
     webcam_publish_status: string;
     screen_capture_status: string;
     last_publish_at: string | null;
+    live_request_enabled?: boolean;
+    live_slot_active?: boolean;
   };
 }
 
@@ -139,6 +141,9 @@ export const formatMinutes = (minutes: number) => {
 export const formatEvidenceLabel = (evidenceType: string) =>
   evidenceType === "webcam_snapshot" ? "Webcam evidence" : "Screen evidence";
 
+export const getEvidenceCardTitle = (evidenceType: string) =>
+  evidenceType === "webcam_snapshot" ? "Bằng chứng webcam" : "Bằng chứng màn hình";
+
 export const getWebcamStatusText = (status: string) => {
   switch (status) {
     case "publishing":
@@ -148,7 +153,7 @@ export const getWebcamStatusText = (status: string) => {
     case "stopped":
       return "Webcam live stopped";
     default:
-      return "Webcam live unavailable";
+      return "Webcam local only";
   }
 };
 

@@ -16,6 +16,13 @@ const mockCaptureTrackSnapshot = vi.fn();
 const mockConnectCandidatePublisher = vi.fn();
 const mockDisconnectRoom = vi.fn();
 const mockRequestFullscreen = vi.fn();
+const websocketInstances: Array<{
+  onopen: (() => void) | null;
+  onmessage: ((event: { data: string }) => void) | null;
+  onerror: (() => void) | null;
+  onclose: (() => void) | null;
+  close: ReturnType<typeof vi.fn>;
+}> = [];
 
 vi.mock("../lib/http", async () => {
   const actual = await vi.importActual<typeof import("../lib/http")>("../lib/http");
@@ -46,6 +53,14 @@ vi.mock("../lib/proctoringMedia", async () => {
     ...actual,
     connectCandidatePublisher: (...args: unknown[]) => mockConnectCandidatePublisher(...args),
     disconnectRoom: (...args: unknown[]) => mockDisconnectRoom(...args),
+  };
+});
+
+vi.mock("../lib/storage", async () => {
+  const actual = await vi.importActual<typeof import("../lib/storage")>("../lib/storage");
+  return {
+    ...actual,
+    getStoredTokens: () => ({ access: "access-token", refresh: "refresh-token" }),
   };
 });
 
@@ -150,10 +165,30 @@ describe("TakeExam", () => {
         value: document.documentElement,
       });
     });
+    class WebSocketMock {
+      onopen: (() => void) | null = null;
+      onmessage: ((event: { data: string }) => void) | null = null;
+      onerror: (() => void) | null = null;
+      onclose: (() => void) | null = null;
+      close = vi.fn();
+
+      constructor(_url: string) {
+        websocketInstances.push(this);
+        queueMicrotask(() => {
+          this.onopen?.();
+        });
+      }
+    }
+    Object.defineProperty(window, "WebSocket", {
+      configurable: true,
+      writable: true,
+      value: WebSocketMock,
+    });
+    websocketInstances.length = 0;
     mockRequestProctoringStreams.mockResolvedValue(captureResources);
     mockCaptureTrackSnapshot.mockResolvedValue(new Blob(["png"], { type: "image/png" }));
     mockConnectCandidatePublisher.mockResolvedValue({ disconnect: mockDisconnectRoom });
-    mockApiRequest.mockImplementation(async (path: string, options?: { method?: string }) => {
+    mockApiRequest.mockImplementation(async (path: string, options?: { method?: string; body?: unknown }) => {
       if (path === "/api/v1/exams/1/start-session/" && options?.method === "POST") {
         return sessionPayload;
       }
@@ -171,16 +206,21 @@ describe("TakeExam", () => {
         };
       }
       if (path === "/api/v1/proctoring/sessions/77/media/status/" && options?.method === "POST") {
+        const body = options.body as {
+          webcam_publish_status?: string;
+          screen_capture_status?: string;
+          metadata?: Record<string, unknown>;
+        };
         return {
           provider: "livekit",
           room_name: "eduexam-exam-1-session-77",
           participant_name: "candidate-2-session-77",
-          webcam_publish_status: "publishing",
-          screen_capture_status: "ready",
+          webcam_publish_status: body?.webcam_publish_status ?? "idle",
+          screen_capture_status: body?.screen_capture_status ?? "ready",
           webcam_publish_error: "",
           last_publish_at: "2026-03-23T08:00:00Z",
           last_status_at: "2026-03-23T08:00:00Z",
-          metadata: {},
+          metadata: body?.metadata ?? {},
         };
       }
       if (path === "/api/v1/proctoring/sessions/77/heartbeats/" && options?.method === "POST") {
@@ -236,7 +276,7 @@ describe("TakeExam", () => {
     expect(await screen.findByText(/webcam access is required/i)).toBeInTheDocument();
   });
 
-  it("binds the local webcam stream to the preview and then reports media status", async () => {
+  it("binds the local webcam stream and keeps webcam publishing disabled until requested", async () => {
     const user = userEvent.setup();
 
     renderTakeExam();
@@ -245,21 +285,55 @@ describe("TakeExam", () => {
 
     await waitFor(() => {
       expect(mockApiRequest).toHaveBeenCalledWith(
-        "/api/v1/proctoring/sessions/77/media/publish-token/",
+        "/api/v1/proctoring/sessions/77/media/status/",
         expect.objectContaining({ method: "POST" }),
       );
     });
 
     expect(mockRequestFullscreen).toHaveBeenCalledTimes(1);
-    expect(mockApiRequest).toHaveBeenCalledWith(
-      "/api/v1/proctoring/sessions/77/media/status/",
-      expect.objectContaining({ method: "POST" }),
+    expect(mockApiRequest).not.toHaveBeenCalledWith(
+      "/api/v1/proctoring/sessions/77/media/publish-token/",
+      expect.anything(),
     );
     const preview = (await screen.findByLabelText(/your webcam preview/i)) as HTMLVideoElement & {
       srcObject: unknown;
     };
     expect(preview).toBeInTheDocument();
     expect(preview.srcObject).toBe(captureResources.webcamStream);
+  });
+
+  it("publishes webcam only after an admin live request arrives over the control socket", async () => {
+    const user = userEvent.setup();
+
+    renderTakeExam();
+
+    await user.click(await screen.findByRole("button", { name: /start monitoring/i }));
+
+    await waitFor(() => {
+      expect(mockApiRequest).toHaveBeenCalledWith(
+        "/api/v1/proctoring/sessions/77/media/status/",
+        expect.objectContaining({ method: "POST" }),
+      );
+    });
+    expect(websocketInstances).toHaveLength(1);
+
+    await act(async () => {
+      websocketInstances[0].onmessage?.({
+        data: JSON.stringify({
+          type: "live_request",
+          payload: { enabled: true },
+        }),
+      });
+      await Promise.resolve();
+    });
+
+    await waitFor(() => {
+      expect(mockApiRequest).toHaveBeenCalledWith(
+        "/api/v1/proctoring/sessions/77/media/publish-token/",
+        expect.objectContaining({ method: "POST" }),
+      );
+    });
+    expect(mockConnectCandidatePublisher).toHaveBeenCalledTimes(1);
   });
 
   it("keeps the exam locked until fullscreen is restored after permissions are granted", async () => {
@@ -290,7 +364,7 @@ describe("TakeExam", () => {
 
     await waitFor(() => {
       expect(mockApiRequest).toHaveBeenCalledWith(
-        "/api/v1/proctoring/sessions/77/media/publish-token/",
+        "/api/v1/proctoring/sessions/77/media/status/",
         expect.objectContaining({ method: "POST" }),
       );
     });
@@ -302,13 +376,6 @@ describe("TakeExam", () => {
     renderTakeExam();
 
     await user.click(await screen.findByRole("button", { name: /start monitoring/i }));
-
-    await waitFor(() => {
-      expect(mockApiRequest).toHaveBeenCalledWith(
-        "/api/v1/proctoring/sessions/77/media/publish-token/",
-        expect.objectContaining({ method: "POST" }),
-      );
-    });
 
     Object.defineProperty(document, "fullscreenElement", {
       configurable: true,
@@ -346,13 +413,6 @@ describe("TakeExam", () => {
 
     await user.click(await screen.findByRole("button", { name: /start monitoring/i }));
 
-    await waitFor(() => {
-      expect(mockApiRequest).toHaveBeenCalledWith(
-        "/api/v1/proctoring/sessions/77/media/publish-token/",
-        expect.objectContaining({ method: "POST" }),
-      );
-    });
-
     await user.click(screen.getByLabelText(/2/i));
 
     await waitFor(() => {
@@ -380,7 +440,7 @@ describe("TakeExam", () => {
 
     await waitFor(() => {
       expect(mockApiRequest).toHaveBeenCalledWith(
-        "/api/v1/proctoring/sessions/77/media/publish-token/",
+        "/api/v1/proctoring/sessions/77/media/status/",
         expect.objectContaining({ method: "POST" }),
       );
     });

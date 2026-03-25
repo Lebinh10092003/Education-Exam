@@ -20,7 +20,7 @@ from ..access import get_accessible_subject_queryset, get_candidate_exam_queryse
 from ..models import ExamSession, SessionQuestion
 from ..services import (
     UNSET,
-    create_autosave_snapshot,
+    build_autosave_receipt,
     save_session_answer,
     start_or_resume_session,
     submit_session,
@@ -129,9 +129,9 @@ class ExamSessionViewSet(mixins.RetrieveModelMixin, viewsets.GenericViewSet):
         session = self.get_object()
         serializer = AutosaveSnapshotWriteSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        snapshot = create_autosave_snapshot(session=session, payload=serializer.validated_data.get("payload"))
+        snapshot = build_autosave_receipt(session=session, payload=serializer.validated_data.get("payload"))
         output = AutosaveSnapshotSerializer(snapshot)
-        return Response(output.data, status=status.HTTP_201_CREATED)
+        return Response(output.data)
 
     @action(detail=True, methods=["post"])
     def submit(self, request, pk=None):

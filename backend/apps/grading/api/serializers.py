@@ -81,7 +81,11 @@ class ResultSerializer(serializers.ModelSerializer):
     candidate = serializers.SerializerMethodField()
     exam = serializers.SerializerMethodField()
     score = serializers.DecimalField(source="total_score", max_digits=8, decimal_places=2, read_only=True)
+    original_score = serializers.DecimalField(source="original_total_score", max_digits=8, decimal_places=2, read_only=True)
     total_marks = serializers.DecimalField(source="max_score", max_digits=8, decimal_places=2, read_only=True)
+    original_percentage = serializers.DecimalField(max_digits=8, decimal_places=2, read_only=True)
+    penalty_percent_applied = serializers.DecimalField(max_digits=5, decimal_places=2, read_only=True)
+    certificate_level = serializers.SerializerMethodField()
     result_status = serializers.SerializerMethodField()
     completed_date = serializers.DateTimeField(source="session.submitted_at", read_only=True)
     time_taken_minutes = serializers.SerializerMethodField()
@@ -95,8 +99,12 @@ class ResultSerializer(serializers.ModelSerializer):
             "workflow_status",
             "publish_state",
             "score",
+            "original_score",
             "total_marks",
             "percentage",
+            "original_percentage",
+            "penalty_percent_applied",
+            "certificate_level",
             "result_status",
             "passed",
             "completed_date",
@@ -127,6 +135,18 @@ class ResultSerializer(serializers.ModelSerializer):
         if obj.workflow_status != Result.WorkflowStatus.FINALIZED:
             return "Pending"
         return "Pass" if obj.passed else "Fail"
+
+    @extend_schema_field(OpenApiTypes.STR)
+    def get_certificate_level(self, obj):
+        certificate_award = (
+            obj.session.exam.certificate_awards.filter(
+                candidate=obj.session.candidate,
+                selected_session=obj.session,
+            )
+            .only("award_level")
+            .first()
+        )
+        return certificate_award.award_level if certificate_award is not None else ""
 
     @extend_schema_field(OpenApiTypes.INT)
     def get_time_taken_minutes(self, obj):

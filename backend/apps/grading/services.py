@@ -40,24 +40,29 @@ def _sync_result_state(*, session, published_by=None, request=None):
             continue
         manual_score += task.manual_grade.score_awarded
 
-    total_score = Decimal(session.objective_score) + manual_score
+    original_total_score = Decimal(session.objective_score) + manual_score
     max_score = Decimal(session.max_score)
-    percentage = _calculate_percentage(total_score=total_score, max_score=max_score)
+    original_percentage = _calculate_percentage(total_score=original_total_score, max_score=max_score)
     workflow_status = (
         Result.WorkflowStatus.PENDING_GRADING if pending_tasks else Result.WorkflowStatus.FINALIZED
     )
     passed = None if workflow_status == Result.WorkflowStatus.PENDING_GRADING else _calculate_passed(
         session=session,
-        percentage=percentage,
+        percentage=original_percentage,
     )
 
     defaults = {
         "workflow_status": workflow_status,
         "objective_score": session.objective_score,
         "manual_score": manual_score,
-        "total_score": total_score,
+        "original_total_score": original_total_score,
+        "original_percentage": original_percentage,
+        "penalty_percent_applied": Decimal("0.00"),
+        "final_total_score": original_total_score,
+        "final_percentage": original_percentage,
+        "total_score": original_total_score,
         "max_score": max_score,
-        "percentage": percentage,
+        "percentage": original_percentage,
         "passed": passed,
     }
     result, _ = Result.objects.update_or_create(session=session, defaults=defaults)
@@ -86,6 +91,9 @@ def _sync_result_state(*, session, published_by=None, request=None):
                 request=request,
             )
 
+    from apps.discipline.services import sync_discipline_after_result_change
+
+    sync_discipline_after_result_change(session=session, actor=published_by, request=request)
     return result
 
 

@@ -62,6 +62,8 @@ def test_admin_can_list_results_with_candidate_and_exam_filters(api_client, admi
     payload = response.json()
     assert payload["count"] == 1
     assert payload["results"][0]["candidate"]["email"] == candidate_user.email
+    assert payload["results"][0]["original_score"] == payload["results"][0]["score"]
+    assert payload["results"][0]["penalty_percent_applied"] == "0.00"
 
 
 @pytest.mark.django_db

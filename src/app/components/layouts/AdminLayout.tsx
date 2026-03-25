@@ -113,6 +113,7 @@ const navEntries: NavEntry[] = [
   { type: "item", icon: GraduationCap, labelKey: "admin.manualGrading", path: "/manual-grading" },
   { type: "item", icon: BookMarked, labelKey: "admin.materials", path: "/materials" },
   { type: "item", icon: BarChart3, labelKey: "admin.results", path: "/results" },
+  { type: "item", icon: Shield, labelKey: "admin.discipline", path: "/discipline" },
   { type: "item", icon: Shield, labelKey: "admin.roles", path: "/roles-permissions" },
   { type: "item", icon: Bell, labelKey: "admin.notifications", path: "/notifications" },
   { type: "item", icon: Activity, labelKey: "admin.audit", path: "/audit" },

@@ -27,6 +27,7 @@ from ..services import (
     record_proctor_event,
     register_client_capability,
     resolve_violation_case,
+    stop_admin_live_view,
     update_media_status,
 )
 from .querysets import build_exam_monitoring_hub_queryset, build_exam_monitoring_hub_summary, build_violation_case_queryset
@@ -79,7 +80,7 @@ class CandidateSessionHeartbeatView(APIView):
 
     @extend_schema(
         request=SessionHeartbeatWriteSerializer,
-        responses={status.HTTP_201_CREATED: SessionHeartbeatSerializer},
+        responses={status.HTTP_200_OK: SessionHeartbeatSerializer},
     )
     def post(self, request, session_id):
         session = _get_candidate_session(session_id, request.user)
@@ -91,7 +92,7 @@ class CandidateSessionHeartbeatView(APIView):
             **serializer.validated_data,
         )
         output = SessionHeartbeatSerializer(heartbeat)
-        return Response(output.data, status=status.HTTP_201_CREATED)
+        return Response(output.data)
 
 
 class CandidateSessionEventView(APIView):
@@ -183,6 +184,16 @@ class AdminSessionMediaViewTokenView(APIView):
         )
         payload = issue_admin_view_token(session=session, user=request.user)
         return Response(MediaProviderTokenSerializer(payload).data)
+
+    @extend_schema(request=None, responses={status.HTTP_204_NO_CONTENT: None})
+    def delete(self, request, session_id):
+        assert_admin_monitoring_access(user=request.user)
+        session = get_object_or_404(
+            ExamSession.objects.select_related("candidate", "exam"),
+            pk=session_id,
+        )
+        stop_admin_live_view(session=session, user=request.user)
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
 
 class ExamMonitoringSnapshotView(APIView):

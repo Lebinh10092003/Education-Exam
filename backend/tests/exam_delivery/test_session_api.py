@@ -99,8 +99,9 @@ def test_candidate_can_create_autosave_snapshot(api_client, candidate_user, subj
         format="json",
     )
 
-    assert response.status_code == 201
+    assert response.status_code == 200
     assert response.json()["answered_count"] == 0
+    assert response.json()["id"] is None
 
 
 @pytest.mark.django_db

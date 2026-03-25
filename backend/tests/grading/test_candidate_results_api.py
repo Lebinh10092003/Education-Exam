@@ -53,9 +53,10 @@ def _build_candidate_result(*, subject, admin_user, candidate_user, publish, suf
 
 @pytest.mark.django_db
 def test_candidate_can_list_only_published_results(api_client, candidate_user, user, subject, admin_user):
+    from apps.discipline.models import ExamCertificateAward
     from rest_framework_simplejwt.tokens import RefreshToken
 
-    _build_candidate_result(
+    published_result = _build_candidate_result(
         subject=subject,
         admin_user=admin_user,
         candidate_user=candidate_user,
@@ -76,6 +77,14 @@ def test_candidate_can_list_only_published_results(api_client, candidate_user, u
         publish=True,
         suffix="other-user",
     )
+    ExamCertificateAward.objects.create(
+        exam=published_result.session.exam,
+        candidate=candidate_user,
+        selected_session=published_result.session,
+        award_level="gold",
+        basis_total_score=published_result.final_total_score,
+        basis_percentage=published_result.final_percentage,
+    )
 
     token = str(RefreshToken.for_user(candidate_user).access_token)
     api_client.credentials(HTTP_AUTHORIZATION=f"Bearer {token}")
@@ -87,3 +96,6 @@ def test_candidate_can_list_only_published_results(api_client, candidate_user, u
     assert payload["count"] == 1
     assert payload["results"][0]["candidate"]["email"] == candidate_user.email
     assert payload["results"][0]["publish_state"] == "published"
+    assert payload["results"][0]["original_score"] == "1.00"
+    assert payload["results"][0]["penalty_percent_applied"] == "0.00"
+    assert payload["results"][0]["certificate_level"] == "gold"
