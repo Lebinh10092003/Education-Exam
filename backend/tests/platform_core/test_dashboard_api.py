@@ -40,6 +40,7 @@ def test_dashboard_overview_returns_expected_payload(
         name="Dashboard Exam",
         subject=subject,
         status=Exam.Status.OPEN,
+        enable_proctoring=True,
         duration_minutes=60,
         passing_score=60,
         max_attempts=1,

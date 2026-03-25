@@ -10,6 +10,11 @@ from django.utils import timezone
 from rest_framework.exceptions import PermissionDenied, ValidationError
 
 from apps.exam_authoring.models import Exam, ExamAssignment
+from apps.exam_authoring.lifecycle import (
+    exam_supports_live_monitoring,
+    exam_supports_proctoring_runtime,
+    resolve_exam_phase,
+)
 from apps.exam_delivery.models import ExamSession
 from apps.notifications.models import Notification
 from apps.notifications.services import create_notification, create_notifications_for_permission
@@ -86,6 +91,17 @@ def _broadcast_session_control_update(*, session_id, message_type, payload):
                 extra={"session_id": session_id, "message_type": message_type},
             )
             _broadcast_warning_logged = True
+
+
+def broadcast_session_phase_update(*, session):
+    _broadcast_session_control_update(
+        session_id=session.id,
+        message_type="session_phase",
+        payload={
+            "phase": resolve_exam_phase(session.exam),
+            "exam_id": session.exam_id,
+        },
+    )
 
 
 def _event_message(event):
@@ -271,6 +287,13 @@ def register_client_capability(
 
 
 def record_heartbeat(*, session, connection_status, latency_ms=None, payload=None, reported_by=None):
+    if not exam_supports_proctoring_runtime(session.exam):
+        raise ValidationError(
+            t(
+                vi="Bài thi này hiện không nhận trạng thái giám sát trực tiếp.",
+                en="This exam is not currently accepting live proctoring runtime updates.",
+            )
+        )
     now = timezone.now()
     payload = payload or {}
     runtime_state = refresh_presence(
@@ -304,6 +327,13 @@ def record_heartbeat(*, session, connection_status, latency_ms=None, payload=Non
 
 @transaction.atomic
 def record_proctor_event(*, session, event_type, severity="info", metadata=None, reported_by=None):
+    if not exam_supports_proctoring_runtime(session.exam):
+        raise ValidationError(
+            t(
+                vi="Bài thi này hiện không ghi nhận cảnh báo giám sát trực tiếp.",
+                en="This exam is not currently recording live proctoring alerts.",
+            )
+        )
     event = ProctorEvent.objects.create(
         session=session,
         reported_by=reported_by,
@@ -443,6 +473,13 @@ def update_media_status(
 
 def issue_candidate_publish_token(*, session, user):
     assert_candidate_session_access(session=session, user=user)
+    if not exam_supports_proctoring_runtime(session.exam):
+        raise PermissionDenied(
+            t(
+                vi="Webcam trực tiếp chỉ khả dụng khi kỳ thi đang mở.",
+                en="Live webcam is only available while the exam is open.",
+            )
+        )
     runtime_snapshot = get_runtime_snapshot(session_id=session.id)
     if not runtime_snapshot.get("live_request", {}).get("enabled"):
         raise PermissionDenied(
@@ -466,6 +503,13 @@ def issue_candidate_publish_token(*, session, user):
 
 def issue_admin_view_token(*, session, user):
     assert_admin_monitoring_access(user=user)
+    if not exam_supports_live_monitoring(session.exam):
+        raise ValidationError(
+            t(
+                vi="Chỉ có thể xem trực tiếp khi kỳ thi đang mở.",
+                en="Live view is only available while the exam is open.",
+            )
+        )
     if not acquire_live_slot(session_id=session.id, exam_id=session.exam_id):
         raise ValidationError(
             t(
@@ -520,6 +564,7 @@ def build_exam_monitoring_snapshot(*, exam):
     latest_sessions = _latest_session_by_candidate(exam)
     candidate_statuses = []
     now = timezone.now()
+    monitoring_active = exam_supports_live_monitoring(exam, now=now)
 
     for candidate in assigned_candidates:
         session = latest_sessions.get(candidate.id)
@@ -555,10 +600,14 @@ def build_exam_monitoring_snapshot(*, exam):
         runtime_snapshot = get_runtime_snapshot(session_id=session.id)
         media_state = getattr(session, "proctoring_media_state", None)
         end_time = session.submitted_at or now
-        connection_status = _resolve_runtime_connection_status(
-            session=session,
-            runtime_snapshot=runtime_snapshot,
-            now=now,
+        connection_status = (
+            _resolve_runtime_connection_status(
+                session=session,
+                runtime_snapshot=runtime_snapshot,
+                now=now,
+            )
+            if monitoring_active
+            else SessionHeartbeat.ConnectionStatus.OFFLINE
         )
         candidate_statuses.append(
             {
@@ -592,22 +641,28 @@ def build_exam_monitoring_snapshot(*, exam):
                         if media_state and media_state.last_publish_at
                         else None
                     ),
-                    "live_request_enabled": bool(runtime_snapshot.get("live_request", {}).get("enabled")),
-                    "live_slot_active": bool(runtime_snapshot.get("live_slot_active")),
+                    "live_request_enabled": (
+                        bool(runtime_snapshot.get("live_request", {}).get("enabled")) if monitoring_active else False
+                    ),
+                    "live_slot_active": bool(runtime_snapshot.get("live_slot_active")) if monitoring_active else False,
                 },
             }
         )
 
-    alerts = [
-        _serialize_event(event)
-        for event in ProctorEvent.objects.filter(
-            session__exam=exam,
-            severity__in=[ProctorEvent.Severity.WARNING, ProctorEvent.Severity.CRITICAL],
-        )
-        .select_related("session__candidate")
-        .prefetch_related("violation_cases")
-        .order_by("-occurred_at")[:20]
-    ]
+    alerts = (
+        [
+            _serialize_event(event)
+            for event in ProctorEvent.objects.filter(
+                session__exam=exam,
+                severity__in=[ProctorEvent.Severity.WARNING, ProctorEvent.Severity.CRITICAL],
+            )
+            .select_related("session__candidate")
+            .prefetch_related("violation_cases")
+            .order_by("-occurred_at")[:20]
+        ]
+        if monitoring_active
+        else []
+    )
 
     total_candidates = len(candidate_statuses)
     in_progress = sum(1 for item in candidate_statuses if item["status"] == "in_progress")

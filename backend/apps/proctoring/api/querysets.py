@@ -1,4 +1,5 @@
 from django.db.models import Count, F, Max, Q
+from django.utils import timezone
 
 from apps.exam_authoring.models import Exam
 
@@ -44,12 +45,20 @@ def build_violation_case_queryset(request):
 
 
 def build_exam_monitoring_hub_queryset(request):
+    current_time = timezone.now()
     alert_filter = Q(
         sessions__proctor_events__severity__in=[
             ProctorEvent.Severity.WARNING,
             ProctorEvent.Severity.CRITICAL,
         ]
     )
+    effective_open_filter = (
+        Q(status=Exam.Status.OPEN)
+        | Q(
+            status=Exam.Status.SCHEDULED,
+            schedule_window__opens_at__lte=current_time,
+        )
+    ) & (Q(schedule_window__closes_at__isnull=True) | Q(schedule_window__closes_at__gt=current_time))
     queryset = (
         Exam.objects.select_related("subject")
         .filter(enable_proctoring=True)
@@ -103,6 +112,8 @@ def build_exam_monitoring_hub_queryset(request):
     status_filter = request.query_params.get("status")
     if status_filter:
         queryset = queryset.filter(status=status_filter)
+    else:
+        queryset = queryset.filter(effective_open_filter)
 
     subject_id = request.query_params.get("subject")
     if subject_id:

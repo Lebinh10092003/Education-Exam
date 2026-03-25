@@ -8,6 +8,11 @@ from django.utils import timezone
 from rest_framework.exceptions import PermissionDenied, ValidationError
 
 from apps.exam_authoring.models import Exam, ExamAssignment
+from apps.exam_authoring.lifecycle import (
+    assert_exam_phase_allows_start,
+    assert_session_allows_interaction,
+    resolve_exam_phase,
+)
 from apps.platform_core.i18n import t
 
 from .models import AutosaveSnapshot, ExamSession, SessionAnswer, SessionQuestion, Submission
@@ -33,17 +38,12 @@ def _assert_candidate_can_start(*, exam, candidate, now):
         raise ValidationError(t(vi="Mục này không phải bài thi để làm bài.", en="This item is not a deliverable exam."))
     if exam.current_version_id is None:
         raise ValidationError(t(vi="Bài thi này chưa có phiên bản có thể phân phối.", en="This exam does not have a deliverable version."))
-    if exam.status not in {Exam.Status.SCHEDULED, Exam.Status.OPEN}:
-        raise ValidationError(t(vi="Bài thi này hiện không thể mở cho thí sinh.", en="This exam is not available for delivery."))
-
-    schedule_window = getattr(exam, "schedule_window", None)
-    if schedule_window and schedule_window.opens_at and schedule_window.opens_at > now:
-        raise ValidationError(t(vi="Bài thi này chưa mở.", en="This exam is not open yet."))
-    if schedule_window and schedule_window.closes_at and schedule_window.closes_at <= now:
-        raise ValidationError(t(vi="Bài thi này đã đóng.", en="This exam is already closed."))
+    assert_exam_phase_allows_start(exam, now=now)
 
 
 def _expire_if_needed(session, *, now):
+    if session.paused_at is not None and session.remaining_seconds_at_pause is not None:
+        return False
     if session.status == ExamSession.Status.IN_PROGRESS and session.expires_at <= now:
         session.status = ExamSession.Status.EXPIRED
         session.save(update_fields=["status", "updated_at"])
@@ -81,8 +81,6 @@ def _build_session_questions(*, session, exam_items):
 @transaction.atomic
 def start_or_resume_session(*, exam, candidate):
     now = timezone.now()
-    _assert_candidate_can_start(exam=exam, candidate=candidate, now=now)
-
     current_session = (
         ExamSession.objects.select_related("exam", "exam_version")
         .filter(exam=exam, candidate=candidate, status=ExamSession.Status.IN_PROGRESS)
@@ -92,6 +90,21 @@ def start_or_resume_session(*, exam, candidate):
     if current_session:
         if not _expire_if_needed(current_session, now=now):
             return current_session
+
+    latest_session = (
+        ExamSession.objects.select_related("exam", "exam_version")
+        .filter(exam=exam, candidate=candidate)
+        .order_by("-attempt_number")
+        .first()
+    )
+    if latest_session and resolve_exam_phase(exam, now=now) in {"paused", "closed", "results"} and latest_session.status in {
+        ExamSession.Status.SUBMITTED,
+        ExamSession.Status.EXPIRED,
+        ExamSession.Status.TERMINATED,
+    }:
+        return latest_session
+
+    _assert_candidate_can_start(exam=exam, candidate=candidate, now=now)
 
     attempts_used = ExamSession.objects.filter(exam=exam, candidate=candidate).count()
     if attempts_used >= exam.max_attempts:
@@ -125,11 +138,12 @@ def start_or_resume_session(*, exam, candidate):
 
 def _assert_session_is_active(session):
     now = timezone.now()
-    if _expire_if_needed(session, now=now):
+    interaction_time = assert_session_allows_interaction(session, now=now)
+    if _expire_if_needed(session, now=interaction_time):
         raise ValidationError(t(vi="Phiên thi này đã hết hạn.", en="This session has expired."))
     if session.status != ExamSession.Status.IN_PROGRESS:
         raise ValidationError(t(vi="Phiên thi này hiện không nhận câu trả lời.", en="This session is not accepting answers."))
-    return now
+    return interaction_time
 
 
 @transaction.atomic
@@ -189,7 +203,7 @@ def build_autosave_receipt(*, session, payload=None):
 
 
 @transaction.atomic
-def submit_session(*, session, submitted_by):
+def submit_session(*, session, submitted_by, source=Submission.Source.MANUAL, force=False):
     if hasattr(session, "submission"):
         try:
             from apps.grading.services import initialize_grading_for_submission
@@ -198,7 +212,11 @@ def submit_session(*, session, submitted_by):
         initialize_grading_for_submission(session=session)
         return session.submission
 
-    now = _assert_session_is_active(session)
+    now = timezone.now()
+    if force:
+        assert_session_allows_interaction(session, now=now, allow_closed=True)
+    else:
+        now = _assert_session_is_active(session)
     objective_score = Decimal("0.00")
     max_score = Decimal("0.00")
     manual_grading_required = False
@@ -253,7 +271,7 @@ def submit_session(*, session, submitted_by):
     submission = Submission.objects.create(
         session=session,
         submitted_by=submitted_by,
-        source=Submission.Source.MANUAL,
+        source=source,
         answered_count=answered_count,
     )
     try:
@@ -265,6 +283,8 @@ def submit_session(*, session, submitted_by):
 
 
 def get_remaining_seconds(session):
+    if session.paused_at is not None and session.remaining_seconds_at_pause is not None:
+        return int(session.remaining_seconds_at_pause)
     delta = session.expires_at - timezone.now()
     return max(0, int(delta.total_seconds()))
 

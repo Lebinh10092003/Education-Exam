@@ -32,6 +32,8 @@ class ExamSession(TimeStampedModel):
     attempt_number = models.PositiveIntegerField()
     started_at = models.DateTimeField()
     expires_at = models.DateTimeField()
+    paused_at = models.DateTimeField(null=True, blank=True)
+    remaining_seconds_at_pause = models.PositiveIntegerField(null=True, blank=True)
     submitted_at = models.DateTimeField(null=True, blank=True)
     last_activity_at = models.DateTimeField(null=True, blank=True)
     objective_score = models.DecimalField(max_digits=8, decimal_places=2, default=Decimal("0.00"))
@@ -125,6 +127,7 @@ class Submission(TimeStampedModel):
     class Source(models.TextChoices):
         MANUAL = "manual", "Manual"
         AUTO_TIMEOUT = "auto_timeout", "Auto Timeout"
+        FORCED_CLOSE = "forced_close", "Forced Close"
 
     session = models.OneToOneField(
         ExamSession,

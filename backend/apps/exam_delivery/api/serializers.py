@@ -2,6 +2,7 @@ from drf_spectacular.types import OpenApiTypes
 from drf_spectacular.utils import extend_schema_field
 from rest_framework import serializers
 
+from apps.exam_authoring.lifecycle import resolve_exam_phase
 from apps.exam_authoring.models import Exam
 from apps.grading.api.serializers import ResultSerializer
 from apps.materials.api.serializers import MaterialSerializer
@@ -32,6 +33,7 @@ class CandidateAssignedExamSerializer(serializers.ModelSerializer):
     active_session_id = serializers.SerializerMethodField()
     question_count = serializers.SerializerMethodField()
     enable_proctoring = serializers.BooleanField(read_only=True)
+    lifecycle_phase = serializers.SerializerMethodField()
 
     class Meta:
         model = Exam
@@ -50,6 +52,7 @@ class CandidateAssignedExamSerializer(serializers.ModelSerializer):
             "active_session_id",
             "question_count",
             "enable_proctoring",
+            "lifecycle_phase",
         )
 
     @extend_schema_field(CandidateExamScheduleSerializer)
@@ -87,6 +90,10 @@ class CandidateAssignedExamSerializer(serializers.ModelSerializer):
         if current_version is None:
             return 0
         return current_version.items.count()
+
+    @extend_schema_field(OpenApiTypes.STR)
+    def get_lifecycle_phase(self, obj):
+        return resolve_exam_phase(obj)
 
 
 class SessionQuestionOptionSerializer(serializers.ModelSerializer):
@@ -146,6 +153,7 @@ class CandidateExamSessionSerializer(serializers.ModelSerializer):
     marked_count = serializers.SerializerMethodField()
     total_questions = serializers.SerializerMethodField()
     questions = SessionQuestionSerializer(many=True, read_only=True)
+    lifecycle_phase = serializers.SerializerMethodField()
 
     class Meta:
         model = ExamSession
@@ -161,6 +169,7 @@ class CandidateExamSessionSerializer(serializers.ModelSerializer):
             "submitted_at",
             "show_results_immediately",
             "enable_proctoring",
+            "lifecycle_phase",
             "remaining_seconds",
             "objective_score",
             "max_score",
@@ -186,6 +195,10 @@ class CandidateExamSessionSerializer(serializers.ModelSerializer):
     @extend_schema_field(OpenApiTypes.INT)
     def get_total_questions(self, obj):
         return obj.questions.count()
+
+    @extend_schema_field(OpenApiTypes.STR)
+    def get_lifecycle_phase(self, obj):
+        return resolve_exam_phase(obj.exam)
 
 
 class SessionAnswerWriteSerializer(serializers.Serializer):

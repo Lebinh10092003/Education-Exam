@@ -6,6 +6,7 @@ from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
+from apps.exam_authoring.models import Exam
 from apps.identity.permissions import HasAPIPermissionCode
 
 from ..models import ManualGradingTask, Result
@@ -165,6 +166,7 @@ class CandidateResultListView(generics.ListAPIView):
             .filter(
                 session__candidate=self.request.user,
                 publish_state=Result.PublishState.PUBLISHED,
+                session__exam__status__in=[Exam.Status.CLOSED, Exam.Status.ARCHIVED],
             )
             .order_by("-published_at", "-created_at")
         )

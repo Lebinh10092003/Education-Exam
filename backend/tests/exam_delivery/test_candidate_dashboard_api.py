@@ -40,7 +40,7 @@ def _build_candidate_exam(*, subject, admin_user, candidate_user):
 
 
 def _build_published_result(*, subject, admin_user, candidate_user):
-    from apps.exam_authoring.services import create_exam
+    from apps.exam_authoring.services import create_exam, transition_exam_status
     from apps.exam_delivery.services import save_session_answer, start_or_resume_session, submit_session
     from apps.grading.services import publish_result
     from apps.institutions.models import CandidateGroup, GroupMembership, School
@@ -81,6 +81,7 @@ def _build_published_result(*, subject, admin_user, candidate_user):
         selected_option_keys=["A"],
     )
     submit_session(session=session, submitted_by=candidate_user)
+    transition_exam_status(exam=exam, next_status="closed", actor=admin_user)
     return publish_result(result=session.result, published_by=admin_user)
 
 
@@ -129,12 +130,10 @@ def test_candidate_can_load_dashboard_overview(api_client, candidate_user, subje
     assert response.status_code == 200
     payload = response.json()
     assert payload["stats"]["assigned_exam_count"] == 2
-    assert payload["stats"]["upcoming_exam_count"] == 2
+    assert payload["stats"]["upcoming_exam_count"] == 1
     assert payload["stats"]["published_result_count"] == 1
     assert payload["stats"]["active_material_count"] == 1
-    assert {exam["name"] for exam in payload["upcoming_exams"]} == {
-        "Mathematics Final Exam",
-        "Published Mathematics Final Exam",
-    }
+    assert {exam["name"] for exam in payload["upcoming_exams"]} == {"Mathematics Final Exam"}
+    assert payload["upcoming_exams"][0]["lifecycle_phase"] == "scheduled"
     assert payload["recent_results"][0]["candidate"]["email"] == candidate_user.email
     assert payload["recent_materials"][0]["title"] == "Calculus Fundamentals"

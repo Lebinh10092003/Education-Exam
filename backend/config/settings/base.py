@@ -50,6 +50,7 @@ ALLOWED_HOSTS = env.list("ALLOWED_HOSTS")
 REDIS_URL = env("REDIS_URL")
 
 INSTALLED_APPS = [
+    "daphne",
     "django.contrib.admin",
     "django.contrib.auth",
     "django.contrib.contenttypes",

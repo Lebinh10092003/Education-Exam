@@ -24,11 +24,15 @@ def _load_monitoring_snapshot(user, exam_id):
 @database_sync_to_async
 def _load_candidate_control_snapshot(user, session_id):
     from apps.exam_delivery.models import ExamSession
+    from apps.exam_authoring.lifecycle import resolve_exam_phase
     from apps.proctoring.runtime import get_runtime_snapshot
 
-    session = ExamSession.objects.select_related("candidate").get(pk=session_id)
+    session = ExamSession.objects.select_related("candidate", "exam", "exam__schedule_window").get(pk=session_id)
     assert_candidate_session_access(session=session, user=user)
-    return get_runtime_snapshot(session_id=session.id)
+    return {
+        "runtime": get_runtime_snapshot(session_id=session.id),
+        "phase": resolve_exam_phase(session.exam),
+    }
 
 
 class MonitoringConsumer(AsyncJsonWebsocketConsumer):
@@ -83,10 +87,16 @@ class CandidateSessionControlConsumer(AsyncJsonWebsocketConsumer):
         await self.send_json(
             {
                 "type": "live_request",
-                "payload": runtime_snapshot.get(
+                "payload": runtime_snapshot["runtime"].get(
                     "live_request",
                     {"enabled": False, "state": "disabled"},
                 ),
+            }
+        )
+        await self.send_json(
+            {
+                "type": "session_phase",
+                "payload": {"phase": runtime_snapshot["phase"]},
             }
         )
 

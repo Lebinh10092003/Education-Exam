@@ -5,7 +5,7 @@ from django.utils import timezone
 
 
 def _build_candidate_result(*, subject, admin_user, candidate_user, publish, suffix):
-    from apps.exam_authoring.services import create_exam
+    from apps.exam_authoring.services import create_exam, transition_exam_status
     from apps.exam_delivery.services import save_session_answer, start_or_resume_session, submit_session
     from apps.grading.services import publish_result
     from apps.institutions.models import CandidateGroup, GroupMembership, School
@@ -46,6 +46,7 @@ def _build_candidate_result(*, subject, admin_user, candidate_user, publish, suf
         selected_option_keys=["A"],
     )
     submit_session(session=session, submitted_by=candidate_user)
+    transition_exam_status(exam=exam, next_status="closed", actor=admin_user)
     if publish:
         publish_result(result=session.result, published_by=admin_user)
     return session.result

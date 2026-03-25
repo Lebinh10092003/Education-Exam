@@ -174,11 +174,21 @@ class DashboardOverviewView(generics.GenericAPIView):
     serializer_class = DashboardOverviewSerializer
 
     def get(self, request):
+        now = timezone.now()
+        effective_open_exam_filter = (
+            Q(status=Exam.Status.OPEN)
+            | Q(status=Exam.Status.SCHEDULED, schedule_window__opens_at__lte=now)
+        ) & (Q(schedule_window__closes_at__isnull=True) | Q(schedule_window__closes_at__gt=now))
+        effective_open_alert_exam_filter = (
+            Q(session__exam__status=Exam.Status.OPEN)
+            | Q(session__exam__status=Exam.Status.SCHEDULED, session__exam__schedule_window__opens_at__lte=now)
+        ) & (
+            Q(session__exam__schedule_window__closes_at__isnull=True)
+            | Q(session__exam__schedule_window__closes_at__gt=now)
+        )
         candidate_role_filter = Q(user_roles__role__slug="candidate") | Q(user_roles__role__slug="student")
         total_candidates = User.objects.filter(candidate_role_filter, user_roles__is_active=True).distinct().count()
-        active_exams = Exam.objects.filter(
-            status__in=[Exam.Status.SCHEDULED, Exam.Status.OPEN, Exam.Status.PAUSED]
-        ).count()
+        active_exams = Exam.objects.filter(effective_open_exam_filter).count()
         question_bank_count = Question.objects.count()
         total_sessions = ExamSession.objects.count()
         submitted_sessions = ExamSession.objects.filter(status=ExamSession.Status.SUBMITTED).count()
@@ -231,7 +241,10 @@ class DashboardOverviewView(generics.GenericAPIView):
 
         recent_alerts = (
             ProctorEvent.objects.select_related("session__exam")
-            .filter(severity__in=[ProctorEvent.Severity.WARNING, ProctorEvent.Severity.CRITICAL])
+            .filter(
+                severity__in=[ProctorEvent.Severity.WARNING, ProctorEvent.Severity.CRITICAL],
+            )
+            .filter(effective_open_alert_exam_filter, session__exam__enable_proctoring=True)
             .order_by("-occurred_at")[:6]
         )
         alerts = [

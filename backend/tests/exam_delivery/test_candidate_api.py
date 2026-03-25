@@ -53,6 +53,7 @@ def test_candidate_can_list_assigned_exams(api_client, candidate_user, subject, 
     payload = response.json()
     assert payload["count"] == 1
     assert payload["results"][0]["name"] == "Mathematics Final Exam"
+    assert payload["results"][0]["lifecycle_phase"] == "open"
 
 
 @pytest.mark.django_db
@@ -97,6 +98,7 @@ def test_candidate_can_start_exam_session_when_assigned_and_open(api_client, can
     assert response.status_code == 200
     assert response.json()["status"] == "in_progress"
     assert response.json()["attempt_number"] == 1
+    assert response.json()["lifecycle_phase"] == "open"
 
 
 @pytest.mark.django_db

@@ -2,20 +2,24 @@ import csv
 from io import StringIO
 import re
 from datetime import datetime
+from datetime import timedelta
 
 from django.contrib.auth import get_user_model
 from django.db import transaction
 from django.db.models import Count, Max, Q
 from django.utils import timezone
 from django.utils.dateparse import parse_datetime
+from rest_framework.exceptions import ValidationError
 
 from apps.identity.models import Profile, Role, UserRole
 from apps.identity.utils import build_student_username, ensure_unique_username
 from apps.institutions.models import CandidateGroup
 from apps.institutions.models import School
 from apps.platform_core.audit import record_audit_event
+from apps.platform_core.i18n import t
 from apps.question_bank.models import Question
 
+from .lifecycle import resolve_exam_phase
 from .models import Exam, ExamAssignment, ExamItem, ExamRandomRule, ExamScheduleWindow, ExamVersion
 
 UNSET = object()
@@ -627,6 +631,7 @@ def revise_exam(
     random_rules=UNSET,
     group_ids=UNSET,
     user_ids=UNSET,
+    bonus_minutes=0,
     request=None,
 ):
     updated_fields = ["updated_by"]
@@ -637,7 +642,6 @@ def revise_exam(
         ("mode", mode),
         ("subject", subject),
         ("description", description),
-        ("status", status),
         ("duration_minutes", duration_minutes),
         ("passing_score", passing_score),
         ("max_attempts", max_attempts),
@@ -686,7 +690,204 @@ def revise_exam(
             request=request,
         )
 
+    if status is not UNSET and status != exam.status:
+        transition_exam_status(
+            exam=exam,
+            next_status=status,
+            actor=updated_by,
+            bonus_minutes=bonus_minutes,
+            request=request,
+        )
+
     return exam
+
+
+def _iter_active_sessions(exam):
+    from apps.exam_delivery.models import ExamSession
+
+    return list(
+        exam.sessions.select_related("candidate", "exam", "exam_version")
+        .prefetch_related("questions__answer", "questions__question_revision__question", "questions__question_revision__answer_key")
+        .filter(status=ExamSession.Status.IN_PROGRESS)
+        .order_by("id")
+    )
+
+
+def _freeze_exam_sessions(*, exam, now):
+    touched_sessions = []
+    for session in _iter_active_sessions(exam):
+        if session.paused_at is not None and session.remaining_seconds_at_pause is not None:
+            continue
+        remaining_seconds = max(0, int((session.expires_at - now).total_seconds()))
+        session.paused_at = now
+        session.remaining_seconds_at_pause = remaining_seconds
+        session.save(update_fields=["paused_at", "remaining_seconds_at_pause", "updated_at"])
+        touched_sessions.append(session)
+    return touched_sessions
+
+
+def _resume_exam_sessions(*, exam, now, bonus_minutes=0):
+    bonus_seconds = max(int(bonus_minutes or 0), 0) * 60
+    touched_sessions = []
+    for session in _iter_active_sessions(exam):
+        if session.paused_at is None or session.remaining_seconds_at_pause is None:
+            continue
+        session.expires_at = now + timedelta(seconds=session.remaining_seconds_at_pause + bonus_seconds)
+        session.paused_at = None
+        session.remaining_seconds_at_pause = None
+        session.save(update_fields=["expires_at", "paused_at", "remaining_seconds_at_pause", "updated_at"])
+        touched_sessions.append(session)
+    return touched_sessions
+
+
+def _broadcast_exam_phase_updates(*, sessions):
+    from apps.proctoring.services import broadcast_session_phase_update
+
+    for session in sessions:
+        broadcast_session_phase_update(session=session)
+
+
+def _cleanup_exam_runtime_state(*, exam):
+    from apps.proctoring.runtime import mark_live_request, release_live_slot
+
+    for session in exam.sessions.only("id"):
+        mark_live_request(session_id=session.id, enabled=False, payload={"exam_id": exam.id})
+        release_live_slot(session_id=session.id, exam_id=exam.id)
+
+
+def _force_close_exam_sessions(*, exam, actor):
+    from apps.exam_delivery.models import Submission
+    from apps.exam_delivery.services import submit_session
+
+    touched_sessions = []
+    for session in _iter_active_sessions(exam):
+        submit_session(
+            session=session,
+            submitted_by=actor,
+            source=Submission.Source.FORCED_CLOSE,
+            force=True,
+        )
+        touched_sessions.append(session)
+    return touched_sessions
+
+
+def _auto_publish_closed_results(*, exam, actor, request=None):
+    from apps.grading.models import Result
+    from apps.grading.services import publish_result
+
+    if not exam.show_results_immediately:
+        return
+
+    for result in (
+        Result.objects.select_related("session", "session__exam")
+        .filter(
+            session__exam=exam,
+            workflow_status=Result.WorkflowStatus.FINALIZED,
+            publish_state=Result.PublishState.DRAFT,
+        )
+        .order_by("id")
+    ):
+        publish_result(result=result, published_by=actor, request=request)
+
+
+def transition_exam_status(*, exam, next_status, actor, bonus_minutes=0, request=None):
+    allowed_transitions = {
+        Exam.Status.DRAFT: {Exam.Status.SCHEDULED, Exam.Status.OPEN},
+        Exam.Status.SCHEDULED: {Exam.Status.OPEN, Exam.Status.CLOSED},
+        Exam.Status.OPEN: {Exam.Status.PAUSED, Exam.Status.CLOSED},
+        Exam.Status.PAUSED: {Exam.Status.OPEN, Exam.Status.CLOSED},
+        Exam.Status.CLOSED: set(),
+        Exam.Status.ARCHIVED: set(),
+    }
+    next_status = str(next_status)
+    current_status = exam.status
+
+    if next_status == current_status:
+        if next_status == Exam.Status.OPEN and bonus_minutes and resolve_exam_phase(exam) == "paused":
+            now = timezone.now()
+            exam.status = Exam.Status.OPEN
+            exam.updated_by = actor
+            exam.save(update_fields=["status", "updated_by", "updated_at"])
+            resumed_sessions = _resume_exam_sessions(exam=exam, now=now, bonus_minutes=bonus_minutes)
+            _broadcast_exam_phase_updates(sessions=resumed_sessions)
+            return exam
+        return exam
+
+    if next_status not in allowed_transitions.get(current_status, set()):
+        raise ValidationError(
+            t(
+                vi=f"Khong the chuyen trang thai tu {current_status} sang {next_status}.",
+                en=f"Cannot transition exam from {current_status} to {next_status}.",
+            )
+        )
+
+    now = timezone.now()
+    exam.status = next_status
+    exam.updated_by = actor
+    exam.save(update_fields=["status", "updated_by", "updated_at"])
+
+    transitioned_sessions = []
+    if current_status == Exam.Status.OPEN and next_status == Exam.Status.PAUSED:
+        transitioned_sessions = _freeze_exam_sessions(exam=exam, now=now)
+    elif current_status == Exam.Status.PAUSED and next_status == Exam.Status.OPEN:
+        transitioned_sessions = _resume_exam_sessions(exam=exam, now=now, bonus_minutes=bonus_minutes)
+    elif next_status == Exam.Status.CLOSED:
+        transitioned_sessions = _force_close_exam_sessions(exam=exam, actor=actor)
+        _cleanup_exam_runtime_state(exam=exam)
+        _auto_publish_closed_results(exam=exam, actor=actor, request=request)
+    if transitioned_sessions:
+        _broadcast_exam_phase_updates(sessions=transitioned_sessions)
+
+    record_audit_event(
+        actor=actor,
+        action="exam.status.transitioned",
+        category="exam",
+        description=f'Transitioned exam "{exam.name}" from {current_status} to {next_status}.',
+        metadata={
+            "exam_id": exam.id,
+            "from_status": current_status,
+            "to_status": next_status,
+            "bonus_minutes": max(int(bonus_minutes or 0), 0),
+        },
+        request=request,
+    )
+    return exam
+
+
+def sync_exam_lifecycle(*, now=None, actor=None):
+    current_time = now or timezone.now()
+    transitioned_exam_ids = []
+    transition_actor = actor or Exam.objects.order_by("id").values_list("updated_by_id", flat=True).first()
+    actor_user = None
+    if transition_actor:
+        actor_user = get_user_model().objects.filter(pk=transition_actor).first()
+
+    candidates = (
+        Exam.objects.select_related("schedule_window")
+        .exclude(status__in=[Exam.Status.DRAFT, Exam.Status.CLOSED, Exam.Status.ARCHIVED])
+        .filter(schedule_window__isnull=False)
+    )
+    for exam in candidates:
+        schedule_window = getattr(exam, "schedule_window", None)
+        opens_at = getattr(schedule_window, "opens_at", None)
+        closes_at = getattr(schedule_window, "closes_at", None)
+        if closes_at and closes_at <= current_time and exam.status in {
+            Exam.Status.SCHEDULED,
+            Exam.Status.OPEN,
+            Exam.Status.PAUSED,
+        }:
+            transition_exam_status(exam=exam, next_status=Exam.Status.CLOSED, actor=actor_user or exam.updated_by)
+            transitioned_exam_ids.append(exam.id)
+            continue
+        if (
+            opens_at
+            and opens_at <= current_time
+            and exam.status == Exam.Status.SCHEDULED
+            and (closes_at is None or closes_at > current_time)
+        ):
+            transition_exam_status(exam=exam, next_status=Exam.Status.OPEN, actor=actor_user or exam.updated_by)
+            transitioned_exam_ids.append(exam.id)
+    return transitioned_exam_ids
 
 
 @transaction.atomic

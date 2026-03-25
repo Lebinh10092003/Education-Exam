@@ -2,6 +2,7 @@ from decimal import Decimal
 
 from django.db.models import Avg
 from django.shortcuts import get_object_or_404
+from django.utils import timezone
 from drf_spectacular.utils import extend_schema
 from rest_framework import mixins, status, viewsets
 from rest_framework.decorators import action
@@ -12,6 +13,7 @@ from rest_framework.views import APIView
 from rest_framework.exceptions import PermissionDenied
 
 from apps.grading.models import Result
+from apps.exam_authoring.lifecycle import resolve_exam_phase
 from apps.exam_authoring.models import Exam
 from apps.materials.models import Material
 from apps.platform_core.i18n import t
@@ -50,8 +52,27 @@ class CandidateDashboardOverviewView(APIView):
 
     @extend_schema(responses=CandidateDashboardOverviewSerializer)
     def get(self, request):
-        exams = get_candidate_exam_queryset(user=request.user)
-        upcoming_exams = exams.order_by("schedule_window__opens_at", "name")
+        exams = list(get_candidate_exam_queryset(user=request.user))
+        phase_priority = {
+            "open": 0,
+            "paused": 1,
+            "scheduled": 2,
+            "closed": 3,
+            "results": 4,
+            "draft": 5,
+        }
+        upcoming_exams = sorted(
+            (
+                exam
+                for exam in exams
+                if resolve_exam_phase(exam) in {"scheduled", "open", "paused"}
+            ),
+            key=lambda exam: (
+                phase_priority.get(resolve_exam_phase(exam), 99),
+                getattr(getattr(exam, "schedule_window", None), "opens_at", None) or timezone.now(),
+                exam.name,
+            ),
+        )
         accessible_subjects = get_accessible_subject_queryset(user=request.user)
         published_results = (
             Result.objects.select_related(
@@ -73,13 +94,13 @@ class CandidateDashboardOverviewView(APIView):
         )
         payload = {
             "stats": {
-                "assigned_exam_count": exams.count(),
-                "upcoming_exam_count": upcoming_exams.count(),
+                "assigned_exam_count": len(exams),
+                "upcoming_exam_count": len(upcoming_exams),
                 "published_result_count": published_results.count(),
                 "average_percentage": published_results.aggregate(avg=Avg("percentage"))["avg"] or Decimal("0.00"),
                 "active_material_count": active_materials.count(),
             },
-            "upcoming_exams": list(upcoming_exams[:5]),
+            "upcoming_exams": upcoming_exams[:5],
             "recent_results": list(published_results[:5]),
             "recent_materials": list(active_materials.order_by("-created_at", "title")[:6]),
         }

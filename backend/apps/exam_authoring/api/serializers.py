@@ -3,6 +3,7 @@ from drf_spectacular.utils import extend_schema_field
 from rest_framework import serializers
 
 from apps.academics.models import Subject
+from apps.exam_authoring.lifecycle import resolve_exam_phase
 from apps.platform_core.i18n import t
 from apps.question_bank.models import Question, QuestionTag
 
@@ -86,6 +87,7 @@ class ExamReadSerializer(serializers.ModelSerializer):
     schedule_window = ExamScheduleWindowSerializer(read_only=True)
     assignment_summary = serializers.SerializerMethodField()
     delivery_summary = serializers.SerializerMethodField()
+    lifecycle_phase = serializers.SerializerMethodField()
 
     class Meta:
         model = Exam
@@ -96,6 +98,7 @@ class ExamReadSerializer(serializers.ModelSerializer):
             "subject",
             "description",
             "status",
+            "lifecycle_phase",
             "duration_minutes",
             "passing_score",
             "max_attempts",
@@ -121,6 +124,10 @@ class ExamReadSerializer(serializers.ModelSerializer):
             "in_progress_sessions": getattr(obj, "in_progress_sessions", obj.sessions.filter(status="in_progress").count()),
             "submitted_sessions": getattr(obj, "submitted_sessions", obj.sessions.filter(status="submitted").count()),
         }
+
+    @extend_schema_field(OpenApiTypes.STR)
+    def get_lifecycle_phase(self, obj):
+        return resolve_exam_phase(obj)
 
 
 class ExamRandomRuleInputSerializer(serializers.Serializer):
@@ -148,6 +155,7 @@ class ExamWriteSerializer(serializers.Serializer):
     random_rules = ExamRandomRuleInputSerializer(many=True, required=False)
     group_ids = serializers.ListField(child=serializers.IntegerField(), required=False)
     user_ids = serializers.ListField(child=serializers.IntegerField(), required=False)
+    bonus_minutes = serializers.IntegerField(required=False, min_value=0)
 
     def validate(self, attrs):
         exam = self.instance
@@ -268,6 +276,7 @@ class ExamWriteSerializer(serializers.Serializer):
             random_rules=validated_data["random_rules"] if "random_rules" in validated_data else UNSET,
             group_ids=validated_data["group_ids"] if "group_ids" in validated_data else UNSET,
             user_ids=validated_data["user_ids"] if "user_ids" in validated_data else UNSET,
+            bonus_minutes=validated_data.get("bonus_minutes", 0),
         )
 
 

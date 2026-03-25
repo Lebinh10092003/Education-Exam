@@ -101,13 +101,17 @@ def test_objective_only_submission_finalizes_result_without_manual_tasks(
     admin_user,
     candidate_user,
 ):
-    _, session, _ = _build_submitted_session(
+    from apps.exam_authoring.services import transition_exam_status
+
+    exam, session, _ = _build_submitted_session(
         subject=subject,
         admin_user=admin_user,
         candidate_user=candidate_user,
         include_essay=False,
         show_results_immediately=True,
     )
+    transition_exam_status(exam=exam, next_status="closed", actor=admin_user)
+    session.result.refresh_from_db()
 
     assert session.manual_grading_tasks.count() == 0
     assert session.result.workflow_status == "finalized"
@@ -142,9 +146,10 @@ def test_grade_manual_task_updates_manual_score_and_finalizes_result_when_last_t
 
 @pytest.mark.django_db
 def test_publish_result_marks_result_as_published(subject, admin_user, candidate_user):
+    from apps.exam_authoring.services import transition_exam_status
     from apps.grading.services import grade_manual_task, publish_result
 
-    _, session, _ = _build_submitted_session(
+    exam, session, _ = _build_submitted_session(
         subject=subject,
         admin_user=admin_user,
         candidate_user=candidate_user,
@@ -152,6 +157,7 @@ def test_publish_result_marks_result_as_published(subject, admin_user, candidate
     )
     task = session.manual_grading_tasks.first()
     grade_manual_task(task=task, grader=admin_user, score_awarded="1.00")
+    transition_exam_status(exam=exam, next_status="closed", actor=admin_user)
 
     publish_result(result=session.result, published_by=admin_user)
     session.result.refresh_from_db()

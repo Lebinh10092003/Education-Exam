@@ -59,11 +59,11 @@ def test_admin_can_fetch_exam_monitoring_hub(api_client, admin_token, subject, a
 
     assert response.status_code == 200
     payload = response.json()
-    assert payload["count"] == 2
+    assert payload["count"] == 1
     assert payload["summary"] == {
-        "exam_count": 2,
-        "total_candidates": 2,
-        "in_progress_sessions": 2,
+        "exam_count": 1,
+        "total_candidates": 1,
+        "in_progress_sessions": 1,
         "alert_count": 2,
         "critical_exam_count": 1,
     }

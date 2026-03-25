@@ -4,6 +4,8 @@ from django.db import transaction
 from django.utils import timezone
 from rest_framework.exceptions import ValidationError
 
+from apps.exam_authoring.lifecycle import resolve_exam_phase
+from apps.exam_authoring.models import Exam
 from apps.exam_delivery.models import SessionAnswer
 from apps.notifications.models import Notification
 from apps.notifications.services import create_notifications_for_permission
@@ -28,6 +30,10 @@ def _calculate_percentage(*, total_score, max_score):
 
 def _calculate_passed(*, session, percentage):
     return percentage >= Decimal(str(session.exam.passing_score))
+
+
+def _get_fresh_exam(session):
+    return Exam.objects.select_related("schedule_window").get(pk=session.exam_id)
 
 
 def _sync_result_state(*, session, published_by=None, request=None):
@@ -67,9 +73,11 @@ def _sync_result_state(*, session, published_by=None, request=None):
     }
     result, _ = Result.objects.update_or_create(session=session, defaults=defaults)
 
+    current_exam = _get_fresh_exam(session)
     if (
         workflow_status == Result.WorkflowStatus.FINALIZED
-        and session.exam.show_results_immediately
+        and current_exam.show_results_immediately
+        and resolve_exam_phase(current_exam) in {"closed", "results"}
         and result.publish_state != Result.PublishState.PUBLISHED
     ):
         result.publish_state = Result.PublishState.PUBLISHED
@@ -204,6 +212,14 @@ def grade_manual_task(*, task, grader, score_awarded, feedback="", request=None)
 def publish_result(*, result, published_by, request=None):
     if result.workflow_status != Result.WorkflowStatus.FINALIZED:
         raise ValidationError(t(vi="Chi co ket qua da hoan tat moi co the cong bo.", en="Only finalized results can be published."))
+    current_exam = _get_fresh_exam(result.session)
+    if resolve_exam_phase(current_exam) not in {"closed", "results"}:
+        raise ValidationError(
+            t(
+                vi="Chỉ có thể công bố kết quả sau khi kỳ thi đã đóng.",
+                en="Results can only be published after the exam has closed.",
+            )
+        )
 
     result.publish_state = Result.PublishState.PUBLISHED
     result.published_at = timezone.now()
