@@ -26,6 +26,7 @@ import {
   formatResultNumber,
   toResultNumber,
 } from "./candidateResultsShared";
+import { formatCertificateLevel } from "./disciplineShared";
 
 export function CandidateResults() {
   const [searchQuery, setSearchQuery] = useState("");
@@ -263,7 +264,9 @@ export function CandidateResults() {
                   <tr className="border-b border-gray-200 text-left text-sm text-gray-600">
                     <th className="px-4 py-3 font-semibold">Exam</th>
                     <th className="px-4 py-3 font-semibold">Score</th>
+                    <th className="px-4 py-3 font-semibold">Penalty</th>
                     <th className="px-4 py-3 font-semibold">Performance</th>
+                    <th className="px-4 py-3 font-semibold">Certificate</th>
                     <th className="px-4 py-3 font-semibold">Status</th>
                     <th className="px-4 py-3 font-semibold">Published</th>
                     <th className="px-4 py-3 font-semibold">Actions</th>
@@ -279,14 +282,17 @@ export function CandidateResults() {
                         </div>
                       </td>
                       <td className="px-4 py-4 text-sm font-medium text-gray-900">
-                        {formatResultNumber(result.score)} / {formatResultNumber(result.total_marks)}
+                        <div>{formatResultNumber(result.score)} / {formatResultNumber(result.total_marks)}</div>
+                        <div className="text-xs text-gray-500">Original: {formatResultNumber(result.original_score)}</div>
                       </td>
+                      <td className="px-4 py-4 text-sm text-gray-600">{formatResultNumber(result.penalty_percent_applied)}%</td>
                       <td className="px-4 py-4">
                         <div className="space-y-1">
                           <Progress value={toResultNumber(result.percentage)} className="h-2 w-28" />
                           <p className="text-xs text-gray-500">{formatResultNumber(result.percentage)}%</p>
                         </div>
                       </td>
+                      <td className="px-4 py-4 text-sm text-gray-600">{formatCertificateLevel(result.certificate_level)}</td>
                       <td className="px-4 py-4">
                         <div className="flex flex-col gap-2">
                           <StatusBadge status={result.publish_state} />

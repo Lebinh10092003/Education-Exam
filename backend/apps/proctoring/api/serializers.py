@@ -59,10 +59,12 @@ class ClientCapabilityWriteSerializer(serializers.Serializer):
     user_agent = serializers.CharField(required=False, allow_blank=True, default="")
 
 
-class SessionHeartbeatSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = SessionHeartbeat
-        fields = ("id", "connection_status", "latency_ms", "payload", "recorded_at")
+class SessionHeartbeatSerializer(serializers.Serializer):
+    session_id = serializers.IntegerField()
+    connection_status = serializers.ChoiceField(choices=SessionHeartbeat.ConnectionStatus.choices)
+    latency_ms = serializers.IntegerField(required=False, allow_null=True, min_value=0)
+    payload = serializers.JSONField()
+    recorded_at = serializers.DateTimeField()
 
 
 class SessionHeartbeatWriteSerializer(serializers.Serializer):
@@ -199,6 +201,8 @@ class MonitoringCandidateStatusSerializer(serializers.Serializer):
         webcam_publish_status = serializers.CharField()
         screen_capture_status = serializers.CharField()
         last_publish_at = serializers.CharField(allow_null=True)
+        live_request_enabled = serializers.BooleanField(required=False)
+        live_slot_active = serializers.BooleanField(required=False)
 
     session_id = serializers.IntegerField(allow_null=True)
     candidate = CandidateSummarySerializer()

@@ -18,6 +18,7 @@ import { RadioGroup, RadioGroupItem } from "../components/ui/radio-group";
 import { Label } from "../components/ui/label";
 import { Badge } from "../components/ui/badge";
 import { Textarea } from "../components/ui/textarea";
+import { buildWsUrl } from "../lib/env";
 import { apiRequest } from "../lib/http";
 import {
   captureTrackSnapshot,
@@ -34,6 +35,7 @@ import {
   type ConnectedMediaRoom,
   type ProctorEventResponse,
 } from "../lib/proctoringMedia";
+import { getStoredTokens } from "../lib/storage";
 
 interface SessionQuestion {
   id: number;
@@ -90,7 +92,10 @@ interface SessionAnswerResponse {
 }
 
 interface AutosaveResponse {
-  id: number;
+  id: number | null;
+  answered_count: number;
+  marked_count: number;
+  payload: Record<string, unknown>;
   created_at: string;
 }
 
@@ -115,7 +120,9 @@ type NavigatorConnectionInfo = {
   rtt?: number;
 };
 
-const HEARTBEAT_INTERVAL_MS = 20_000;
+const HEARTBEAT_INTERVAL_MS = 60_000;
+const AUTOSAVE_INTERVAL_MS = 120_000;
+const ESSAY_AUTOSAVE_DELAY_MS = 25_000;
 const DEGRADED_CONNECTION_RTT_MS = 1_500;
 
 const formatTime = (seconds: number) => {
@@ -168,6 +175,9 @@ const getCandidateConnectionStatus = (failedHeartbeatCount: number): ConnectionS
   return "stable";
 };
 
+const parseLiveRequestEnabled = (value: boolean | string | undefined) =>
+  value === true || value === "1" || value === "true";
+
 export function TakeExam() {
   const { t, i18n } = useTranslation("common");
   const { id } = useParams();
@@ -191,15 +201,20 @@ export function TakeExam() {
   const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>(
     navigator.onLine ? "stable" : "offline",
   );
+  const [controlSocketRevision, setControlSocketRevision] = useState(0);
   const dirtyEssayQuestionIdsRef = useRef<Set<number>>(new Set());
   const latestQuestionIndexRef = useRef(0);
   const requestQueueRef = useRef(Promise.resolve());
   const heartbeatPendingRef = useRef(false);
   const heartbeatFailureCountRef = useRef(0);
   const autosavePendingRef = useRef(false);
+  const autosaveDirtyRef = useRef(false);
   const capabilityRegisteredSessionIdRef = useRef<number | null>(null);
   const captureResourcesRef = useRef<ProctoringCaptureResources | null>(null);
   const liveRoomRef = useRef<ConnectedMediaRoom | null>(null);
+  const liveRequestEnabledRef = useRef(false);
+  const controlSocketRef = useRef<WebSocket | null>(null);
+  const controlReconnectTimeoutRef = useRef<number | null>(null);
   const setupPreviewRef = useRef<HTMLVideoElement | null>(null);
   const examPreviewRef = useRef<HTMLVideoElement | null>(null);
   const screenEndedHandlerRef = useRef<(() => void) | null>(null);
@@ -216,6 +231,89 @@ export function TakeExam() {
       return await task();
     } finally {
       releaseCurrent();
+    }
+  };
+
+  const clearControlReconnectTimeout = () => {
+    if (controlReconnectTimeoutRef.current !== null) {
+      window.clearTimeout(controlReconnectTimeoutRef.current);
+      controlReconnectTimeoutRef.current = null;
+    }
+  };
+
+  const markAutosaveDirty = () => {
+    autosaveDirtyRef.current = true;
+  };
+
+  const getCurrentScreenCaptureStatus = () => {
+    const screenTrack = captureResourcesRef.current?.screenTrack;
+    if (!screenTrack) {
+      return "unavailable" as const;
+    }
+    return screenTrack.readyState === "ended" ? ("revoked" as const) : ("ready" as const);
+  };
+
+  const syncRequestedLiveState = async (enabled: boolean) => {
+    liveRequestEnabledRef.current = enabled;
+    if (!session) {
+      return;
+    }
+
+    const captureResources = captureResourcesRef.current;
+    if (!captureResources) {
+      return;
+    }
+
+    if (!enabled) {
+      if (!liveRoomRef.current) {
+        return;
+      }
+      await disconnectRoom(liveRoomRef.current);
+      liveRoomRef.current = null;
+      await enqueueSessionMutation(() =>
+        reportMediaStatus(session.id, {
+          webcam_publish_status: "stopped",
+          screen_capture_status: getCurrentScreenCaptureStatus(),
+          metadata: { reason: "live_request_disabled" },
+        }),
+      ).catch(() => undefined);
+      return;
+    }
+
+    if (liveRoomRef.current) {
+      return;
+    }
+
+    try {
+      const publishToken = await enqueueSessionMutation(() => requestPublishToken(session.id));
+      liveRoomRef.current = await connectCandidatePublisher(
+        publishToken,
+        captureResources.webcamTrack,
+      );
+      await enqueueSessionMutation(() =>
+        reportMediaStatus(session.id, {
+          webcam_publish_status: "publishing",
+          screen_capture_status: getCurrentScreenCaptureStatus(),
+          metadata: {
+            provider: publishToken.provider,
+            room_name: publishToken.room_name,
+            participant_name: publishToken.participant_name,
+            reason: "live_request_enabled",
+          },
+        }),
+      );
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : t("examSession.protectedSetupDescription");
+      await enqueueSessionMutation(() =>
+        reportMediaStatus(session.id, {
+          webcam_publish_status: "failed",
+          screen_capture_status: getCurrentScreenCaptureStatus(),
+          webcam_publish_error: message,
+          metadata: { reason: "live_request_failed" },
+        }),
+      ).catch(() => undefined);
+      notify.error(message);
     }
   };
 
@@ -297,8 +395,14 @@ export function TakeExam() {
       captureResourcesRef.current.screenTrack.removeEventListener("ended", screenEndedHandlerRef.current);
     }
     screenEndedHandlerRef.current = null;
+    clearControlReconnectTimeout();
+    if (controlSocketRef.current) {
+      controlSocketRef.current.close();
+      controlSocketRef.current = null;
+    }
     await disconnectRoom(liveRoomRef.current);
     liveRoomRef.current = null;
+    liveRequestEnabledRef.current = false;
     captureResourcesRef.current?.dispose();
     captureResourcesRef.current = null;
     setLocalPreviewStream(null);
@@ -328,7 +432,11 @@ export function TakeExam() {
       return;
     }
 
-    const webcamSnapshot = await captureTrackSnapshot(captureResources.webcamTrack);
+    const webcamSnapshot = await captureTrackSnapshot(captureResources.webcamTrack, {
+      maxWidth: 1280,
+      mimeType: "image/jpeg",
+      quality: 0.82,
+    });
     await enqueueSessionMutation(() =>
       uploadProctorEvidence(session.id, event.id, "webcam_snapshot", webcamSnapshot, { message }),
     );
@@ -337,7 +445,11 @@ export function TakeExam() {
       return;
     }
 
-    const screenSnapshot = await captureTrackSnapshot(captureResources.screenTrack);
+    const screenSnapshot = await captureTrackSnapshot(captureResources.screenTrack, {
+      maxWidth: 1280,
+      mimeType: "image/jpeg",
+      quality: 0.82,
+    });
     await enqueueSessionMutation(() =>
       uploadProctorEvidence(session.id, event.id, "screen_capture", screenSnapshot, { message }),
     );
@@ -407,6 +519,8 @@ export function TakeExam() {
       setProctoringReady(!nextSession.enable_proctoring);
       setIsProctoringSetupPending(false);
       setTimeRemaining(nextSession.remaining_seconds);
+      autosaveDirtyRef.current = false;
+      liveRequestEnabledRef.current = false;
       const nextIndex = Math.max(
         nextSession.questions.findIndex((question) => !question.is_answered),
         0,
@@ -472,11 +586,12 @@ export function TakeExam() {
         captureResources = await requestProctoringStreams();
         captureResourcesRef.current = captureResources;
         setLocalPreviewStream(captureResources.webcamStream);
+        liveRequestEnabledRef.current = false;
 
         const onScreenShareEnded = () => {
           void enqueueSessionMutation(() =>
             reportMediaStatus(session.id, {
-              webcam_publish_status: "publishing",
+              webcam_publish_status: liveRoomRef.current ? "publishing" : "idle",
               screen_capture_status: "revoked",
               metadata: { reason: "screen_share_ended" },
             }),
@@ -527,25 +642,15 @@ export function TakeExam() {
         );
       }
 
-      if (!liveRoomRef.current) {
-        const publishToken = await enqueueSessionMutation(() => requestPublishToken(session.id));
-        liveRoomRef.current = await connectCandidatePublisher(
-          publishToken,
-          captureResources.webcamTrack,
-        );
-
-        await enqueueSessionMutation(() =>
-          reportMediaStatus(session.id, {
-            webcam_publish_status: "publishing",
-            screen_capture_status: "ready",
-            metadata: {
-              provider: publishToken.provider,
-              room_name: publishToken.room_name,
-              participant_name: publishToken.participant_name,
-            },
-          }),
-        );
-      }
+      await enqueueSessionMutation(() =>
+        reportMediaStatus(session.id, {
+          webcam_publish_status: "idle",
+          screen_capture_status: "ready",
+          metadata: {
+            mode: "local_only",
+          },
+        }),
+      );
       setProctoringBlockReason(null);
       setProctoringReady(true);
     } catch (proctoringError) {
@@ -589,6 +694,88 @@ export function TakeExam() {
   }, [session?.id, session?.status]);
 
   useEffect(() => {
+    const tokens = getStoredTokens();
+    if (
+      !session
+      || !session.enable_proctoring
+      || session.status !== "in_progress"
+      || !proctoringReady
+      || !tokens?.access
+    ) {
+      clearControlReconnectTimeout();
+      if (controlSocketRef.current) {
+        controlSocketRef.current.close();
+        controlSocketRef.current = null;
+      }
+      return;
+    }
+
+    let isActive = true;
+    const scheduleReconnect = () => {
+      if (!isActive || controlReconnectTimeoutRef.current !== null) {
+        return;
+      }
+      controlReconnectTimeoutRef.current = window.setTimeout(() => {
+        controlReconnectTimeoutRef.current = null;
+        if (!isActive) {
+          return;
+        }
+        setControlSocketRevision((current) => current + 1);
+      }, 3000);
+    };
+
+    const websocket = new WebSocket(
+      buildWsUrl(`/ws/proctoring/sessions/${session.id}/control/?token=${tokens.access}`),
+    );
+    controlSocketRef.current = websocket;
+
+    websocket.onopen = () => {
+      clearControlReconnectTimeout();
+    };
+
+    websocket.onmessage = (event) => {
+      try {
+        const message = JSON.parse(event.data) as {
+          type?: string;
+          payload?: { enabled?: boolean | string };
+        };
+        if (message.type !== "live_request") {
+          return;
+        }
+        const enabled = parseLiveRequestEnabled(message.payload?.enabled);
+        void syncRequestedLiveState(enabled);
+      } catch {
+        // Ignore malformed control payloads and wait for the next update.
+      }
+    };
+
+    websocket.onerror = () => {
+      scheduleReconnect();
+    };
+
+    websocket.onclose = () => {
+      if (!isActive) {
+        return;
+      }
+      scheduleReconnect();
+    };
+
+    return () => {
+      isActive = false;
+      if (controlSocketRef.current === websocket) {
+        controlSocketRef.current = null;
+      }
+      websocket.close();
+    };
+  }, [
+    proctoringReady,
+    session?.enable_proctoring,
+    session?.id,
+    session?.status,
+    controlSocketRevision,
+  ]);
+
+  useEffect(() => {
     if (!session || session.status !== "in_progress") {
       return;
     }
@@ -598,7 +785,7 @@ export function TakeExam() {
     }
 
     const autosave = () => {
-      if (autosavePendingRef.current) {
+      if (autosavePendingRef.current || !autosaveDirtyRef.current) {
         return;
       }
 
@@ -610,6 +797,7 @@ export function TakeExam() {
             body: { payload: { current_question_index: latestQuestionIndexRef.current } },
           });
           setLastSavedAt(response.created_at);
+          autosaveDirtyRef.current = false;
         } catch {
           heartbeatFailureCountRef.current = Math.max(heartbeatFailureCountRef.current, 1);
           setConnectionStatus("unstable");
@@ -621,7 +809,7 @@ export function TakeExam() {
 
     const intervalId = window.setInterval(() => {
       autosave();
-    }, 30000);
+    }, AUTOSAVE_INTERVAL_MS);
 
     return () => window.clearInterval(intervalId);
   }, [proctoringReady, session?.enable_proctoring, session?.id, session?.status]);
@@ -709,6 +897,32 @@ export function TakeExam() {
 
   const currentQuestion = session?.questions[currentQuestionIndex] ?? null;
 
+  useEffect(() => {
+    if (
+      !session
+      || session.status !== "in_progress"
+      || !currentQuestion
+      || currentQuestion.question_type !== "essay"
+      || !dirtyEssayQuestionIdsRef.current.has(currentQuestion.id)
+    ) {
+      return;
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      void persistEssayAnswer(currentQuestionIndex).catch(() => undefined);
+    }, ESSAY_AUTOSAVE_DELAY_MS);
+
+    return () => {
+      window.clearTimeout(timeoutId);
+    };
+  }, [
+    currentQuestion?.answer_text,
+    currentQuestion?.id,
+    currentQuestion?.question_type,
+    currentQuestionIndex,
+    session,
+  ]);
+
   const answeredCount = useMemo(
     () => session?.questions.filter((question) => question.is_answered).length ?? 0,
     [session],
@@ -725,6 +939,7 @@ export function TakeExam() {
     try {
       await persistEssayAnswer();
       setCurrentQuestionIndex(nextIndex);
+      markAutosaveDirty();
     } catch {
       // Error already surfaced via notify.
     }
@@ -738,6 +953,7 @@ export function TakeExam() {
       selected_option_keys: [optionKey],
       is_answered: true,
     });
+    markAutosaveDirty();
     await saveAnswer(currentQuestion.id, {
       selected_option_keys: [optionKey],
       is_marked_for_review: currentQuestion.is_marked_for_review,
@@ -749,6 +965,7 @@ export function TakeExam() {
       return;
     }
     dirtyEssayQuestionIdsRef.current.add(currentQuestion.id);
+    markAutosaveDirty();
     updateQuestion(currentQuestion.id, {
       answer_text: nextText,
       is_answered: Boolean(nextText.trim()),
@@ -760,6 +977,7 @@ export function TakeExam() {
       return;
     }
     const nextMarked = !currentQuestion.is_marked_for_review;
+    markAutosaveDirty();
     updateQuestion(currentQuestion.id, { is_marked_for_review: nextMarked });
     await saveAnswer(currentQuestion.id, { is_marked_for_review: nextMarked });
   };

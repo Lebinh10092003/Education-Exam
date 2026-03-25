@@ -105,6 +105,8 @@ def admin_user(db, permission_grant):
         "grading.view",
         "results.manage",
         "results.view",
+        "discipline.manage",
+        "discipline.view",
         "proctoring.manage",
         "proctoring.view",
         "materials.manage",

@@ -3,7 +3,13 @@ from channels.generic.websocket import AsyncJsonWebsocketConsumer
 from django.core.exceptions import ObjectDoesNotExist
 from rest_framework.exceptions import PermissionDenied
 
-from .services import assert_admin_monitoring_access, build_exam_monitoring_snapshot, monitoring_group_name
+from .services import (
+    assert_admin_monitoring_access,
+    assert_candidate_session_access,
+    build_exam_monitoring_snapshot,
+    monitoring_group_name,
+    session_control_group_name,
+)
 
 
 @database_sync_to_async
@@ -13,6 +19,16 @@ def _load_monitoring_snapshot(user, exam_id):
     assert_admin_monitoring_access(user=user)
     exam = Exam.objects.select_related("subject", "current_version").get(pk=exam_id)
     return build_exam_monitoring_snapshot(exam=exam)
+
+
+@database_sync_to_async
+def _load_candidate_control_snapshot(user, session_id):
+    from apps.exam_delivery.models import ExamSession
+    from apps.proctoring.runtime import get_runtime_snapshot
+
+    session = ExamSession.objects.select_related("candidate").get(pk=session_id)
+    assert_candidate_session_access(session=session, user=user)
+    return get_runtime_snapshot(session_id=session.id)
 
 
 class MonitoringConsumer(AsyncJsonWebsocketConsumer):
@@ -39,6 +55,46 @@ class MonitoringConsumer(AsyncJsonWebsocketConsumer):
             await self.channel_layer.group_discard(self.group_name, self.channel_name)
 
     async def monitoring_message(self, event):
+        await self.send_json(
+            {
+                "type": event["message_type"],
+                "payload": event["payload"],
+            }
+        )
+
+
+class CandidateSessionControlConsumer(AsyncJsonWebsocketConsumer):
+    async def connect(self):
+        self.session_id = int(self.scope["url_route"]["kwargs"]["session_id"])
+        user = self.scope.get("user")
+        if not user or not user.is_authenticated:
+            await self.close(code=4401)
+            return
+
+        try:
+            runtime_snapshot = await _load_candidate_control_snapshot(user, self.session_id)
+        except (PermissionDenied, ObjectDoesNotExist):
+            await self.close(code=4403)
+            return
+
+        self.group_name = session_control_group_name(self.session_id)
+        await self.channel_layer.group_add(self.group_name, self.channel_name)
+        await self.accept()
+        await self.send_json(
+            {
+                "type": "live_request",
+                "payload": runtime_snapshot.get(
+                    "live_request",
+                    {"enabled": False, "state": "disabled"},
+                ),
+            }
+        )
+
+    async def disconnect(self, close_code):
+        if hasattr(self, "group_name"):
+            await self.channel_layer.group_discard(self.group_name, self.channel_name)
+
+    async def control_message(self, event):
         await self.send_json(
             {
                 "type": event["message_type"],

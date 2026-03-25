@@ -54,6 +54,14 @@ const PracticeSessionRoute = lazyRoute(() => import("./pages/PracticeSession"), 
 const PracticeReviewRoute = lazyRoute(() => import("./pages/PracticeReview"), "PracticeReview");
 const MaterialsLibraryRoute = lazyRoute(() => import("./pages/MaterialsLibrary"), "MaterialsLibrary");
 const ResultsReportsRoute = lazyRoute(() => import("./pages/ResultsReports"), "ResultsReports");
+const DisciplinaryManagementRoute = lazyRoute(
+  () => import("./pages/DisciplinaryManagement"),
+  "DisciplinaryManagement",
+);
+const DisciplinaryExamSheetRoute = lazyRoute(
+  () => import("./pages/DisciplinaryExamSheet"),
+  "DisciplinaryExamSheet",
+);
 const ProfileRoute = lazyRoute(() => import("./pages/Profile"), "Profile");
 
 export function ExamMonitorRedirectRoute() {
@@ -98,6 +106,8 @@ export const routeConfig = [
       { path: "manual-grading", Component: ManualGradingRoute },
       { path: "materials", Component: MaterialsLibraryRoute },
       { path: "results", Component: ResultsReportsRoute },
+      { path: "discipline", Component: DisciplinaryManagementRoute },
+      { path: "discipline/exams/:id", Component: DisciplinaryExamSheetRoute },
       { path: "roles-permissions", Component: RolesPermissionsRoute },
       { path: "notifications", Component: NotificationCenterRoute },
       { path: "audit", Component: AuditCenterRoute },

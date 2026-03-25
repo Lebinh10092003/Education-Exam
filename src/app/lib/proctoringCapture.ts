@@ -50,7 +50,16 @@ export async function requestProctoringStreams(): Promise<ProctoringCaptureResou
   };
 }
 
-export async function captureTrackSnapshot(track: MediaStreamTrack): Promise<Blob> {
+interface CaptureTrackSnapshotOptions {
+  maxWidth?: number;
+  mimeType?: "image/jpeg" | "image/webp" | "image/png";
+  quality?: number;
+}
+
+export async function captureTrackSnapshot(
+  track: MediaStreamTrack,
+  options: CaptureTrackSnapshotOptions = {},
+): Promise<Blob> {
   const stream = new MediaStream([track]);
   const video = document.createElement("video");
   video.playsInline = true;
@@ -68,16 +77,22 @@ export async function captureTrackSnapshot(track: MediaStreamTrack): Promise<Blo
     });
 
     const canvas = document.createElement("canvas");
-    canvas.width = video.videoWidth || 1280;
-    canvas.height = video.videoHeight || 720;
+    const sourceWidth = video.videoWidth || 1280;
+    const sourceHeight = video.videoHeight || 720;
+    const maxWidth = Math.max(320, options.maxWidth ?? 1280);
+    const scale = sourceWidth > maxWidth ? maxWidth / sourceWidth : 1;
+    canvas.width = Math.max(1, Math.round(sourceWidth * scale));
+    canvas.height = Math.max(1, Math.round(sourceHeight * scale));
     const context = canvas.getContext("2d");
     if (!context) {
       throw new Error("Unable to initialize snapshot canvas.");
     }
     context.drawImage(video, 0, 0, canvas.width, canvas.height);
 
+    const mimeType = options.mimeType ?? "image/jpeg";
+    const quality = options.quality ?? 0.82;
     const blob = await new Promise<Blob | null>((resolve) => {
-      canvas.toBlob(resolve, "image/png");
+      canvas.toBlob(resolve, mimeType, quality);
     });
     if (!blob) {
       throw new Error("Unable to capture snapshot.");

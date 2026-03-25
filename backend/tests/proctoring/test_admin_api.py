@@ -163,7 +163,14 @@ def test_exam_monitoring_hub_supports_filters(api_client, admin_token, subject, 
 
 
 @pytest.mark.django_db
-def test_admin_can_fetch_exam_monitoring_snapshot(api_client, admin_token, subject, admin_user, candidate_user):
+def test_admin_can_fetch_exam_monitoring_snapshot(
+    api_client,
+    admin_token,
+    subject,
+    admin_user,
+    candidate_user,
+    fake_redis,
+):
     from apps.proctoring.services import record_heartbeat, update_media_status
 
     exam, session = build_active_session(
@@ -353,6 +360,7 @@ def test_admin_can_request_view_token_for_candidate_session(
     subject,
     admin_user,
     candidate_user,
+    fake_redis,
 ):
     _, session = build_active_session(
         subject=subject,
@@ -369,4 +377,9 @@ def test_admin_can_request_view_token_for_candidate_session(
 
     assert response.status_code == 200
     assert response.json()["room_name"]
+
+    release_response = api_client.delete(
+        f"/api/v1/proctoring/sessions/{session.id}/media/view-token/",
+    )
+    assert release_response.status_code == 204
 

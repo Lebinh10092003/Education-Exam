@@ -83,6 +83,12 @@ export async function requestViewToken(sessionId: number) {
   });
 }
 
+export async function stopViewToken(sessionId: number) {
+  return apiRequest<null>(`/api/v1/proctoring/sessions/${sessionId}/media/view-token/`, {
+    method: "DELETE",
+  });
+}
+
 export async function reportMediaStatus(sessionId: number, payload: MediaStatusPayload) {
   return apiRequest<MediaStatusResponse>(`/api/v1/proctoring/sessions/${sessionId}/media/status/`, {
     method: "POST",
@@ -111,6 +117,7 @@ export async function uploadProctorEvidence(
   file: Blob,
   metadata: Record<string, unknown>,
 ) {
+  const extension = file.type === "image/webp" ? "webp" : file.type === "image/jpeg" ? "jpg" : "png";
   const formData = new FormData();
   if (eventId !== null) {
     formData.set("event_id", String(eventId));
@@ -119,7 +126,7 @@ export async function uploadProctorEvidence(
   formData.set("metadata", JSON.stringify(metadata));
   formData.set(
     "file",
-    new File([file], `${evidenceType}.png`, { type: file.type || "image/png" }),
+    new File([file], `${evidenceType}.${extension}`, { type: file.type || "application/octet-stream" }),
   );
   return apiRequest<ProctorEvidenceResponse>(`/api/v1/proctoring/sessions/${sessionId}/evidence/`, {
     method: "POST",

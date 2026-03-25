@@ -3,8 +3,12 @@ export interface CandidateResultRecord {
   workflow_status: string;
   publish_state: string;
   score: string;
+  original_score: string;
   total_marks: string;
   percentage: string;
+  original_percentage: string;
+  penalty_percent_applied: string;
+  certificate_level: string;
   result_status: string;
   passed: boolean | null;
   completed_date: string | null;

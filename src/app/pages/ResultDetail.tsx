@@ -27,6 +27,7 @@ import {
   getPerformanceMessage,
   toResultNumber,
 } from "./candidateResultsShared";
+import { formatCertificateLevel } from "./disciplineShared";
 
 const emptyResults: PaginatedResponse<CandidateResultRecord> = {
   count: 0,
@@ -121,6 +122,9 @@ export function ResultDetail() {
                   <p className="mt-2 text-sm text-slate-600">
                     {formatResultNumber(result.score)} / {formatResultNumber(result.total_marks)} points
                   </p>
+                  <p className="mt-1 text-xs text-slate-500">
+                    Original: {formatResultNumber(result.original_score)} points, penalty {formatResultNumber(result.penalty_percent_applied)}%
+                  </p>
                 </div>
 
                 <div className="rounded-3xl bg-slate-950 px-6 py-5 text-white lg:min-w-64">
@@ -189,7 +193,7 @@ export function ResultDetail() {
                   </div>
                   <div>
                     <p className="text-sm text-slate-500">Band</p>
-                    <p className="text-2xl font-semibold text-slate-950">{band}</p>
+                    <p className="text-2xl font-semibold text-slate-950">{formatCertificateLevel(result.certificate_level)}</p>
                   </div>
                 </div>
               </CardContent>
@@ -214,12 +218,16 @@ export function ResultDetail() {
 
               <div className="grid gap-4 md:grid-cols-2">
                 <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                  <p className="text-xs uppercase tracking-wide text-slate-500">Published at</p>
-                  <p className="mt-2 font-medium text-slate-900">{formatResultDate(result.published_at)}</p>
+                  <p className="text-xs uppercase tracking-wide text-slate-500">Published at / Certificate</p>
+                  <p className="mt-2 font-medium text-slate-900">
+                    {formatResultDate(result.published_at)} / {formatCertificateLevel(result.certificate_level)}
+                  </p>
                 </div>
                 <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                  <p className="text-xs uppercase tracking-wide text-slate-500">Completed at</p>
-                  <p className="mt-2 font-medium text-slate-900">{formatResultDate(result.completed_date)}</p>
+                  <p className="text-xs uppercase tracking-wide text-slate-500">Completed at / Original</p>
+                  <p className="mt-2 font-medium text-slate-900">
+                    {formatResultDate(result.completed_date)} / {formatResultNumber(result.original_score)}
+                  </p>
                 </div>
               </div>
             </CardContent>
@@ -250,6 +258,10 @@ export function ResultDetail() {
               <div className="flex items-center justify-between gap-4">
                 <span className="text-slate-500">Publish state</span>
                 <span className="text-right font-medium text-slate-900">{result.publish_state}</span>
+              </div>
+              <div className="flex items-center justify-between gap-4">
+                <span className="text-slate-500">Penalty percent</span>
+                <span className="text-right font-medium text-slate-900">{formatResultNumber(result.penalty_percent_applied)}%</span>
               </div>
             </CardContent>
           </Card>

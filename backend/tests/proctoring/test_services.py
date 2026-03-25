@@ -112,7 +112,12 @@ def test_record_proctor_event_creates_candidate_notification(subject, admin_user
 
 
 @pytest.mark.django_db
-def test_build_exam_monitoring_snapshot_returns_candidate_statuses_and_alerts(subject, admin_user, candidate_user):
+def test_build_exam_monitoring_snapshot_returns_candidate_statuses_and_alerts(
+    subject,
+    admin_user,
+    candidate_user,
+    fake_redis,
+):
     from apps.proctoring.services import build_exam_monitoring_snapshot, record_heartbeat, record_proctor_event
 
     exam, session = build_active_session(
@@ -144,12 +149,12 @@ def test_build_exam_monitoring_snapshot_returns_candidate_statuses_and_alerts(su
 
 
 @pytest.mark.django_db
-def test_build_exam_monitoring_snapshot_derives_connection_status_from_stale_heartbeats(
+def test_build_exam_monitoring_snapshot_derives_connection_status_from_stale_runtime_presence(
     subject,
     admin_user,
     candidate_user,
+    fake_redis,
 ):
-    from apps.proctoring.models import SessionHeartbeat
     from apps.proctoring.services import build_exam_monitoring_snapshot, record_heartbeat
 
     exam, session = build_active_session(
@@ -157,7 +162,7 @@ def test_build_exam_monitoring_snapshot_derives_connection_status_from_stale_hea
         admin_user=admin_user,
         candidate_user=candidate_user,
     )
-    heartbeat = record_heartbeat(
+    record_heartbeat(
         session=session,
         connection_status="stable",
         latency_ms=120,
@@ -165,15 +170,15 @@ def test_build_exam_monitoring_snapshot_derives_connection_status_from_stale_hea
         reported_by=candidate_user,
     )
 
-    SessionHeartbeat.objects.filter(pk=heartbeat.pk).update(
-        recorded_at=timezone.now() - timezone.timedelta(seconds=settings.PROCTORING_HEARTBEAT_UNSTABLE_AFTER_SECONDS + 1)
-    )
+    fake_redis.hashes[f"monitor:session:{session.id}"]["updated_at"] = (
+        timezone.now() - timezone.timedelta(seconds=settings.PROCTORING_HEARTBEAT_UNSTABLE_AFTER_SECONDS + 1)
+    ).isoformat()
     unstable_snapshot = build_exam_monitoring_snapshot(exam=exam)
     assert unstable_snapshot["candidate_statuses"][0]["connection_status"] == "unstable"
 
-    SessionHeartbeat.objects.filter(pk=heartbeat.pk).update(
-        recorded_at=timezone.now() - timezone.timedelta(seconds=settings.PROCTORING_HEARTBEAT_OFFLINE_AFTER_SECONDS + 1)
-    )
+    fake_redis.hashes[f"monitor:session:{session.id}"]["updated_at"] = (
+        timezone.now() - timezone.timedelta(seconds=settings.PROCTORING_HEARTBEAT_OFFLINE_AFTER_SECONDS + 1)
+    ).isoformat()
     offline_snapshot = build_exam_monitoring_snapshot(exam=exam)
     assert offline_snapshot["candidate_statuses"][0]["connection_status"] == "offline"
 
@@ -183,6 +188,7 @@ def test_build_exam_monitoring_snapshot_expires_stale_in_progress_session_for_mo
     subject,
     admin_user,
     candidate_user,
+    fake_redis,
 ):
     from apps.exam_delivery.models import ExamSession
     from apps.proctoring.services import build_exam_monitoring_snapshot, record_heartbeat
@@ -217,6 +223,7 @@ def test_build_exam_monitoring_snapshot_reports_non_active_sessions_as_offline(
     subject,
     admin_user,
     candidate_user,
+    fake_redis,
 ):
     from apps.exam_delivery.models import ExamSession
     from apps.proctoring.services import build_exam_monitoring_snapshot, record_heartbeat
@@ -312,7 +319,7 @@ def test_register_client_capability_tolerates_broadcast_failures(
 
 
 @pytest.mark.django_db
-def test_broadcast_failures_only_log_once(monkeypatch, caplog, subject, admin_user, candidate_user):
+def test_broadcast_failures_only_log_once(monkeypatch, caplog, subject, admin_user, candidate_user, fake_redis):
     from apps.proctoring import services
 
     class FailingChannelLayer:

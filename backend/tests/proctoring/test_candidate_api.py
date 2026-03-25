@@ -34,7 +34,7 @@ def test_candidate_can_register_client_capability(api_client, subject, admin_use
 
 
 @pytest.mark.django_db
-def test_candidate_can_post_heartbeat(api_client, subject, admin_user, candidate_user):
+def test_candidate_can_post_heartbeat(api_client, subject, admin_user, candidate_user, fake_redis):
     _, session = build_active_session(
         subject=subject,
         admin_user=admin_user,
@@ -49,7 +49,7 @@ def test_candidate_can_post_heartbeat(api_client, subject, admin_user, candidate
         format="json",
     )
 
-    assert response.status_code == 201
+    assert response.status_code == 200
     assert response.json()["connection_status"] == "stable"
 
 
@@ -93,12 +93,15 @@ def test_candidate_can_post_proctor_event_and_evidence(api_client, subject, admi
 
 
 @pytest.mark.django_db
-def test_candidate_can_request_media_publish_token(api_client, subject, admin_user, candidate_user):
+def test_candidate_can_request_media_publish_token(api_client, subject, admin_user, candidate_user, fake_redis):
+    from apps.proctoring.runtime import mark_live_request
+
     _, session = build_active_session(
         subject=subject,
         admin_user=admin_user,
         candidate_user=candidate_user,
     )
+    mark_live_request(session_id=session.id, enabled=True, payload={"requested_by": admin_user.id})
     token = str(RefreshToken.for_user(candidate_user).access_token)
     api_client.credentials(HTTP_AUTHORIZATION=f"Bearer {token}")
 
@@ -113,7 +116,7 @@ def test_candidate_can_request_media_publish_token(api_client, subject, admin_us
 
 
 @pytest.mark.django_db
-def test_candidate_can_report_media_status(api_client, subject, admin_user, candidate_user):
+def test_candidate_can_report_media_status(api_client, subject, admin_user, candidate_user, fake_redis):
     _, session = build_active_session(
         subject=subject,
         admin_user=admin_user,

@@ -8,6 +8,7 @@ import {
   ChevronRight,
   Clock,
   Download,
+  Globe,
   Pause,
   Play,
   RefreshCw,
@@ -45,6 +46,7 @@ import {
   connectViewerRoom,
   disconnectRoom,
   requestViewToken,
+  stopViewToken,
   type ConnectedMediaRoom,
 } from "../lib/proctoringMedia";
 import { getStoredTokens } from "../lib/storage";
@@ -60,6 +62,7 @@ import {
   formatDate,
   formatEvidenceLabel,
   formatMinutes,
+  getEvidenceCardTitle,
   getScreenStatusText,
   getWebcamStatusText,
   paginateItems,
@@ -120,6 +123,25 @@ const getConnectionTone = (value: string) => {
   }
   return "text-yellow-600";
 };
+
+const updateCandidateStatusBySession = (
+  snapshot: MonitoringSnapshot,
+  sessionId: number,
+  updater: (candidateStatus: CandidateMonitoringStatus) => CandidateMonitoringStatus,
+): MonitoringSnapshot => ({
+  ...snapshot,
+  candidate_statuses: snapshot.candidate_statuses.map((candidateStatus) =>
+    candidateStatus.session_id === sessionId ? updater(candidateStatus) : candidateStatus,
+  ),
+});
+
+const appendAlertRecord = (
+  snapshot: MonitoringSnapshot,
+  alert: MonitoringSnapshot["alerts"][number],
+): MonitoringSnapshot => ({
+  ...snapshot,
+  alerts: [alert, ...snapshot.alerts.filter((item) => item.id !== alert.id)].slice(0, 20),
+});
 
 const PaginationControls = ({
   label,
@@ -242,6 +264,22 @@ const CaseDetailPanel = ({
         <div className="grid gap-3 sm:grid-cols-2">
           {caseRecord.evidence_items.map((evidence) => (
             <div key={evidence.id} className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
+              <div className="space-y-2 border-b border-slate-200 px-3 py-3">
+                <p className="font-medium text-slate-900">{getEvidenceCardTitle(evidence.evidence_type)}</p>
+                {evidence.file_url && !evidence.deleted_at ? (
+                  <a
+                    aria-label={`${getEvidenceCardTitle(evidence.evidence_type)} source`}
+                    className="flex items-center gap-2 text-xs text-sky-700 transition hover:text-sky-900"
+                    href={evidence.file_url}
+                    rel="noreferrer"
+                    target="_blank"
+                    title={evidence.file_url}
+                  >
+                    <Globe className="h-3.5 w-3.5 shrink-0" />
+                    <span className="truncate">{evidence.file_url}</span>
+                  </a>
+                ) : null}
+              </div>
               {evidence.file_url && !evidence.deleted_at ? (
                 <a href={evidence.file_url} rel="noreferrer" target="_blank">
                   <img
@@ -256,7 +294,6 @@ const CaseDetailPanel = ({
                 </div>
               )}
               <div className="space-y-1 px-3 py-3 text-xs text-slate-600">
-                <p className="font-medium text-slate-900">{formatEvidenceLabel(evidence.evidence_type)}</p>
                 <p>{formatDate(evidence.captured_at)}</p>
               </div>
             </div>
@@ -321,6 +358,7 @@ export function LiveMonitoring({ examId: examIdProp, embedded = false }: LiveMon
   const attachedElementsRef = useRef<HTMLElement[]>([]);
   const pendingTrackRef = useRef<LivekitTrackLike | null>(null);
   const reconnectTimeoutRef = useRef<number | null>(null);
+  const selectedSessionIdRef = useRef<number | null>(null);
 
   const updateMonitoringParams = (
     updates: Record<string, string | null | undefined>,
@@ -428,7 +466,10 @@ export function LiveMonitoring({ examId: examIdProp, embedded = false }: LiveMon
     }
   };
 
-  const cleanupLiveView = async () => {
+  const cleanupLiveView = async (options?: { releaseServerView?: boolean; sessionId?: number | null }) => {
+    if (options?.releaseServerView && options.sessionId) {
+      await stopViewToken(options.sessionId).catch(() => undefined);
+    }
     clearAttachedMedia();
     await disconnectRoom(liveRoomRef.current);
     liveRoomRef.current = null;
@@ -442,9 +483,13 @@ export function LiveMonitoring({ examId: examIdProp, embedded = false }: LiveMon
   };
 
   useEffect(() => {
+    selectedSessionIdRef.current = selectedSessionId;
+  }, [selectedSessionId]);
+
+  useEffect(() => {
     return () => {
       clearReconnectTimeout();
-      void cleanupLiveView();
+      void cleanupLiveView({ releaseServerView: true, sessionId: selectedSessionIdRef.current });
     };
   }, []);
 
@@ -508,21 +553,6 @@ export function LiveMonitoring({ examId: examIdProp, embedded = false }: LiveMon
   }, [resolvedExamId, selectedCaseFromList, selectedCaseId]);
 
   useEffect(() => {
-    if (!resolvedExamId) {
-      return;
-    }
-
-    const intervalId = window.setInterval(() => {
-      void snapshot.reload().catch(() => undefined);
-      void caseHistory.reload().catch(() => undefined);
-    }, 5000);
-
-    return () => {
-      window.clearInterval(intervalId);
-    };
-  }, [caseHistory.reload, resolvedExamId, snapshot.reload]);
-
-  useEffect(() => {
     const tokens = getStoredTokens();
     if (!resolvedExamId || !tokens?.access) {
       setSocketState("closed");
@@ -555,13 +585,71 @@ export function LiveMonitoring({ examId: examIdProp, embedded = false }: LiveMon
 
     websocket.onmessage = (event) => {
       try {
-        const message = JSON.parse(event.data) as { type: string; payload: MonitoringSnapshot };
+        const message = JSON.parse(event.data) as {
+          type: string;
+          payload: Record<string, unknown> | MonitoringSnapshot;
+        };
         if (message.type === "snapshot") {
-          snapshot.setData(message.payload);
+          snapshot.setData(message.payload as MonitoringSnapshot);
           return;
         }
-        void snapshot.reload().catch(() => undefined);
-        void caseHistory.reload().catch(() => undefined);
+
+        snapshot.setData((current) => {
+          if (!current) {
+            return current;
+          }
+          const payload = message.payload as Record<string, unknown>;
+          switch (message.type) {
+            case "heartbeat":
+              return updateCandidateStatusBySession(current, Number(payload.session_id), (candidateStatus) => ({
+                ...candidateStatus,
+                connection_status: String(payload.connection_status ?? candidateStatus.connection_status),
+                last_activity_at:
+                  typeof payload.recorded_at === "string"
+                    ? payload.recorded_at
+                    : candidateStatus.last_activity_at,
+              }));
+            case "media_state":
+              return updateCandidateStatusBySession(current, Number(payload.session_id), (candidateStatus) => ({
+                ...candidateStatus,
+                media: {
+                  ...candidateStatus.media,
+                  webcam_publish_status: String(
+                    payload.webcam_publish_status ?? candidateStatus.media.webcam_publish_status,
+                  ),
+                  screen_capture_status: String(
+                    payload.screen_capture_status ?? candidateStatus.media.screen_capture_status,
+                  ),
+                  last_publish_at: typeof payload.last_publish_at === "string" || payload.last_publish_at === null
+                    ? payload.last_publish_at
+                      : candidateStatus.media.last_publish_at,
+                  live_request_enabled:
+                    typeof payload.live_request_enabled === "boolean"
+                      ? payload.live_request_enabled
+                      : candidateStatus.media.live_request_enabled,
+                  live_slot_active:
+                    typeof payload.live_slot_active === "boolean"
+                      ? payload.live_slot_active
+                      : candidateStatus.media.live_slot_active,
+                },
+              }));
+            case "client_capability":
+              return updateCandidateStatusBySession(current, Number(payload.session_id), (candidateStatus) => ({
+                ...candidateStatus,
+                media: {
+                  ...candidateStatus.media,
+                  screen_capture_status: candidateStatus.media.screen_capture_status,
+                },
+              }));
+            case "proctor_event":
+              return appendAlertRecord(current, payload as MonitoringSnapshot["alerts"][number]);
+            default:
+              return current;
+          }
+        });
+        if (message.type === "proctor_event" || message.type === "violation_case" || message.type === "evidence") {
+          void caseHistory.reload().catch(() => undefined);
+        }
       } catch {
         void snapshot.reload().catch(() => undefined);
       }
@@ -715,6 +803,7 @@ export function LiveMonitoring({ examId: examIdProp, embedded = false }: LiveMon
     }
 
     try {
+      const previousSessionId = selectedSessionId;
       setSelectedSessionId(candidateStatus.session_id);
       setLiveView({
         sessionId: candidateStatus.session_id,
@@ -725,7 +814,10 @@ export function LiveMonitoring({ examId: examIdProp, embedded = false }: LiveMon
         error: null,
       });
 
-      await cleanupLiveView();
+      await cleanupLiveView({
+        releaseServerView: previousSessionId !== null && previousSessionId !== candidateStatus.session_id,
+        sessionId: previousSessionId,
+      });
 
       const token = await requestViewToken(candidateStatus.session_id);
       const room = await connectViewerRoom(token);
@@ -767,6 +859,7 @@ export function LiveMonitoring({ examId: examIdProp, embedded = false }: LiveMon
       });
     } catch (error) {
       const message = error instanceof Error ? error.message : "Unable to open candidate webcam.";
+      await cleanupLiveView({ releaseServerView: true, sessionId: candidateStatus.session_id });
       setLiveView({
         sessionId: candidateStatus.session_id,
         candidateName: candidateStatus.candidate.full_name,
@@ -780,9 +873,10 @@ export function LiveMonitoring({ examId: examIdProp, embedded = false }: LiveMon
   };
 
   const closeLiveView = async () => {
-    await cleanupLiveView();
+    const sessionId = selectedSessionId;
     setSelectedSessionId(null);
     setLiveView(null);
+    await cleanupLiveView({ releaseServerView: true, sessionId });
   };
 
   const openViolationCase = (caseId: number | null) => {
@@ -1049,7 +1143,7 @@ export function LiveMonitoring({ examId: examIdProp, embedded = false }: LiveMon
                         <td className="px-4 py-3"><div className="space-y-1"><div className="flex items-center gap-2"><Progress value={candidateStatus.progress_percentage} className="w-28" /><span className="text-xs text-slate-600">{candidateStatus.progress_percentage}%</span></div><p className="text-xs text-slate-500">{candidateStatus.questions_answered}/{candidateStatus.total_questions} questions</p></div></td>
                         <td className="px-4 py-3"><p className="text-sm text-slate-900">{formatMinutes(candidateStatus.time_elapsed_minutes)}</p><p className="text-xs text-slate-500">{formatDate(candidateStatus.last_activity_at)}</p></td>
                         <td className="px-4 py-3"><div className="flex items-center gap-2"><Wifi className={cn("h-4 w-4", getConnectionTone(candidateStatus.connection_status))} /><span className="text-xs capitalize text-slate-600">{candidateStatus.connection_status}</span></div></td>
-                        <td className="px-4 py-3"><div className="space-y-2"><div className="rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-700"><p className="font-medium text-slate-900">{getWebcamStatusText(candidateStatus.media.webcam_publish_status)}</p><p className="mt-1">{getScreenStatusText(candidateStatus.media.screen_capture_status)}</p><p className="mt-1 text-slate-500">Last webcam publish: {formatDate(candidateStatus.media.last_publish_at)}</p></div><div className="flex flex-wrap gap-2"><Button size="sm" variant={selectedSessionId === candidateStatus.session_id ? "secondary" : "outline"} disabled={!candidateStatus.session_id || candidateStatus.media.webcam_publish_status !== "publishing"} onClick={() => void openLiveView(candidateStatus)}><Video className="mr-2 h-4 w-4" />Open Webcam</Button>{candidateStatus.session_id && latestCaseIdBySession.has(candidateStatus.session_id) ? <Button size="sm" variant="outline" onClick={() => openViolationCase(latestCaseIdBySession.get(candidateStatus.session_id) ?? null)}><AlertTriangle className="mr-2 h-4 w-4" />View Violation</Button> : null}</div></div></td>
+                        <td className="px-4 py-3"><div className="space-y-2"><div className="rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-700"><p className="font-medium text-slate-900">{getWebcamStatusText(candidateStatus.media.webcam_publish_status)}</p><p className="mt-1">{getScreenStatusText(candidateStatus.media.screen_capture_status)}</p><p className="mt-1 text-slate-500">Last webcam publish: {formatDate(candidateStatus.media.last_publish_at)}</p>{candidateStatus.media.live_request_enabled ? <p className="mt-1 text-sky-600">Live request is active.</p> : <p className="mt-1 text-slate-500">Webcam stays local until requested.</p>}</div><div className="flex flex-wrap gap-2"><Button size="sm" variant={selectedSessionId === candidateStatus.session_id ? "secondary" : "outline"} disabled={!candidateStatus.session_id} onClick={() => void openLiveView(candidateStatus)}><Video className="mr-2 h-4 w-4" />Open Webcam</Button>{candidateStatus.session_id && latestCaseIdBySession.has(candidateStatus.session_id) ? <Button size="sm" variant="outline" onClick={() => openViolationCase(latestCaseIdBySession.get(candidateStatus.session_id) ?? null)}><AlertTriangle className="mr-2 h-4 w-4" />View Violation</Button> : null}</div></div></td>
                       </tr>
                     ))}
                     {!snapshot.isLoading && !paginatedCandidates.totalItems ? <tr><td className="px-4 py-10 text-center text-sm text-slate-500" colSpan={6}>No candidates matched the current filters.</td></tr> : null}
@@ -1069,7 +1163,7 @@ export function LiveMonitoring({ examId: examIdProp, embedded = false }: LiveMon
                         <Button size="sm" variant="outline" onClick={() => void closeLiveView()}>Close Webcam</Button>
                       </>
                     ) : (
-                      <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-4 py-10 text-center text-sm text-slate-500">Select a candidate with webcam live available to open a near real-time view.</div>
+                      <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-4 py-10 text-center text-sm text-slate-500">Select a candidate to request an on-demand webcam view.</div>
                     )}
                   </CardContent>
                 </Card>

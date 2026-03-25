@@ -11,6 +11,7 @@ const navigation = {
     manualGrading: "Manual Grading",
     materials: "Materials Library",
     results: "Results & Reports",
+    discipline: "Discipline & Certificates",
     roles: "Roles & Permissions",
     notifications: "Notifications",
     audit: "Audit & Security",

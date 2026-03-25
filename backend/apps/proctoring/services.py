@@ -26,6 +26,7 @@ from .models import (
     ViolationCase,
     ViolationReview,
 )
+from .runtime import acquire_live_slot, get_runtime_snapshot, mark_live_request, refresh_presence, release_live_slot
 
 logger = logging.getLogger(__name__)
 _broadcast_warning_logged = False
@@ -33,6 +34,10 @@ _broadcast_warning_logged = False
 
 def monitoring_group_name(exam_id):
     return f"monitoring_exam_{exam_id}"
+
+
+def session_control_group_name(session_id):
+    return f"proctoring_session_{session_id}"
 
 
 def _broadcast_exam_monitoring_update(*, exam_id, message_type, payload):
@@ -55,6 +60,30 @@ def _broadcast_exam_monitoring_update(*, exam_id, message_type, payload):
             logger.warning(
                 "Unable to broadcast monitoring update: channel layer is unavailable.",
                 extra={"exam_id": exam_id, "message_type": message_type},
+            )
+            _broadcast_warning_logged = True
+
+
+def _broadcast_session_control_update(*, session_id, message_type, payload):
+    global _broadcast_warning_logged
+
+    channel_layer = get_channel_layer()
+    if channel_layer is None:
+        return
+    try:
+        async_to_sync(channel_layer.group_send)(
+            session_control_group_name(session_id),
+            {
+                "type": "control.message",
+                "message_type": message_type,
+                "payload": payload,
+            },
+        )
+    except Exception:
+        if not _broadcast_warning_logged:
+            logger.warning(
+                "Unable to broadcast monitoring update: channel layer is unavailable.",
+                extra={"session_id": session_id, "message_type": message_type},
             )
             _broadcast_warning_logged = True
 
@@ -101,6 +130,15 @@ def _serialize_case(case):
     }
 
 
+def _parse_runtime_timestamp(value):
+    if not value:
+        return None
+    try:
+        return timezone.datetime.fromisoformat(value)
+    except ValueError:
+        return None
+
+
 def _assigned_candidates_for_exam(exam):
     user_model = get_user_model()
     return (
@@ -116,7 +154,7 @@ def _assigned_candidates_for_exam(exam):
 def _latest_session_by_candidate(exam):
     sessions = (
         exam.sessions.select_related("candidate", "proctoring_media_state")
-        .prefetch_related("questions__answer", "heartbeats")
+        .prefetch_related("questions__answer")
         .order_by("candidate_id", "-attempt_number")
     )
     latest = {}
@@ -131,6 +169,36 @@ def _get_connection_timeout(setting_name, default_value):
         return max(int(raw_value), 0)
     except (TypeError, ValueError):
         return default_value
+
+
+def _resolve_runtime_connection_status(*, session, runtime_snapshot, now):
+    if session.status != ExamSession.Status.IN_PROGRESS:
+        return SessionHeartbeat.ConnectionStatus.OFFLINE
+
+    presence = runtime_snapshot.get("presence")
+    if presence != "online":
+        return SessionHeartbeat.ConnectionStatus.OFFLINE
+
+    updated_at = _parse_runtime_timestamp(runtime_snapshot.get("updated_at"))
+    if updated_at is None:
+        return SessionHeartbeat.ConnectionStatus.OFFLINE
+
+    unstable_after_seconds = _get_connection_timeout("PROCTORING_HEARTBEAT_UNSTABLE_AFTER_SECONDS", 90)
+    offline_after_seconds = max(
+        unstable_after_seconds,
+        _get_connection_timeout("PROCTORING_HEARTBEAT_OFFLINE_AFTER_SECONDS", 150),
+    )
+    age = now - updated_at
+    if age >= timezone.timedelta(seconds=offline_after_seconds):
+        return SessionHeartbeat.ConnectionStatus.OFFLINE
+
+    reported_status = runtime_snapshot.get("connection_status") or SessionHeartbeat.ConnectionStatus.STABLE
+    if (
+        reported_status == SessionHeartbeat.ConnectionStatus.UNSTABLE
+        or age >= timezone.timedelta(seconds=unstable_after_seconds)
+    ):
+        return SessionHeartbeat.ConnectionStatus.UNSTABLE
+    return reported_status
 
 
 def _resolve_session_connection_status(*, session, last_heartbeat, now):
@@ -202,29 +270,36 @@ def register_client_capability(
     return capability
 
 
-@transaction.atomic
 def record_heartbeat(*, session, connection_status, latency_ms=None, payload=None, reported_by=None):
-    heartbeat = SessionHeartbeat.objects.create(
-        session=session,
-        reported_by=reported_by,
-        connection_status=connection_status,
-        latency_ms=latency_ms,
-        payload=payload or {},
+    now = timezone.now()
+    payload = payload or {}
+    runtime_state = refresh_presence(
+        session_id=session.id,
+        exam_id=session.exam_id,
+        payload={
+            **payload,
+            "connection_status": connection_status,
+            "latency_ms": latency_ms,
+        },
     )
-    session.last_activity_at = timezone.now()
-    session.save(update_fields=["last_activity_at", "updated_at"])
     _broadcast_exam_monitoring_update(
         exam_id=session.exam_id,
         message_type="heartbeat",
         payload={
             "session_id": session.id,
             "candidate_id": session.candidate_id,
-            "connection_status": heartbeat.connection_status,
-            "latency_ms": heartbeat.latency_ms,
-            "recorded_at": heartbeat.recorded_at.isoformat(),
+            "connection_status": connection_status,
+            "latency_ms": latency_ms,
+            "recorded_at": now.isoformat(),
         },
     )
-    return heartbeat
+    return {
+        "session_id": session.id,
+        "connection_status": connection_status,
+        "latency_ms": latency_ms,
+        "payload": payload,
+        "recorded_at": runtime_state["state"]["updated_at"],
+    }
 
 
 @transaction.atomic
@@ -332,6 +407,7 @@ def update_media_status(
     participant_name="",
 ):
     now = timezone.now()
+    runtime_snapshot = get_runtime_snapshot(session_id=session.id)
     media_state, _ = ProctoringMediaState.objects.get_or_create(
         session=session,
         defaults={"provider": provider or settings.PROCTORING_MEDIA_PROVIDER},
@@ -358,6 +434,8 @@ def update_media_status(
             "webcam_publish_status": media_state.webcam_publish_status,
             "screen_capture_status": media_state.screen_capture_status,
             "last_publish_at": media_state.last_publish_at.isoformat() if media_state.last_publish_at else None,
+            "live_request_enabled": bool(runtime_snapshot.get("live_request", {}).get("enabled")),
+            "live_slot_active": bool(runtime_snapshot.get("live_slot_active")),
         },
     )
     return media_state
@@ -365,6 +443,14 @@ def update_media_status(
 
 def issue_candidate_publish_token(*, session, user):
     assert_candidate_session_access(session=session, user=user)
+    runtime_snapshot = get_runtime_snapshot(session_id=session.id)
+    if not runtime_snapshot.get("live_request", {}).get("enabled"):
+        raise PermissionDenied(
+            t(
+                vi="Giám thị chưa yêu cầu xem webcam trực tiếp.",
+                en="Live webcam has not been requested for this session.",
+            )
+        )
     payload = get_media_provider().build_publish_token(session=session, user=user)
     update_media_status(
         session=session,
@@ -380,7 +466,53 @@ def issue_candidate_publish_token(*, session, user):
 
 def issue_admin_view_token(*, session, user):
     assert_admin_monitoring_access(user=user)
+    if not acquire_live_slot(session_id=session.id, exam_id=session.exam_id):
+        raise ValidationError(
+            t(
+                vi="Hiện không còn suất xem webcam trực tiếp khả dụng.",
+                en="No live webcam slots are currently available.",
+            )
+        )
+    live_request_state = mark_live_request(
+        session_id=session.id,
+        enabled=True,
+        payload={
+            "exam_id": session.exam_id,
+            "requested_by": user.id,
+        },
+    )
+    live_request_payload = get_runtime_snapshot(session_id=session.id).get(
+        "live_request",
+        live_request_state["state"],
+    )
+    _broadcast_session_control_update(
+        session_id=session.id,
+        message_type="live_request",
+        payload=live_request_payload,
+    )
     return get_media_provider().build_view_token(session=session, user=user)
+
+
+def stop_admin_live_view(*, session, user):
+    assert_admin_monitoring_access(user=user)
+    live_request_state = mark_live_request(
+        session_id=session.id,
+        enabled=False,
+        payload={
+            "exam_id": session.exam_id,
+            "requested_by": user.id,
+        },
+    )
+    release_live_slot(session_id=session.id, exam_id=session.exam_id)
+    live_request_payload = get_runtime_snapshot(session_id=session.id).get(
+        "live_request",
+        live_request_state["state"],
+    )
+    _broadcast_session_control_update(
+        session_id=session.id,
+        message_type="live_request",
+        payload=live_request_payload,
+    )
 
 
 def build_exam_monitoring_snapshot(*, exam):
@@ -420,12 +552,12 @@ def build_exam_monitoring_snapshot(*, exam):
         answered_count = session.questions.filter(answer__is_answered=True).count()
         progress_percentage = int((answered_count / total_questions) * 100) if total_questions else 0
         session_status = _sync_session_status_for_monitoring(session=session, now=now)
-        last_heartbeat = next(iter(session.heartbeats.all()), None)
+        runtime_snapshot = get_runtime_snapshot(session_id=session.id)
         media_state = getattr(session, "proctoring_media_state", None)
         end_time = session.submitted_at or now
-        connection_status = _resolve_session_connection_status(
+        connection_status = _resolve_runtime_connection_status(
             session=session,
-            last_heartbeat=last_heartbeat,
+            runtime_snapshot=runtime_snapshot,
             now=now,
         )
         candidate_statuses.append(
@@ -442,7 +574,8 @@ def build_exam_monitoring_snapshot(*, exam):
                 "total_questions": total_questions,
                 "time_elapsed_minutes": max(0, int((end_time - session.started_at).total_seconds() // 60)),
                 "connection_status": connection_status,
-                "last_activity_at": session.last_activity_at.isoformat() if session.last_activity_at else None,
+                "last_activity_at": runtime_snapshot.get("updated_at")
+                or (session.last_activity_at.isoformat() if session.last_activity_at else None),
                 "media": {
                     "webcam_publish_status": (
                         media_state.webcam_publish_status
@@ -459,6 +592,8 @@ def build_exam_monitoring_snapshot(*, exam):
                         if media_state and media_state.last_publish_at
                         else None
                     ),
+                    "live_request_enabled": bool(runtime_snapshot.get("live_request", {}).get("enabled")),
+                    "live_slot_active": bool(runtime_snapshot.get("live_slot_active")),
                 },
             }
         )
