@@ -229,6 +229,19 @@ CHANNEL_LAYERS = {
     }
 }
 
+# Redis cache — giam tai query DB cho exam data va session metadata
+CACHES = {
+    "default": {
+        "BACKEND": "django.core.cache.backends.redis.RedisCache",
+        "LOCATION": REDIS_URL,
+        "TIMEOUT": 300,  # 5 phut mac dinh
+        "KEY_PREFIX": "eduexam",
+        "OPTIONS": {
+            "CLIENT_CLASS": "django_redis.client.DefaultClient",
+        },
+    }
+}
+
 USE_S3_STORAGE = env("USE_S3_STORAGE")
 if USE_S3_STORAGE:
     AWS_ACCESS_KEY_ID = env("AWS_ACCESS_KEY_ID")

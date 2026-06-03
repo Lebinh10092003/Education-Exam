@@ -42,6 +42,14 @@ class ExamSession(TimeStampedModel):
 
     class Meta:
         ordering = ("-created_at",)
+        indexes = [
+            # Toi uu query 'tim session dang active cua thi sinh' (hay goi nhat)
+            models.Index(fields=["candidate", "exam", "status"], name="es_cand_exam_status_idx"),
+            # Toi uu query 'tat ca session cua mot bai thi' (proctor/admin)
+            models.Index(fields=["exam", "status"], name="es_exam_status_idx"),
+            # Toi uu query loc theo status
+            models.Index(fields=["status"], name="es_status_idx"),
+        ]
         constraints = [
             models.UniqueConstraint(
                 fields=("exam", "candidate", "attempt_number"),

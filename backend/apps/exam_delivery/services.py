@@ -222,9 +222,11 @@ def submit_session(*, session, submitted_by, source=Submission.Source.MANUAL, fo
     manual_grading_required = False
     answered_count = 0
 
+    answers_to_update = []
     for session_question in session.questions.select_related(
         "question_revision__question",
         "question_revision__answer_key",
+        "answer",
     ).order_by("sort_order"):
         max_score += session_question.points
         answer = getattr(session_question, "answer", None)
@@ -238,18 +240,23 @@ def submit_session(*, session, submitted_by, source=Submission.Source.MANUAL, fo
             is_correct = bool(expected_keys) and selected_keys == expected_keys
             awarded_points = session_question.points if is_correct else Decimal("0.00")
             if answer is None:
-                answer = SessionAnswer.objects.create(
+                answer = SessionAnswer(
                     session_question=session_question,
                     selected_option_keys=[],
                     answer_text="",
                     is_answered=False,
                 )
+                answer.save()  # cần id trước khi bulk_update
             answer.is_correct = is_correct
             answer.awarded_points = awarded_points
-            answer.save(update_fields=["is_correct", "awarded_points", "updated_at"])
+            answers_to_update.append(answer)
             objective_score += awarded_points
         else:
             manual_grading_required = True
+
+    # Ghi tất cả kết quả chấm điểm trong 1 lần bulk_update thay vì N lần save()
+    if answers_to_update:
+        SessionAnswer.objects.bulk_update(answers_to_update, ["is_correct", "awarded_points", "updated_at"])
 
     session.status = ExamSession.Status.SUBMITTED
     session.submitted_at = now
