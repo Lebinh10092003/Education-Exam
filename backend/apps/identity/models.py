@@ -69,7 +69,7 @@ class User(AbstractBaseUser, PermissionsMixin, TimeStampedModel):
         return self.username or self.email
 
     def save(self, *args, **kwargs):
-        if self.status == self.Status.ACTIVE:
+        if self.status in (self.Status.ACTIVE, self.Status.PENDING):
             self.is_active = True
         else:
             self.is_active = False

@@ -8,8 +8,13 @@ from rest_framework.views import APIView
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 
 from apps.identity.models import Permission, Role, User, UserRole
+from rest_framework.parsers import MultiPartParser, FormParser
 from apps.identity.permissions import HasAPIPermissionCode
-from apps.identity.services import request_password_reset, reset_password_with_token
+from apps.identity.services import (
+    request_password_reset,
+    reset_password_with_token,
+    import_users_from_csv,
+)
 from apps.identity.utils import is_student_self_service_locked
 from apps.platform_core.audit import record_audit_event
 from apps.platform_core.i18n import t
@@ -24,6 +29,8 @@ from .serializers import (
     ProfileUpdateSerializer,
     RoleSerializer,
     UserSerializer,
+    UserImportRequestSerializer,
+    UserImportSummarySerializer,
 )
 
 
@@ -221,6 +228,25 @@ class UserViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST,
             )
         return super().destroy(request, *args, **kwargs)
+
+    @extend_schema(
+        request=UserImportRequestSerializer,
+        responses={200: UserImportSummarySerializer},
+    )
+    @action(
+        detail=False,
+        methods=["post"],
+        url_path="import-csv",
+        parser_classes=[MultiPartParser, FormParser],
+    )
+    def import_csv(self, request):
+        serializer = UserImportRequestSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        summary = import_users_from_csv(
+            uploaded_file=serializer.validated_data["file"],
+            requested_by=request.user,
+        )
+        return Response(summary, status=status.HTTP_200_OK)
 
 
 class RoleViewSet(viewsets.ModelViewSet):

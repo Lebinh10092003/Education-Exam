@@ -149,6 +149,60 @@ class ResultViewSet(
         output = ResultSerializer(result)
         return Response(output.data, status=status.HTTP_200_OK)
 
+    @action(detail=False, methods=["get"], url_path="export-csv")
+    def export_csv(self, request):
+        import csv
+        from django.http import HttpResponse
+
+        queryset = self.filter_queryset(self.get_queryset())
+        data = ResultSerializer(queryset, many=True).data
+
+        response = HttpResponse(content_type="text/csv; charset=utf-8")
+        response.write(b"\xef\xbb\xbf")  # UTF-8 BOM
+        response["Content-Disposition"] = 'attachment; filename="eduexam-results.csv"'
+
+        writer = csv.writer(response)
+        writer.writerow([
+            "Candidate",
+            "Candidate Email",
+            "Exam",
+            "Subject",
+            "Score",
+            "Original Score",
+            "Total Marks",
+            "Percentage",
+            "Original Percentage",
+            "Penalty Percent",
+            "Certificate",
+            "Workflow Status",
+            "Publish State",
+            "Completed Date",
+            "Time Taken (minutes)",
+        ])
+
+        for item in data:
+            candidate = item.get("candidate") or {}
+            exam = item.get("exam") or {}
+            writer.writerow([
+                candidate.get("full_name") or "",
+                candidate.get("email") or "",
+                exam.get("name") or "",
+                exam.get("subject_name") or "",
+                item.get("score") or "0.00",
+                item.get("original_score") or "0.00",
+                item.get("total_marks") or "0.00",
+                item.get("percentage") or "0.00",
+                item.get("original_percentage") or "0.00",
+                item.get("penalty_percent_applied") or "0.00",
+                item.get("certificate_level") or "",
+                item.get("workflow_status") or "",
+                item.get("publish_state") or "",
+                item.get("completed_date") or "",
+                item.get("time_taken_minutes") or 0,
+            ])
+
+        return response
+
 
 class CandidateResultListView(generics.ListAPIView):
     serializer_class = ResultSerializer

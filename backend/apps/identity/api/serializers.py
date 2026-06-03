@@ -36,13 +36,17 @@ class EduExamTokenObtainPairSerializer(TokenObtainPairSerializer):
             )
 
         user = User.objects.filter(Q(username__iexact=identifier) | Q(email__iexact=identifier)).first()
-        if user is None or not user.check_password(password) or not user.is_active or user.status != User.Status.ACTIVE:
+        if user is None or not user.check_password(password) or not user.is_active or user.status not in (User.Status.ACTIVE, User.Status.PENDING):
             raise serializers.ValidationError(
                 t(
                     vi="Không tìm thấy tài khoản đang hoạt động với thông tin đăng nhập đã cung cấp.",
                     en="No active account found with the given credentials.",
                 )
             )
+
+        if user.status == User.Status.PENDING:
+            user.status = User.Status.ACTIVE
+            user.save(update_fields=["status"])
 
         self.user = user
         data = super().validate({"email": user.email, "password": password})
@@ -322,3 +326,21 @@ class UserSerializer(serializers.ModelSerializer):
             for role in roles:
                 instance.user_roles.create(role=role)
         return instance
+
+
+class UserImportRequestSerializer(serializers.Serializer):
+    file = serializers.FileField(required=True)
+
+
+class UserImportErrorSerializer(serializers.Serializer):
+    row_number = serializers.IntegerField()
+    identifier = serializers.CharField()
+    message = serializers.CharField()
+
+
+class UserImportSummarySerializer(serializers.Serializer):
+    total_rows = serializers.IntegerField()
+    created_users = serializers.IntegerField()
+    updated_users = serializers.IntegerField()
+    failed_rows = serializers.IntegerField()
+    errors = UserImportErrorSerializer(many=True)

@@ -9,9 +9,10 @@ def _build_exam(*, subject, admin_user, candidate_user, status="scheduled", open
     from apps.institutions.models import CandidateGroup, GroupMembership, School
     from apps.question_bank.services import create_question
 
+    import uuid
     School.objects.create(
-        name=f"Lifecycle School {candidate_user.id}-{timezone.now().timestamp()}",
-        code=f"LF-{candidate_user.id}-{timezone.now().microsecond}",
+        name=f"Lifecycle School {candidate_user.id}-{uuid.uuid4().hex[:8]}",
+        code=f"LF-{uuid.uuid4().hex[:6]}",
     )
     group = CandidateGroup.objects.create(name=f"Lifecycle Group {candidate_user.id}")
     GroupMembership.objects.create(group=group, user=candidate_user)

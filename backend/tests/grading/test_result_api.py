@@ -98,3 +98,21 @@ def test_admin_can_publish_finalized_result(api_client, admin_token, subject, ad
 
     assert response.status_code == 200
     assert response.json()["publish_state"] == "published"
+
+
+@pytest.mark.django_db
+def test_admin_can_export_results_via_csv(api_client, admin_token, subject, admin_user, candidate_user):
+    _build_finalized_result(subject=subject, admin_user=admin_user, candidate_user=candidate_user)
+    api_client.credentials(HTTP_AUTHORIZATION=f"Bearer {admin_token}")
+
+    response = api_client.get("/api/v1/results/export-csv/")
+
+    assert response.status_code == 200
+    assert response["Content-Type"] == "text/csv; charset=utf-8"
+    assert "attachment; filename=\"eduexam-results.csv\"" in response["Content-Disposition"]
+
+    content = response.content.decode("utf-8-sig")
+    lines = content.strip().split("\n")
+    assert len(lines) >= 2
+    assert "Candidate,Candidate Email" in lines[0]
+    assert candidate_user.email in content
