@@ -79,6 +79,8 @@ def test_candidate_control_consumer_receives_live_request_updates(subject, admin
         initial_message = await communicator.receive_json_from()
         assert initial_message["type"] == "live_request"
         assert initial_message["payload"]["enabled"] is False
+        phase_message = await communicator.receive_json_from()
+        assert phase_message["type"] == "session_phase"
 
         await sync_to_async(issue_admin_view_token)(
             session=session,

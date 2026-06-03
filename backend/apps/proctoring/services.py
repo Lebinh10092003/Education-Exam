@@ -4,8 +4,9 @@ from asgiref.sync import async_to_sync
 from channels.layers import get_channel_layer
 from django.conf import settings
 from django.contrib.auth import get_user_model
+from django.core.cache import cache
 from django.db import transaction
-from django.db.models import Q
+from django.db.models import Count, Q
 from django.utils import timezone
 from rest_framework.exceptions import PermissionDenied, ValidationError
 
@@ -170,7 +171,14 @@ def _assigned_candidates_for_exam(exam):
 def _latest_session_by_candidate(exam):
     sessions = (
         exam.sessions.select_related("candidate", "proctoring_media_state")
-        .prefetch_related("questions__answer")
+        .annotate(
+            total_question_count=Count("questions", distinct=True),
+            answered_question_count=Count(
+                "questions",
+                filter=Q(questions__answer__is_answered=True),
+                distinct=True,
+            ),
+        )
         .order_by("candidate_id", "-attempt_number")
     )
     latest = {}
@@ -341,6 +349,8 @@ def record_proctor_event(*, session, event_type, severity="info", metadata=None,
         severity=severity,
         metadata=metadata or {},
     )
+    admin_notification_kwargs = None
+    candidate_notification_kwargs = None
     if severity in {ProctorEvent.Severity.WARNING, ProctorEvent.Severity.CRITICAL}:
         case = ViolationCase.objects.create(
             session=session,
@@ -349,17 +359,21 @@ def record_proctor_event(*, session, event_type, severity="info", metadata=None,
             summary=(metadata or {}).get("message", ""),
         )
         case.events.add(event)
-        create_notifications_for_permission(
-            permission_code="proctoring.view",
-            title=f"Proctoring {severity} detected",
-            message=(
+        admin_notification_kwargs = {
+            "permission_code": "proctoring.view",
+            "title": f"Proctoring {severity} detected",
+            "message": (
                 f'{session.candidate.full_name or session.candidate.email} triggered '
                 f'{event.get_event_type_display()} in "{session.exam.name}".'
             ),
-            category=Notification.Category.ALERT,
-            priority=Notification.Priority.HIGH if severity == ProctorEvent.Severity.CRITICAL else Notification.Priority.MEDIUM,
-            action_url=f"/exams/{session.exam_id}/monitor",
-            metadata={
+            "category": Notification.Category.ALERT,
+            "priority": (
+                Notification.Priority.HIGH
+                if severity == ProctorEvent.Severity.CRITICAL
+                else Notification.Priority.MEDIUM
+            ),
+            "action_url": f"/exams/{session.exam_id}/monitor",
+            "metadata": {
                 "session_id": session.id,
                 "exam_id": session.exam_id,
                 "candidate_id": session.candidate_id,
@@ -367,19 +381,19 @@ def record_proctor_event(*, session, event_type, severity="info", metadata=None,
                 "event_type": event.event_type,
                 "severity": severity,
             },
-        )
-        create_notification(
-            recipient=session.candidate,
-            title="Exam monitoring alert recorded",
-            message=(metadata or {}).get("message") or event.get_event_type_display(),
-            category=Notification.Category.ALERT,
-            priority=(
+        }
+        candidate_notification_kwargs = {
+            "recipient": session.candidate,
+            "title": "Exam monitoring alert recorded",
+            "message": (metadata or {}).get("message") or event.get_event_type_display(),
+            "category": Notification.Category.ALERT,
+            "priority": (
                 Notification.Priority.HIGH
                 if severity == ProctorEvent.Severity.CRITICAL
                 else Notification.Priority.MEDIUM
             ),
-            action_url="/candidate/notifications",
-            metadata={
+            "action_url": "/candidate/notifications",
+            "metadata": {
                 "session_id": session.id,
                 "exam_id": session.exam_id,
                 "candidate_id": session.candidate_id,
@@ -388,12 +402,20 @@ def record_proctor_event(*, session, event_type, severity="info", metadata=None,
                 "severity": severity,
                 "audience": "candidate",
             },
+        }
+
+    def publish_event_side_effects():
+        if admin_notification_kwargs is not None:
+            create_notifications_for_permission(**admin_notification_kwargs)
+        if candidate_notification_kwargs is not None:
+            create_notification(**candidate_notification_kwargs)
+        _broadcast_exam_monitoring_update(
+            exam_id=session.exam_id,
+            message_type="proctor_event",
+            payload=_serialize_event(event),
         )
-    _broadcast_exam_monitoring_update(
-        exam_id=session.exam_id,
-        message_type="proctor_event",
-        payload=_serialize_event(event),
-    )
+
+    transaction.on_commit(publish_event_side_effects)
     return event
 
 
@@ -559,12 +581,30 @@ def stop_admin_live_view(*, session, user):
     )
 
 
+def _monitoring_snapshot_cache_key(exam_id):
+    return f"proctoring:monitoring:snapshot:{exam_id}"
+
+
+def get_cached_exam_monitoring_snapshot(*, exam):
+    ttl_seconds = max(int(getattr(settings, "PROCTORING_MONITORING_SNAPSHOT_TTL_SECONDS", 10)), 0)
+    if ttl_seconds == 0:
+        return build_exam_monitoring_snapshot(exam=exam)
+
+    cache_key = _monitoring_snapshot_cache_key(exam.id)
+    payload = cache.get(cache_key)
+    if payload is None:
+        payload = build_exam_monitoring_snapshot(exam=exam)
+        cache.set(cache_key, payload, ttl_seconds)
+    return payload
+
+
 def build_exam_monitoring_snapshot(*, exam):
     assigned_candidates = list(_assigned_candidates_for_exam(exam))
     latest_sessions = _latest_session_by_candidate(exam)
     candidate_statuses = []
     now = timezone.now()
     monitoring_active = exam_supports_live_monitoring(exam, now=now)
+    exam_question_count = exam.current_version.items.count() if exam.current_version_id else 0
 
     for candidate in assigned_candidates:
         session = latest_sessions.get(candidate.id)
@@ -580,7 +620,7 @@ def build_exam_monitoring_snapshot(*, exam):
                     "status": "not_started",
                     "progress_percentage": 0,
                     "questions_answered": 0,
-                    "total_questions": exam.current_version.items.count() if exam.current_version_id else 0,
+                    "total_questions": exam_question_count,
                     "time_elapsed_minutes": 0,
                     "connection_status": "offline",
                     "last_activity_at": None,
@@ -593,8 +633,8 @@ def build_exam_monitoring_snapshot(*, exam):
             )
             continue
 
-        total_questions = session.questions.count()
-        answered_count = session.questions.filter(answer__is_answered=True).count()
+        total_questions = getattr(session, "total_question_count", 0)
+        answered_count = getattr(session, "answered_question_count", 0)
         progress_percentage = int((answered_count / total_questions) * 100) if total_questions else 0
         session_status = _sync_session_status_for_monitoring(session=session, now=now)
         runtime_snapshot = get_runtime_snapshot(session_id=session.id)

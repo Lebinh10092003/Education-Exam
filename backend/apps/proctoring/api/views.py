@@ -19,8 +19,8 @@ from ..models import ProctorEvent
 from ..services import (
     assert_admin_monitoring_access,
     assert_candidate_session_access,
-    build_exam_monitoring_snapshot,
     create_proctor_evidence,
+    get_cached_exam_monitoring_snapshot,
     issue_admin_view_token,
     issue_candidate_publish_token,
     record_heartbeat,
@@ -204,7 +204,7 @@ class ExamMonitoringSnapshotView(APIView):
     def get(self, request, exam_id):
         assert_admin_monitoring_access(user=request.user)
         exam = get_object_or_404(Exam.objects.select_related("subject", "current_version"), pk=exam_id)
-        payload = build_exam_monitoring_snapshot(exam=exam)
+        payload = get_cached_exam_monitoring_snapshot(exam=exam)
         serializer = ExamMonitoringSnapshotSerializer(payload)
         return Response(serializer.data)
 

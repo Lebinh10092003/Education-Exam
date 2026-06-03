@@ -39,6 +39,19 @@ from .serializers import (
     SessionSubmissionSummarySerializer,
 )
 
+
+def _candidate_session_queryset():
+    return ExamSession.objects.select_related(
+        "exam",
+        "exam__schedule_window",
+        "exam__subject",
+    ).prefetch_related(
+        "questions__question_revision__question",
+        "questions__question_revision__options",
+        "questions__answer",
+    )
+
+
 class CandidateAssignedExamListView(ListAPIView):
     serializer_class = CandidateAssignedExamSerializer
     permission_classes = [IsAuthenticated]
@@ -118,6 +131,7 @@ class CandidateExamStartView(APIView):
             pk=pk,
         )
         session = start_or_resume_session(exam=exam, candidate=request.user)
+        session = _candidate_session_queryset().get(pk=session.pk)
         serializer = CandidateExamSessionSerializer(session, context={"request": request})
         return Response(serializer.data)
 
@@ -127,15 +141,7 @@ class ExamSessionViewSet(mixins.RetrieveModelMixin, viewsets.GenericViewSet):
     permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
-        return (
-            ExamSession.objects.select_related("exam", "exam__subject")
-            .prefetch_related(
-                "questions__question_revision__question",
-                "questions__question_revision__options",
-                "questions__answer",
-            )
-            .order_by("-created_at")
-        )
+        return _candidate_session_queryset().order_by("-created_at")
 
     def get_object(self):
         session = super().get_object()
@@ -171,7 +177,10 @@ class SessionAnswerWriteAPIView(APIView):
         responses=SessionAnswerResponseSerializer,
     )
     def put(self, request, session_id, question_id):
-        session = get_object_or_404(ExamSession, pk=session_id)
+        session = get_object_or_404(
+            ExamSession.objects.select_related("exam", "exam__schedule_window"),
+            pk=session_id,
+        )
         if not user_can_access_session(user=request.user, session=session):
             raise PermissionDenied(
                 t(vi="Bạn không có quyền truy cập phiên thi này.", en="You do not have access to this session.")

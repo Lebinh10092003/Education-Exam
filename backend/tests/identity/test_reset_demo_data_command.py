@@ -42,9 +42,9 @@ def test_reset_demo_data_command_rebuilds_full_dataset(settings, tmp_path):
     assert Result.objects.count() == 3
     assert ManualGradingTask.objects.count() == 2
     assert ManualGradingTask.objects.filter(status=ManualGradingTask.Status.PENDING).count() == 1
-    assert Result.objects.filter(publish_state=Result.PublishState.PUBLISHED).count() == 2
+    assert Result.objects.filter(publish_state=Result.PublishState.PUBLISHED).count() == 1
 
-    assert Notification.objects.count() >= 10
+    assert Notification.objects.count() >= 9
     assert AuditEvent.objects.count() >= 8
     assert ProctorEvent.objects.count() == 2
     assert ViolationCase.objects.count() == 2

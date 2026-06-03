@@ -44,7 +44,11 @@ def _filter_reserved_payload(payload, reserved_fields):
 
 @lru_cache(maxsize=1)
 def get_runtime_redis():
-    return redis.Redis.from_url(settings.REDIS_URL, decode_responses=True)
+    return redis.Redis.from_url(
+        settings.REDIS_RUNTIME_URL,
+        decode_responses=True,
+        max_connections=settings.REDIS_RUNTIME_MAX_CONNECTIONS,
+    )
 
 
 def _runtime_ttl_seconds(ttl_seconds=None):

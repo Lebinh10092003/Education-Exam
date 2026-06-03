@@ -1,5 +1,6 @@
 import pytest
 from django.db import IntegrityError
+from django.utils import timezone
 
 
 @pytest.mark.django_db
@@ -22,6 +23,7 @@ def test_manual_grading_task_is_unique_per_session_question(subject, admin_user,
         tags=["Algebra"],
         essay_rubric="State formula and explain usage.",
     )
+    now = timezone.now()
     exam = create_exam(
         name="Mathematics Final Exam",
         subject=subject,
@@ -30,6 +32,8 @@ def test_manual_grading_task_is_unique_per_session_question(subject, admin_user,
         duration_minutes=120,
         passing_score=60,
         max_attempts=1,
+        opening_at=now - timezone.timedelta(hours=1),
+        closing_at=now + timezone.timedelta(hours=2),
         manual_question_ids=[essay_question.id],
         group_ids=[group.id],
     )
@@ -71,6 +75,7 @@ def test_result_is_unique_per_session(subject, admin_user, candidate_user):
         options=[{"key": "A", "text": "2x"}, {"key": "B", "text": "x"}],
         correct_option_keys=["A"],
     )
+    now = timezone.now()
     exam = create_exam(
         name="Mathematics Final Exam",
         subject=subject,
@@ -79,6 +84,8 @@ def test_result_is_unique_per_session(subject, admin_user, candidate_user):
         duration_minutes=120,
         passing_score=60,
         max_attempts=1,
+        opening_at=now - timezone.timedelta(hours=1),
+        closing_at=now + timezone.timedelta(hours=2),
         manual_question_ids=[objective_question.id],
         group_ids=[group.id],
     )

@@ -1,57 +1,57 @@
-# EduExam
+# EduExam - Hệ Thống Thi Trực Tuyến 🚀
 
-EduExam la he thong thi truc tuyen gom:
+EduExam là hệ thống thi trực tuyến hiện đại với các thành phần:
+- **Frontend**: Vite + React (ở thư mục gốc)
+- **Backend**: Django API (ở thư mục `backend/`)
+- **Redis**: Dành cho websocket và realtime monitoring
+- **LiveKit**: Dành cho webcam live trong proctoring (giám thị tự động/giám sát trực tiếp)
 
-- frontend Vite + React o thu muc goc repo
-- backend Django API o thu muc `backend/`
-- Redis cho websocket/realtime
-- LiveKit cho webcam live trong proctoring
+---
 
-README nay chi huong dan cho Windows PowerShell va da duoc chinh theo trang thai hien tai cua du an.
+## ⚡ Chạy Dự Án Nhanh Nhất (Chỉ 1 Dòng Lệnh)
 
-## Chay tu clone moi
-
-### Yeu cau moi truong
-
-- Git
-- Node.js 20+
-- Python 3.12+
-- Docker Desktop
-- Windows PowerShell
-
-### Dich vu local can co
-
-De chay dung du an hien tai sau khi clone, local can:
-
-- SQLite local cho database
-- Redis local cho websocket va realtime monitoring
-- LiveKit local cho webcam live proctoring
-- Celery worker va Celery beat neu muon evidence proctoring tu dong bi don sau khi het han
-
-PostgreSQL va MinIO hien khong bat buoc de chay local.
-
-### Buoc 1: clone repo
+Bạn chỉ cần mở **PowerShell** tại thư mục dự án, sao chép duy nhất dòng dưới đây và chạy (không copy ký tự prompt `>`):
 
 ```powershell
-git clone https://github.com/Lebinh10092003/Education-Exam.git Education-Exam
-cd Education-Exam
+Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass; .\run.ps1
 ```
 
-### Buoc 2: cai frontend, backend, env, va local services
+---
+
+## ⚡ Lệnh Chạy Dự Án Dự Phòng (Nếu Không Muốn Chạy File .ps1)
+
+> [!IMPORTANT]
+> **Yêu cầu trước khi chạy:**
+> - Máy tính chạy hệ điều hành **Windows**.
+> - Đã cài đặt **Git**, **Node.js 20+**, **Python 3.12+**, và **Docker Desktop** (đã khởi động Docker).
+
+Nếu không muốn chạy qua file `run.ps1` ở trên, bạn mở **PowerShell** tại thư mục gốc của dự án và chạy khối lệnh dưới đây:
 
 ```powershell
+# 1. Xác định đường dẫn thư mục dự án
+$repo = (Resolve-Path .).Path
+
+# 2. Cài đặt các thư viện Frontend
+Write-Host ">>> [1/6] Đang cài đặt thư viện Frontend (npm)..." -ForegroundColor Cyan
 npm.cmd install
 
+# 3. Tạo môi trường ảo Python và cài đặt thư viện Backend
+Write-Host ">>> [2/6] Đang khởi tạo Python Virtual Environment..." -ForegroundColor Cyan
 cd backend
-py -m venv .venv
+if (!(Test-Path .venv)) {
+    py -m venv .venv
+}
 .\.venv\Scripts\python.exe -m pip install --upgrade pip
 .\.venv\Scripts\python.exe -m pip install -e .
 
-if (!(Test-Path .env)) { Copy-Item .env.example .env }
+# 4. Cấu hình file .env tự động
+Write-Host ">>> [3/6] Đang tạo và cấu hình file .env..." -ForegroundColor Cyan
+if (!(Test-Path .env)) {
+    Copy-Item .env.example .env
+}
 
-$dbPath = ((Join-Path (Resolve-Path .).Path "db.sqlite3") -replace '\\', '/')
 $envContent = Get-Content .env
-$envContent = $envContent -replace '^DATABASE_URL=.*', "DATABASE_URL=sqlite:///$dbPath"
+$envContent = $envContent -replace '^DATABASE_URL=.*', 'DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:5432/eduexam'
 $envContent = $envContent -replace '^REDIS_URL=.*', 'REDIS_URL=redis://127.0.0.1:6379/0'
 $envContent = $envContent -replace '^CELERY_BROKER_URL=.*', 'CELERY_BROKER_URL=redis://127.0.0.1:6379/0'
 $envContent = $envContent -replace '^CELERY_RESULT_BACKEND=.*', 'CELERY_RESULT_BACKEND=redis://127.0.0.1:6379/1'
@@ -66,161 +66,138 @@ $envContent = $envContent -replace '^PROCTORING_EVIDENCE_RETENTION_DAYS=.*', 'PR
 $envContent = $envContent -replace '^PROCTORING_EVIDENCE_CLEANUP_INTERVAL_SECONDS=.*', 'PROCTORING_EVIDENCE_CLEANUP_INTERVAL_SECONDS=3600'
 $envContent | Set-Content .env
 
-if (-not (Select-String -Path .env -Pattern '^DATABASE_URL=' -Quiet)) { Add-Content .env "DATABASE_URL=sqlite:///$dbPath" }
-if (-not (Select-String -Path .env -Pattern '^REDIS_URL=' -Quiet)) { Add-Content .env 'REDIS_URL=redis://127.0.0.1:6379/0' }
-if (-not (Select-String -Path .env -Pattern '^CELERY_BROKER_URL=' -Quiet)) { Add-Content .env 'CELERY_BROKER_URL=redis://127.0.0.1:6379/0' }
-if (-not (Select-String -Path .env -Pattern '^CELERY_RESULT_BACKEND=' -Quiet)) { Add-Content .env 'CELERY_RESULT_BACKEND=redis://127.0.0.1:6379/1' }
-if (-not (Select-String -Path .env -Pattern '^FRONTEND_BASE_URL=' -Quiet)) { Add-Content .env 'FRONTEND_BASE_URL=http://127.0.0.1:5173' }
-if (-not (Select-String -Path .env -Pattern '^PROCTORING_MEDIA_PROVIDER=' -Quiet)) { Add-Content .env 'PROCTORING_MEDIA_PROVIDER=livekit' }
-if (-not (Select-String -Path .env -Pattern '^PROCTORING_MEDIA_URL=' -Quiet)) { Add-Content .env 'PROCTORING_MEDIA_URL=ws://127.0.0.1:7880' }
-if (-not (Select-String -Path .env -Pattern '^PROCTORING_MEDIA_API_KEY=' -Quiet)) { Add-Content .env 'PROCTORING_MEDIA_API_KEY=devkey' }
-if (-not (Select-String -Path .env -Pattern '^PROCTORING_MEDIA_API_SECRET=' -Quiet)) { Add-Content .env 'PROCTORING_MEDIA_API_SECRET=devsecret-livekit-token-signing-key-123456' }
-if (-not (Select-String -Path .env -Pattern '^PROCTORING_MEDIA_ROOM_PREFIX=' -Quiet)) { Add-Content .env 'PROCTORING_MEDIA_ROOM_PREFIX=eduexam-' }
-if (-not (Select-String -Path .env -Pattern '^PROCTORING_MEDIA_TOKEN_TTL_SECONDS=' -Quiet)) { Add-Content .env 'PROCTORING_MEDIA_TOKEN_TTL_SECONDS=900' }
-if (-not (Select-String -Path .env -Pattern '^PROCTORING_EVIDENCE_RETENTION_DAYS=' -Quiet)) { Add-Content .env 'PROCTORING_EVIDENCE_RETENTION_DAYS=15' }
-if (-not (Select-String -Path .env -Pattern '^PROCTORING_EVIDENCE_CLEANUP_INTERVAL_SECONDS=' -Quiet)) { Add-Content .env 'PROCTORING_EVIDENCE_CLEANUP_INTERVAL_SECONDS=3600' }
+# Bổ sung các giá trị cấu hình nếu chưa có trong file .env
+$keys = @(
+    @{ Pattern = '^DATABASE_URL='; Value = 'DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:5432/eduexam' },
+    @{ Pattern = '^REDIS_URL='; Value = "REDIS_URL=redis://127.0.0.1:6379/0" },
+    @{ Pattern = '^CELERY_BROKER_URL='; Value = "CELERY_BROKER_URL=redis://127.0.0.1:6379/0" },
+    @{ Pattern = '^CELERY_RESULT_BACKEND='; Value = "CELERY_RESULT_BACKEND=redis://127.0.0.1:6379/1" },
+    @{ Pattern = '^FRONTEND_BASE_URL='; Value = "FRONTEND_BASE_URL=http://127.0.0.1:5173" },
+    @{ Pattern = '^PROCTORING_MEDIA_PROVIDER='; Value = "PROCTORING_MEDIA_PROVIDER=livekit" },
+    @{ Pattern = '^PROCTORING_MEDIA_URL='; Value = "PROCTORING_MEDIA_URL=ws://127.0.0.1:7880" },
+    @{ Pattern = '^PROCTORING_MEDIA_API_KEY='; Value = "PROCTORING_MEDIA_API_KEY=devkey" },
+    @{ Pattern = '^PROCTORING_MEDIA_API_SECRET='; Value = "PROCTORING_MEDIA_API_SECRET=devsecret-livekit-token-signing-key-123456" },
+    @{ Pattern = '^PROCTORING_MEDIA_ROOM_PREFIX='; Value = "PROCTORING_MEDIA_ROOM_PREFIX=eduexam-" },
+    @{ Pattern = '^PROCTORING_MEDIA_TOKEN_TTL_SECONDS='; Value = "PROCTORING_MEDIA_TOKEN_TTL_SECONDS=900" },
+    @{ Pattern = '^PROCTORING_EVIDENCE_RETENTION_DAYS='; Value = "PROCTORING_EVIDENCE_RETENTION_DAYS=15" },
+    @{ Pattern = '^PROCTORING_EVIDENCE_CLEANUP_INTERVAL_SECONDS='; Value = "PROCTORING_EVIDENCE_CLEANUP_INTERVAL_SECONDS=3600" }
+)
+foreach ($key in $keys) {
+    if (-not (Select-String -Path .env -Pattern $key.Pattern -Quiet)) {
+        Add-Content .env $key.Value
+    }
+}
 
-docker compose up -d redis livekit
+# 5. Khởi động PostgreSQL, Redis và LiveKit qua Docker
+Write-Host ">>> [4/6] Đang khởi động PostgreSQL, Redis & LiveKit qua Docker..." -ForegroundColor Cyan
+docker compose up -d postgres redis livekit
+Start-Sleep -Seconds 10  # Chờ PostgreSQL sẵn sàng
 
+# 6. Migrate Database và Reset Demo Data
+Write-Host ">>> [5/6] Thực hiện Database Migrations và reset dữ liệu demo..." -ForegroundColor Cyan
 .\.venv\Scripts\python.exe manage.py migrate
 .\.venv\Scripts\python.exe manage.py reset_demo_data
+
+# 7. Khởi động Backend (Daphne ASGI) và Frontend trong 2 cửa sổ mới
+Write-Host ">>> [6/6] Khởi động Backend và Frontend..." -ForegroundColor Green
+Start-Process powershell -ArgumentList "-NoExit", "-Command", "cd '$repo\backend'; .\.venv\Scripts\daphne.exe -b 0.0.0.0 -p 8000 config.asgi:application"
+Start-Process powershell -ArgumentList "-NoExit", "-Command", "cd '$repo'; npm.cmd run dev"
+
+Write-Host ">>> HOÀN THÀNH! Dự án đã được chạy thành công." -ForegroundColor Green
 ```
 
-### Buoc 3: mo backend va frontend
+---
 
-Backend:
+## 🔑 Tài Khoản Demo Mặc Định
 
+Sau khi chạy lệnh reset dữ liệu demo, các tài khoản sau sẽ được tạo sẵn để bạn sử dụng đăng nhập:
+
+| Vai Trò | Email | Mật Khẩu |
+| :--- | :--- | :--- |
+| **Quản trị viên (Admin)** | `admin@example.com` | `admin123456` |
+| **Giám thị (Proctor)** | `proctor1@example.com` | `admin123456` |
+| **Giáo viên tạo đề (Examiner)** | `examiner1@example.com` | `admin123456` |
+| **Thí sinh (Candidate)** | `candidate01@example.com` | `admin123456` |
+
+---
+
+## 🌐 Các Địa Chỉ Truy Cập
+
+- 🖥️ **Frontend**: [http://127.0.0.1:5173](http://127.0.0.1:5173)
+- ⚙️ **Backend API**: [http://127.0.0.1:8000/api/v1/](http://127.0.0.1:8000/api/v1/)
+- 📖 **Tài liệu API (Swagger)**: [http://127.0.0.1:8000/api/docs/](http://127.0.0.1:8000/api/docs/)
+
+---
+
+## 🛠️ Kiến Trúc Hệ Thống
+
+```mermaid
+graph TD
+    A[Vite + React Frontend] <-->|REST API / WebSockets| B[Django Backend API]
+    B <--> C[(SQLite Database)]
+    B <--> D[(Redis Broker / Cache)]
+    A <-->|WebRTC Live Video| E[LiveKit Server]
+    B <-->|Token Signing| E
+```
+
+---
+
+## 🛠️ Các Lệnh Chạy Thủ Công (Từng Bước)
+
+Nếu bạn không muốn chạy khối lệnh tự động ở trên hoặc cần chạy lại từng dịch vụ riêng lẻ:
+
+### Khởi động các dịch vụ phụ trợ (Docker)
 ```powershell
-cd Education-Exam\backend
+docker compose up -d postgres redis livekit
+```
+
+### Chạy Backend Daphne (ASGI — khuyến nghị)
+```powershell
+cd backend
+.\.venv\Scripts\daphne.exe -b 0.0.0.0 -p 8000 config.asgi:application
+```
+
+### Chạy Backend Django (dev-only, không dùng cho load test)
+```powershell
+cd backend
 .\.venv\Scripts\python.exe manage.py runserver 0.0.0.0:8000
 ```
 
-Frontend:
-
+### Chạy Frontend Vite
 ```powershell
-cd Education-Exam
-npm.cmd run dev
+npm run dev
 ```
 
-Celery worker:
-
+### Chạy Celery Worker (xử lý tác vụ nền)
 ```powershell
-cd Education-Exam\backend
+cd backend
 .\.venv\Scripts\celery.exe -A config worker -l info --pool=solo
 ```
 
-Celery beat:
-
+### Chạy Celery Beat (lịch trình dọn dẹp dữ liệu proctoring hết hạn)
 ```powershell
-cd Education-Exam\backend
+cd backend
 .\.venv\Scripts\celery.exe -A config beat -l info
 ```
 
-Neu worker va beat dang chay, evidence proctoring het han se duoc don dinh ky theo `PROCTORING_EVIDENCE_CLEANUP_INTERVAL_SECONDS`.
-Neu can chay tay ngay lap tuc:
+---
 
-```powershell
-cd Education-Exam\backend
-.\.venv\Scripts\python.exe manage.py cleanup_expired_proctor_evidence
-```
+## ❌ Khắc Phục Lỗi Nhanh
 
-Truy cap:
+* **Lỗi `could not establish signal connection: Failed to fetch` khi vào phòng thi:**
+  Lỗi này xảy ra do LiveKit chưa được bật hoặc khởi động thất bại. Hãy khởi động lại:
+  ```powershell
+  cd backend
+  docker compose up -d redis livekit
+  ```
+  Sau đó hãy khởi động lại server Backend để nhận diện kết nối mới.
 
-- Frontend: `http://127.0.0.1:5173`
-- Backend API: `http://127.0.0.1:8000/api/v1/`
-- Swagger: `http://127.0.0.1:8000/api/docs/`
+* **Lỗi môi trường Python:**
+  Đảm bảo bạn đang sử dụng Python 3.12 trở lên. Nếu lệnh `py` không hoạt động, hãy thay thế bằng `python` hoặc `python3`.
 
-## Tai khoan demo mac dinh
-
-Sau `reset_demo_data`, du an tao san:
-
-- Administrator: `admin@example.com / admin123456`
-- Examiner: `examiner1@example.com / admin123456`
-- Proctor: `proctor1@example.com / admin123456`
-- Candidate: `candidate01@example.com / admin123456`
-
-## Cap nhat repo da clone san
-
-```powershell
-cd Education-Exam
-git pull
-npm.cmd install
-
-cd backend
-.\.venv\Scripts\python.exe -m pip install -e .
-docker compose up -d redis livekit
-.\.venv\Scripts\python.exe manage.py migrate
-.\.venv\Scripts\python.exe manage.py reset_demo_data
-```
-
-## Troubleshooting nhanh
-
-Neu vao bai thi ma gap loi `could not establish signal connection: Failed to fetch`, thuong la LiveKit local chua chay:
-
-```powershell
-cd Education-Exam\backend
-docker compose up -d redis livekit
-```
-
-Neu backend da chay tu truoc khi bat Redis hoac LiveKit, restart backend sau khi `docker compose up`.
-
-Neu ban muon test webcam live va monitoring realtime, khong duoc bo qua Redis va LiveKit.
-
-## Copy-paste nhanh
-
-Block duoi day da bao gom clone, setup, migrate, seed demo data, va mo 2 cua so PowerShell de chay backend + frontend.
-
-```powershell
-git clone https://github.com/Lebinh10092003/Education-Exam.git Education-Exam
-cd Education-Exam
-
-$repo = (Resolve-Path .).Path
-
-npm.cmd install
-
-cd backend
-py -m venv .venv
-.\.venv\Scripts\python.exe -m pip install --upgrade pip
-.\.venv\Scripts\python.exe -m pip install -e .
-
-if (!(Test-Path .env)) { Copy-Item .env.example .env }
-
-$dbPath = ((Join-Path (Resolve-Path .).Path "db.sqlite3") -replace '\\', '/')
-$envContent = Get-Content .env
-$envContent = $envContent -replace '^DATABASE_URL=.*', "DATABASE_URL=sqlite:///$dbPath"
-$envContent = $envContent -replace '^REDIS_URL=.*', 'REDIS_URL=redis://127.0.0.1:6379/0'
-$envContent = $envContent -replace '^CELERY_BROKER_URL=.*', 'CELERY_BROKER_URL=redis://127.0.0.1:6379/0'
-$envContent = $envContent -replace '^CELERY_RESULT_BACKEND=.*', 'CELERY_RESULT_BACKEND=redis://127.0.0.1:6379/1'
-$envContent = $envContent -replace '^FRONTEND_BASE_URL=.*', 'FRONTEND_BASE_URL=http://127.0.0.1:5173'
-$envContent = $envContent -replace '^PROCTORING_MEDIA_PROVIDER=.*', 'PROCTORING_MEDIA_PROVIDER=livekit'
-$envContent = $envContent -replace '^PROCTORING_MEDIA_URL=.*', 'PROCTORING_MEDIA_URL=ws://127.0.0.1:7880'
-$envContent = $envContent -replace '^PROCTORING_MEDIA_API_KEY=.*', 'PROCTORING_MEDIA_API_KEY=devkey'
-$envContent = $envContent -replace '^PROCTORING_MEDIA_API_SECRET=.*', 'PROCTORING_MEDIA_API_SECRET=devsecret-livekit-token-signing-key-123456'
-$envContent = $envContent -replace '^PROCTORING_MEDIA_ROOM_PREFIX=.*', 'PROCTORING_MEDIA_ROOM_PREFIX=eduexam-'
-$envContent = $envContent -replace '^PROCTORING_MEDIA_TOKEN_TTL_SECONDS=.*', 'PROCTORING_MEDIA_TOKEN_TTL_SECONDS=900'
-$envContent = $envContent -replace '^PROCTORING_EVIDENCE_RETENTION_DAYS=.*', 'PROCTORING_EVIDENCE_RETENTION_DAYS=15'
-$envContent = $envContent -replace '^PROCTORING_EVIDENCE_CLEANUP_INTERVAL_SECONDS=.*', 'PROCTORING_EVIDENCE_CLEANUP_INTERVAL_SECONDS=3600'
-$envContent | Set-Content .env
-
-if (-not (Select-String -Path .env -Pattern '^DATABASE_URL=' -Quiet)) { Add-Content .env "DATABASE_URL=sqlite:///$dbPath" }
-if (-not (Select-String -Path .env -Pattern '^REDIS_URL=' -Quiet)) { Add-Content .env 'REDIS_URL=redis://127.0.0.1:6379/0' }
-if (-not (Select-String -Path .env -Pattern '^CELERY_BROKER_URL=' -Quiet)) { Add-Content .env 'CELERY_BROKER_URL=redis://127.0.0.1:6379/0' }
-if (-not (Select-String -Path .env -Pattern '^CELERY_RESULT_BACKEND=' -Quiet)) { Add-Content .env 'CELERY_RESULT_BACKEND=redis://127.0.0.1:6379/1' }
-if (-not (Select-String -Path .env -Pattern '^FRONTEND_BASE_URL=' -Quiet)) { Add-Content .env 'FRONTEND_BASE_URL=http://127.0.0.1:5173' }
-if (-not (Select-String -Path .env -Pattern '^PROCTORING_MEDIA_PROVIDER=' -Quiet)) { Add-Content .env 'PROCTORING_MEDIA_PROVIDER=livekit' }
-if (-not (Select-String -Path .env -Pattern '^PROCTORING_MEDIA_URL=' -Quiet)) { Add-Content .env 'PROCTORING_MEDIA_URL=ws://127.0.0.1:7880' }
-if (-not (Select-String -Path .env -Pattern '^PROCTORING_MEDIA_API_KEY=' -Quiet)) { Add-Content .env 'PROCTORING_MEDIA_API_KEY=devkey' }
-if (-not (Select-String -Path .env -Pattern '^PROCTORING_MEDIA_API_SECRET=' -Quiet)) { Add-Content .env 'PROCTORING_MEDIA_API_SECRET=devsecret-livekit-token-signing-key-123456' }
-if (-not (Select-String -Path .env -Pattern '^PROCTORING_MEDIA_ROOM_PREFIX=' -Quiet)) { Add-Content .env 'PROCTORING_MEDIA_ROOM_PREFIX=eduexam-' }
-if (-not (Select-String -Path .env -Pattern '^PROCTORING_MEDIA_TOKEN_TTL_SECONDS=' -Quiet)) { Add-Content .env 'PROCTORING_MEDIA_TOKEN_TTL_SECONDS=900' }
-if (-not (Select-String -Path .env -Pattern '^PROCTORING_EVIDENCE_RETENTION_DAYS=' -Quiet)) { Add-Content .env 'PROCTORING_EVIDENCE_RETENTION_DAYS=15' }
-if (-not (Select-String -Path .env -Pattern '^PROCTORING_EVIDENCE_CLEANUP_INTERVAL_SECONDS=' -Quiet)) { Add-Content .env 'PROCTORING_EVIDENCE_CLEANUP_INTERVAL_SECONDS=3600' }
-
-docker compose up -d redis livekit
-
-.\.venv\Scripts\python.exe manage.py migrate
-.\.venv\Scripts\python.exe manage.py reset_demo_data
-
-Start-Process powershell -ArgumentList "-NoExit", "-Command", "cd '$repo\\backend'; .\\.venv\\Scripts\\python.exe manage.py runserver 0.0.0.0:8000"
-Start-Process powershell -ArgumentList "-NoExit", "-Command", "cd '$repo'; npm.cmd run dev"
-```
+* **Lỗi `Error 10061 connecting to 127.0.0.1:6379` (Redis) hoặc kết nối PostgreSQL bị từ chối:**
+  Docker Desktop chưa được khởi động. Hãy mở Docker Desktop trước, sau đó chạy:
+  ```powershell
+  cd backend
+  docker compose up -d postgres redis livekit
+  ```

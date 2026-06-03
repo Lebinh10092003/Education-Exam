@@ -1,8 +1,32 @@
+from types import SimpleNamespace
+
 import pytest
 from django.conf import settings
+from django.core.cache import cache
 from django.utils import timezone
 
 from .utils import build_active_session
+
+
+def test_get_cached_exam_monitoring_snapshot_reuses_payload_within_ttl(settings, monkeypatch):
+    from apps.proctoring import services
+
+    settings.PROCTORING_MONITORING_SNAPSHOT_TTL_SECONDS = 10
+    cache.clear()
+    calls = []
+
+    def fake_build_snapshot(*, exam):
+        calls.append(exam.id)
+        return {"exam": {"id": exam.id}, "candidate_statuses": []}
+
+    monkeypatch.setattr(services, "build_exam_monitoring_snapshot", fake_build_snapshot)
+
+    exam = SimpleNamespace(id=123)
+    first = services.get_cached_exam_monitoring_snapshot(exam=exam)
+    second = services.get_cached_exam_monitoring_snapshot(exam=exam)
+
+    assert first == second
+    assert calls == [123]
 
 
 @pytest.mark.django_db
@@ -51,7 +75,12 @@ def test_record_proctor_event_creates_violation_case_for_warning_events(subject,
 
 
 @pytest.mark.django_db
-def test_record_proctor_event_creates_admin_notification(subject, admin_user, candidate_user):
+def test_record_proctor_event_creates_admin_notification(
+    django_capture_on_commit_callbacks,
+    subject,
+    admin_user,
+    candidate_user,
+):
     from apps.notifications.models import Notification
     from apps.proctoring.services import record_proctor_event
 
@@ -61,13 +90,14 @@ def test_record_proctor_event_creates_admin_notification(subject, admin_user, ca
         candidate_user=candidate_user,
     )
 
-    event = record_proctor_event(
-        session=session,
-        event_type="fullscreen_exit",
-        severity="critical",
-        metadata={"count": 1, "message": "Candidate left fullscreen."},
-        reported_by=candidate_user,
-    )
+    with django_capture_on_commit_callbacks(execute=True):
+        event = record_proctor_event(
+            session=session,
+            event_type="fullscreen_exit",
+            severity="critical",
+            metadata={"count": 1, "message": "Candidate left fullscreen."},
+            reported_by=candidate_user,
+        )
 
     notification = Notification.objects.filter(
         recipient=admin_user,
@@ -81,7 +111,12 @@ def test_record_proctor_event_creates_admin_notification(subject, admin_user, ca
 
 
 @pytest.mark.django_db
-def test_record_proctor_event_creates_candidate_notification(subject, admin_user, candidate_user):
+def test_record_proctor_event_creates_candidate_notification(
+    django_capture_on_commit_callbacks,
+    subject,
+    admin_user,
+    candidate_user,
+):
     from apps.notifications.models import Notification
     from apps.proctoring.services import record_proctor_event
 
@@ -91,13 +126,14 @@ def test_record_proctor_event_creates_candidate_notification(subject, admin_user
         candidate_user=candidate_user,
     )
 
-    event = record_proctor_event(
-        session=session,
-        event_type="tab_switch",
-        severity="warning",
-        metadata={"count": 1, "message": "Candidate switched away from the exam tab."},
-        reported_by=candidate_user,
-    )
+    with django_capture_on_commit_callbacks(execute=True):
+        event = record_proctor_event(
+            session=session,
+            event_type="tab_switch",
+            severity="warning",
+            metadata={"count": 1, "message": "Candidate switched away from the exam tab."},
+            reported_by=candidate_user,
+        )
 
     notification = Notification.objects.filter(
         recipient=candidate_user,

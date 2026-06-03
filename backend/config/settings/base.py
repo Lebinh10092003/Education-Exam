@@ -1,5 +1,6 @@
 from datetime import timedelta
 from pathlib import Path
+from urllib.parse import urlsplit, urlunsplit
 
 import environ
 
@@ -12,7 +13,13 @@ env = environ.Env(
     SECRET_KEY=(str, "unsafe-dev-secret-key-for-eduexam-dev-1234567890"),
     ALLOWED_HOSTS=(list, ["localhost", "127.0.0.1"]),
     DATABASE_URL=(str, f"sqlite:///{BASE_DIR / 'db.sqlite3'}"),
+    DATABASE_CONN_MAX_AGE=(int, 60),
+    DATABASE_CONN_HEALTH_CHECKS=(bool, True),
     REDIS_URL=(str, "redis://localhost:6379/0"),
+    REDIS_CHANNEL_URL=(str, ""),
+    REDIS_CACHE_URL=(str, ""),
+    REDIS_RUNTIME_URL=(str, ""),
+    REDIS_RUNTIME_MAX_CONNECTIONS=(int, 50),
     CELERY_BROKER_URL=(str, "redis://localhost:6379/0"),
     CELERY_RESULT_BACKEND=(str, "redis://localhost:6379/1"),
     USE_S3_STORAGE=(bool, False),
@@ -36,8 +43,11 @@ env = environ.Env(
     PROCTORING_MAX_LIVE_VIEWS_PER_EXAM=(int, 3),
     PROCTORING_HEARTBEAT_UNSTABLE_AFTER_SECONDS=(int, 90),
     PROCTORING_HEARTBEAT_OFFLINE_AFTER_SECONDS=(int, 150),
+    PROCTORING_MONITORING_SNAPSHOT_TTL_SECONDS=(int, 10),
     PROCTORING_EVIDENCE_RETENTION_DAYS=(int, 15),
     PROCTORING_EVIDENCE_CLEANUP_INTERVAL_SECONDS=(int, 3600),
+    NOTIFICATION_PERMISSION_RECIPIENT_CACHE_TTL_SECONDS=(int, 60),
+    EXAM_SESSION_ACTIVITY_WRITE_INTERVAL_SECONDS=(int, 30),
     PRACTICE_DETAILS_RETENTION_DAYS=(int, 15),
     PRACTICE_DETAILS_CLEANUP_INTERVAL_SECONDS=(int, 3600),
 )
@@ -48,6 +58,19 @@ DEBUG = env("DEBUG")
 SECRET_KEY = env("SECRET_KEY")
 ALLOWED_HOSTS = env.list("ALLOWED_HOSTS")
 REDIS_URL = env("REDIS_URL")
+
+
+def _redis_url_with_db(url, db_index):
+    parsed = urlsplit(url)
+    if parsed.scheme not in {"redis", "rediss"}:
+        return url
+    return urlunsplit((parsed.scheme, parsed.netloc, f"/{db_index}", parsed.query, parsed.fragment))
+
+
+REDIS_CHANNEL_URL = env("REDIS_CHANNEL_URL") or REDIS_URL
+REDIS_CACHE_URL = env("REDIS_CACHE_URL") or _redis_url_with_db(REDIS_URL, 2)
+REDIS_RUNTIME_URL = env("REDIS_RUNTIME_URL") or _redis_url_with_db(REDIS_URL, 3)
+REDIS_RUNTIME_MAX_CONNECTIONS = env.int("REDIS_RUNTIME_MAX_CONNECTIONS")
 
 INSTALLED_APPS = [
     "daphne",
@@ -112,6 +135,8 @@ ASGI_APPLICATION = "config.asgi.application"
 DATABASES = {
     "default": env.db("DATABASE_URL"),
 }
+DATABASES["default"]["CONN_MAX_AGE"] = env.int("DATABASE_CONN_MAX_AGE")
+DATABASES["default"]["CONN_HEALTH_CHECKS"] = env.bool("DATABASE_CONN_HEALTH_CHECKS")
 
 AUTH_PASSWORD_VALIDATORS = [
     {
@@ -151,8 +176,11 @@ PROCTORING_MAX_CONCURRENT_LIVE_VIEWS = env.int("PROCTORING_MAX_CONCURRENT_LIVE_V
 PROCTORING_MAX_LIVE_VIEWS_PER_EXAM = env.int("PROCTORING_MAX_LIVE_VIEWS_PER_EXAM")
 PROCTORING_HEARTBEAT_UNSTABLE_AFTER_SECONDS = env.int("PROCTORING_HEARTBEAT_UNSTABLE_AFTER_SECONDS")
 PROCTORING_HEARTBEAT_OFFLINE_AFTER_SECONDS = env.int("PROCTORING_HEARTBEAT_OFFLINE_AFTER_SECONDS")
+PROCTORING_MONITORING_SNAPSHOT_TTL_SECONDS = env.int("PROCTORING_MONITORING_SNAPSHOT_TTL_SECONDS")
 PROCTORING_EVIDENCE_RETENTION_DAYS = env.int("PROCTORING_EVIDENCE_RETENTION_DAYS")
 PROCTORING_EVIDENCE_CLEANUP_INTERVAL_SECONDS = env.int("PROCTORING_EVIDENCE_CLEANUP_INTERVAL_SECONDS")
+NOTIFICATION_PERMISSION_RECIPIENT_CACHE_TTL_SECONDS = env.int("NOTIFICATION_PERMISSION_RECIPIENT_CACHE_TTL_SECONDS")
+EXAM_SESSION_ACTIVITY_WRITE_INTERVAL_SECONDS = env.int("EXAM_SESSION_ACTIVITY_WRITE_INTERVAL_SECONDS")
 PRACTICE_DETAILS_RETENTION_DAYS = env.int("PRACTICE_DETAILS_RETENTION_DAYS")
 PRACTICE_DETAILS_CLEANUP_INTERVAL_SECONDS = env.int("PRACTICE_DETAILS_CLEANUP_INTERVAL_SECONDS")
 
@@ -225,7 +253,7 @@ CELERY_BEAT_SCHEDULE = {
 CHANNEL_LAYERS = {
     "default": {
         "BACKEND": "channels_redis.core.RedisChannelLayer",
-        "CONFIG": {"hosts": [REDIS_URL]},
+        "CONFIG": {"hosts": [REDIS_CHANNEL_URL]},
     }
 }
 
@@ -233,11 +261,11 @@ CHANNEL_LAYERS = {
 CACHES = {
     "default": {
         "BACKEND": "django.core.cache.backends.redis.RedisCache",
-        "LOCATION": REDIS_URL,
+        "LOCATION": REDIS_CACHE_URL,
         "TIMEOUT": 300,  # 5 phut mac dinh
         "KEY_PREFIX": "eduexam",
         "OPTIONS": {
-            "CLIENT_CLASS": "django_redis.client.DefaultClient",
+            "max_connections": 50,
         },
     }
 }

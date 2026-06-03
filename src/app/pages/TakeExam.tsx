@@ -35,6 +35,12 @@ import {
   type ConnectedMediaRoom,
   type ProctorEventResponse,
 } from "../lib/proctoringMedia";
+import {
+  clearSessionSnapshots,
+  compressSnapshotForUpload,
+  getTopViolationSnapshots,
+  saveSnapshotLocally,
+} from "../lib/snapshotStore";
 import { getStoredTokens } from "../lib/storage";
 
 interface SessionQuestion {
@@ -422,7 +428,15 @@ export function TakeExam() {
     await requestFullscreen();
   };
 
-  const captureViolationEvidence = async (event: ProctorEventResponse, message: string) => {
+  /**
+   * Chup anh vi pham va LUU VAO LOCAL (IndexedDB) - khong upload ngay.
+   * Viec upload se duoc thuc hien khi nop bai (chi top-3 snapshot).
+   */
+  const captureViolationEvidence = async (
+    event: ProctorEventResponse,
+    message: string,
+    severity: "critical" | "warning" | "info",
+  ) => {
     if (!session) {
       return;
     }
@@ -432,27 +446,49 @@ export function TakeExam() {
       return;
     }
 
-    const webcamSnapshot = await captureTrackSnapshot(captureResources.webcamTrack, {
-      maxWidth: 1280,
-      mimeType: "image/jpeg",
-      quality: 0.82,
-    });
-    await enqueueSessionMutation(() =>
-      uploadProctorEvidence(session.id, event.id, "webcam_snapshot", webcamSnapshot, { message }),
-    );
+    const capturedAt = new Date().toISOString();
 
-    if (!captureResources.screenTrack) {
-      return;
+    // Chup webcam -> luu local (JPEG chat luong cao, chua nen)
+    try {
+      const webcamBlob = await captureTrackSnapshot(captureResources.webcamTrack, {
+        maxWidth: 1280,
+        mimeType: "image/jpeg",
+        quality: 0.85,
+      });
+      await saveSnapshotLocally({
+        sessionId: session.id,
+        eventId: event.id,
+        evidenceType: "webcam_snapshot",
+        severity,
+        blob: webcamBlob,
+        message,
+        capturedAt,
+      });
+    } catch {
+      // Neu khong chup duoc webcam, bo qua (khong de loi nay chan nop bai)
     }
 
-    const screenSnapshot = await captureTrackSnapshot(captureResources.screenTrack, {
-      maxWidth: 1280,
-      mimeType: "image/jpeg",
-      quality: 0.82,
-    });
-    await enqueueSessionMutation(() =>
-      uploadProctorEvidence(session.id, event.id, "screen_capture", screenSnapshot, { message }),
-    );
+    // Chup man hinh -> luu local
+    if (captureResources.screenTrack && captureResources.screenTrack.readyState !== "ended") {
+      try {
+        const screenBlob = await captureTrackSnapshot(captureResources.screenTrack, {
+          maxWidth: 1280,
+          mimeType: "image/jpeg",
+          quality: 0.85,
+        });
+        await saveSnapshotLocally({
+          sessionId: session.id,
+          eventId: event.id,
+          evidenceType: "screen_capture",
+          severity,
+          blob: screenBlob,
+          message,
+          capturedAt,
+        });
+      } catch {
+        // Neu khong chup duoc man hinh, bo qua
+      }
+    }
   };
 
   const reportViolation = async (
@@ -489,7 +525,7 @@ export function TakeExam() {
           notify.warning(`${t("examSession.warningAlertRecorded")} ${violationMessage}`);
         }
       }
-      await captureViolationEvidence(event, message);
+      await captureViolationEvidence(event, message, severity as "critical" | "warning" | "info");
     } catch (violationError) {
       const errorMessage =
         violationError instanceof Error ? violationError.message : t("examSession.captureEvidenceError");
@@ -982,6 +1018,47 @@ export function TakeExam() {
     await saveAnswer(currentQuestion.id, { is_marked_for_review: nextMarked });
   };
 
+  /**
+   * Upload top-3 snapshot vi pham (theo severity) len server truoc khi nop bai.
+   * Moi snapshot duoc nen tu JPEG 0.85 -> WebP 0.6 de giam tai duong truyen.
+   * Sau khi upload xong, toan bo snapshot local duoc xoa.
+   */
+  const uploadPendingSnapshots = async (sessionId: number) => {
+    const MAX_UPLOADS = 3;
+    let snapshots;
+    try {
+      snapshots = await getTopViolationSnapshots(sessionId, MAX_UPLOADS);
+    } catch {
+      // Neu IndexedDB loi, bo qua upload (khong chặn nop bai)
+      return;
+    }
+
+    for (const entry of snapshots) {
+      try {
+        // Nen anh truoc khi upload (WebP 0.6 - nhe hon ~60%)
+        const compressed = await compressSnapshotForUpload(entry.blob);
+        await enqueueSessionMutation(() =>
+          uploadProctorEvidence(
+            entry.sessionId,
+            entry.eventId,
+            entry.evidenceType,
+            compressed,
+            { message: entry.message, compressed: true, original_size: entry.blob.size },
+          ),
+        );
+      } catch {
+        // Neu upload that bai, tiep tuc voi snapshot tiep theo
+      }
+    }
+
+    // Don dep IndexedDB sau khi upload xong
+    try {
+      await clearSessionSnapshots(sessionId);
+    } catch {
+      // Loi don dep khong quan trong, bo qua
+    }
+  };
+
   const handleSubmit = async () => {
     if (!session) {
       return;
@@ -990,6 +1067,8 @@ export function TakeExam() {
     setIsSubmitting(true);
     try {
       await persistEssayAnswer();
+      // Upload top-3 snapshot vi pham truoc khi nop bai
+      await uploadPendingSnapshots(session.id);
       const response = await enqueueSessionMutation(() =>
         apiRequest<SubmissionSummary>(`/api/v1/exam-sessions/${session.id}/submit/`, {
           method: "POST",

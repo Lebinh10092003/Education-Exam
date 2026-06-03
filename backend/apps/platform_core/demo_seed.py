@@ -12,10 +12,10 @@ from django.utils import timezone
 
 from apps.academics.models import Subject
 from apps.exam_authoring.models import Exam
-from apps.exam_authoring.services import create_exam
+from apps.exam_authoring.services import create_exam, transition_exam_status
 from apps.exam_delivery.services import create_autosave_snapshot, save_session_answer, start_or_resume_session, submit_session
 from apps.grading.models import Result
-from apps.grading.services import grade_manual_task, publish_result
+from apps.grading.services import grade_manual_task
 from apps.identity.bootstrap import seed_identity_access
 from apps.identity.models import Profile, Role, UserRole
 from apps.institutions.models import CandidateGroup, GroupMembership, School
@@ -776,10 +776,7 @@ def _seed_sessions_results_and_proctoring(context: DemoSeedContext):
         )
     math_submission_session.refresh_from_db()
     context.sessions["math_submitted"] = math_submission_session
-    context.results["math_submitted"] = publish_result(
-        result=math_submission_session.result,
-        published_by=admin,
-    )
+    context.results["math_submitted"] = math_submission_session.result
 
     math_in_progress_session = start_or_resume_session(exam=context.exams["math_open"], candidate=candidate2)
     _save_answers_for_session(
@@ -862,23 +859,21 @@ def _seed_sessions_results_and_proctoring(context: DemoSeedContext):
         essay_text="",
     )
     submit_session(session=biology_final_session, submitted_by=candidate4)
+    transition_exam_status(exam=context.exams["biology_closed"], next_status=Exam.Status.CLOSED, actor=admin)
     biology_final_session.refresh_from_db()
     context.sessions["biology_finalized"] = biology_final_session
     context.results["biology_finalized"] = biology_final_session.result
 
-    context.exams["biology_closed"].status = Exam.Status.CLOSED
-    context.exams["biology_closed"].save(update_fields=["status", "updated_at"])
-
 
 def _seed_extra_notifications(context: DemoSeedContext):
     create_notification(
-        recipient=context.users["candidate01"],
+        recipient=context.users["candidate04"],
         title="Published result available",
-        message='Your result for "Mathematics Mock Exam" is now available.',
+        message='Your result for "Biology Practice Review" is now available.',
         category=Notification.Category.RESULT,
         priority=Notification.Priority.MEDIUM,
         action_url="/candidate/results",
-        metadata={"exam_id": context.exams["math_open"].id},
+        metadata={"exam_id": context.exams["biology_closed"].id},
     )
     create_notification(
         recipient=context.users["candidate02"],

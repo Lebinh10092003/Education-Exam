@@ -2,8 +2,9 @@ import random
 from datetime import timedelta
 from decimal import Decimal
 
+from django.conf import settings
 from django.db import transaction
-from django.db.models import Q
+from django.db.models import Count, Q
 from django.utils import timezone
 from rest_framework.exceptions import PermissionDenied, ValidationError
 
@@ -18,6 +19,31 @@ from apps.platform_core.i18n import t
 from .models import AutosaveSnapshot, ExamSession, SessionAnswer, SessionQuestion, Submission
 
 UNSET = object()
+
+
+def _progress_counts_for_session(session):
+    prefetched_questions = getattr(session, "_prefetched_objects_cache", {}).get("questions")
+    if prefetched_questions is not None:
+        return {
+            "answered_count": sum(
+                1
+                for question in prefetched_questions
+                if getattr(getattr(question, "answer", None), "is_answered", False)
+            ),
+            "marked_count": sum(1 for question in prefetched_questions if question.is_marked_for_review),
+        }
+
+    return session.questions.aggregate(
+        answered_count=Count("id", filter=Q(answer__is_answered=True)),
+        marked_count=Count("id", filter=Q(is_marked_for_review=True)),
+    )
+
+
+def _should_write_session_activity(session, now):
+    interval_seconds = max(int(getattr(settings, "EXAM_SESSION_ACTIVITY_WRITE_INTERVAL_SECONDS", 30)), 0)
+    if interval_seconds == 0 or session.last_activity_at is None:
+        return True
+    return now - session.last_activity_at >= timedelta(seconds=interval_seconds)
 
 
 def _candidate_has_access(*, exam, candidate):
@@ -166,25 +192,27 @@ def save_session_answer(
     if answer_text is not None:
         answer.answer_text = answer_text
     answer.is_answered = bool(answer.selected_option_keys or answer.answer_text.strip())
-    answer.save()
+    answer.save(update_fields=["selected_option_keys", "answer_text", "is_answered", "updated_at"])
 
-    if is_marked_for_review is not UNSET:
+    if is_marked_for_review is not UNSET and session_question.is_marked_for_review != bool(is_marked_for_review):
         session_question.is_marked_for_review = bool(is_marked_for_review)
         session_question.save(update_fields=["is_marked_for_review", "updated_at"])
 
-    session.last_activity_at = now
-    session.save(update_fields=["last_activity_at", "updated_at"])
+    if _should_write_session_activity(session, now):
+        session.last_activity_at = now
+        session.save(update_fields=["last_activity_at", "updated_at"])
     return answer
 
 
 @transaction.atomic
 def create_autosave_snapshot(*, session, payload=None):
     now = _assert_session_is_active(session)
+    progress_counts = _progress_counts_for_session(session)
     snapshot = AutosaveSnapshot.objects.create(
         session=session,
         payload=payload or {},
-        answered_count=session.questions.filter(answer__is_answered=True).count(),
-        marked_count=session.questions.filter(is_marked_for_review=True).count(),
+        answered_count=progress_counts["answered_count"],
+        marked_count=progress_counts["marked_count"],
     )
     session.last_activity_at = now
     session.save(update_fields=["last_activity_at", "updated_at"])
@@ -193,10 +221,11 @@ def create_autosave_snapshot(*, session, payload=None):
 
 def build_autosave_receipt(*, session, payload=None):
     now = _assert_session_is_active(session)
+    progress_counts = _progress_counts_for_session(session)
     return {
         "id": None,
-        "answered_count": session.questions.filter(answer__is_answered=True).count(),
-        "marked_count": session.questions.filter(is_marked_for_review=True).count(),
+        "answered_count": progress_counts["answered_count"],
+        "marked_count": progress_counts["marked_count"],
         "payload": payload or {},
         "created_at": now,
     }

@@ -107,6 +107,40 @@ def test_save_answer_updates_session_answer_and_autosave_snapshot(subject, admin
 
 
 @pytest.mark.django_db
+def test_save_answer_throttles_session_activity_writes(settings, subject, admin_user, candidate_user):
+    from apps.exam_delivery.models import ExamSession
+    from apps.exam_delivery.services import save_session_answer, start_or_resume_session
+
+    settings.EXAM_SESSION_ACTIVITY_WRITE_INTERVAL_SECONDS = 30
+    exam = _build_assigned_exam(subject=subject, admin_user=admin_user, candidate_user=candidate_user)
+    session = start_or_resume_session(exam=exam, candidate=candidate_user)
+    session_question = session.questions.order_by("sort_order").first()
+    original_activity_at = session.last_activity_at
+
+    save_session_answer(
+        session=session,
+        session_question=session_question,
+        selected_option_keys=["A"],
+    )
+    session.refresh_from_db()
+
+    assert session.last_activity_at == original_activity_at
+
+    stale_activity_at = timezone.now() - timedelta(seconds=31)
+    ExamSession.objects.filter(pk=session.pk).update(last_activity_at=stale_activity_at)
+    session.refresh_from_db()
+
+    save_session_answer(
+        session=session,
+        session_question=session_question,
+        selected_option_keys=["A"],
+    )
+    session.refresh_from_db()
+
+    assert session.last_activity_at > stale_activity_at
+
+
+@pytest.mark.django_db
 def test_submit_session_is_idempotent_and_auto_scores_objective_items(subject, admin_user, candidate_user):
     from apps.exam_delivery.services import save_session_answer, start_or_resume_session, submit_session
 

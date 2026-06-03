@@ -164,6 +164,32 @@ def test_runtime_defaults_are_env_backed():
     assert settings.PROCTORING_HEARTBEAT_INTERVAL_SECONDS == 60
     assert settings.PROCTORING_MAX_CONCURRENT_LIVE_VIEWS == 5
     assert settings.PROCTORING_MAX_LIVE_VIEWS_PER_EXAM == 3
+    assert settings.REDIS_RUNTIME_URL.endswith("/3")
+    assert settings.REDIS_RUNTIME_MAX_CONNECTIONS == 50
+
+
+def test_runtime_redis_uses_dedicated_url_and_connection_limit(settings, monkeypatch):
+    from apps.proctoring import runtime
+
+    calls = {}
+    client = object()
+
+    def fake_from_url(url, **kwargs):
+        calls["url"] = url
+        calls["kwargs"] = kwargs
+        return client
+
+    runtime.get_runtime_redis.cache_clear()
+    settings.REDIS_RUNTIME_URL = "redis://redis.example.test:6379/9"
+    settings.REDIS_RUNTIME_MAX_CONNECTIONS = 17
+    monkeypatch.setattr(runtime.redis.Redis, "from_url", fake_from_url)
+
+    assert runtime.get_runtime_redis() is client
+    assert calls == {
+        "url": "redis://redis.example.test:6379/9",
+        "kwargs": {"decode_responses": True, "max_connections": 17},
+    }
+    runtime.get_runtime_redis.cache_clear()
 
 
 def test_refresh_presence_sets_expected_ttl_state(fake_redis):

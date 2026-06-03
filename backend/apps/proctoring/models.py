@@ -94,6 +94,9 @@ class SessionHeartbeat(TimeStampedModel):
 
     class Meta:
         ordering = ("-recorded_at", "-id")
+        indexes = [
+            models.Index(fields=["-recorded_at"], name="sh_recorded_at_idx"),
+        ]
 
     def __str__(self):
         return f"Heartbeat<{self.session_id}:{self.connection_status}>"

@@ -184,16 +184,32 @@ class CandidateExamSessionSerializer(serializers.ModelSerializer):
     def get_remaining_seconds(self, obj):
         return get_remaining_seconds(obj)
 
+    def _prefetched_questions(self, obj):
+        return getattr(obj, "_prefetched_objects_cache", {}).get("questions")
+
     @extend_schema_field(OpenApiTypes.INT)
     def get_answered_count(self, obj):
+        questions = self._prefetched_questions(obj)
+        if questions is not None:
+            return sum(
+                1
+                for question in questions
+                if getattr(getattr(question, "answer", None), "is_answered", False)
+            )
         return obj.questions.filter(answer__is_answered=True).count()
 
     @extend_schema_field(OpenApiTypes.INT)
     def get_marked_count(self, obj):
+        questions = self._prefetched_questions(obj)
+        if questions is not None:
+            return sum(1 for question in questions if question.is_marked_for_review)
         return obj.questions.filter(is_marked_for_review=True).count()
 
     @extend_schema_field(OpenApiTypes.INT)
     def get_total_questions(self, obj):
+        questions = self._prefetched_questions(obj)
+        if questions is not None:
+            return len(questions)
         return obj.questions.count()
 
     @extend_schema_field(OpenApiTypes.STR)

@@ -1,3 +1,5 @@
+from django.conf import settings
+from django.core.cache import cache
 from django.utils import timezone
 
 from apps.identity.models import User
@@ -49,18 +51,26 @@ def mark_all_notifications_as_read(*, user):
 
 def users_with_permission(*, permission_code, exclude_user_ids=None):
     exclude_ids = [user_id for user_id in (exclude_user_ids or []) if user_id is not None]
-    queryset = (
-        User.objects.filter(
-            is_active=True,
-            user_roles__is_active=True,
-            user_roles__role__is_active=True,
-            user_roles__role__permissions__code=permission_code,
+    cache_key = f"notifications:permission-users:{permission_code}"
+    ttl_seconds = max(int(getattr(settings, "NOTIFICATION_PERMISSION_RECIPIENT_CACHE_TTL_SECONDS", 60)), 0)
+    user_ids = cache.get(cache_key) if ttl_seconds else None
+    if user_ids is None:
+        user_ids = list(
+            User.objects.filter(
+                is_active=True,
+                user_roles__is_active=True,
+                user_roles__role__is_active=True,
+                user_roles__role__permissions__code=permission_code,
+            )
+            .exclude(status=User.Status.LOCKED)
+            .distinct()
+            .values_list("id", flat=True)
         )
-        .exclude(status=User.Status.LOCKED)
-        .distinct()
-    )
+        if ttl_seconds:
+            cache.set(cache_key, user_ids, ttl_seconds)
     if exclude_ids:
-        queryset = queryset.exclude(id__in=exclude_ids)
+        user_ids = [user_id for user_id in user_ids if user_id not in exclude_ids]
+    queryset = User.objects.filter(id__in=user_ids)
     return queryset.order_by("email")
 
 
