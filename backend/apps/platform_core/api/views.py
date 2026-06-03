@@ -186,7 +186,7 @@ class DashboardOverviewView(generics.GenericAPIView):
             Q(session__exam__schedule_window__closes_at__isnull=True)
             | Q(session__exam__schedule_window__closes_at__gt=now)
         )
-        candidate_role_filter = Q(user_roles__role__slug="candidate") | Q(user_roles__role__slug="student")
+        candidate_role_filter = Q(user_roles__role__slug="candidate")
         total_candidates = User.objects.filter(candidate_role_filter, user_roles__is_active=True).distinct().count()
         active_exams = Exam.objects.filter(effective_open_exam_filter).count()
         question_bank_count = Question.objects.count()

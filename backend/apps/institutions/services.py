@@ -54,12 +54,6 @@ def _decode_csv_upload(uploaded_file):
 
 
 def _get_candidate_role():
-    role = Role.objects.filter(slug="candidate").first()
-    if role is not None:
-        return role
-    role = Role.objects.filter(slug="student").first()
-    if role is not None:
-        return role
     role, _ = Role.objects.get_or_create(
         slug="candidate",
         defaults={"name": "Candidate", "is_system": True},

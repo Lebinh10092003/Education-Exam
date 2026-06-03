@@ -36,7 +36,7 @@ class EduExamTokenObtainPairSerializer(TokenObtainPairSerializer):
             )
 
         user = User.objects.filter(Q(username__iexact=identifier) | Q(email__iexact=identifier)).first()
-        if user is None or not user.check_password(password) or not user.is_active:
+        if user is None or not user.check_password(password) or not user.is_active or user.status != User.Status.ACTIVE:
             raise serializers.ValidationError(
                 t(
                     vi="Không tìm thấy tài khoản đang hoạt động với thông tin đăng nhập đã cung cấp.",
@@ -201,6 +201,7 @@ class RoleSerializer(serializers.ModelSerializer):
 
 class UserSerializer(serializers.ModelSerializer):
     username = serializers.CharField(required=False)
+    email = serializers.CharField(required=False, allow_blank=True)
     password = serializers.CharField(write_only=True, required=False, allow_blank=False)
     school_id = serializers.PrimaryKeyRelatedField(
         queryset=School.objects.all(),
@@ -254,11 +255,25 @@ class UserSerializer(serializers.ModelSerializer):
         return obj.last_login.isoformat()
 
     def create(self, validated_data):
-        username = validated_data.pop("username", "")
+        username = validated_data.pop("username", "").strip()
+        email = validated_data.get("email", "").strip().lower()
+        full_name = validated_data.get("full_name", "").strip()
+
+        from apps.identity.utils import normalize_username_segment, ensure_unique_username
+
+        if not username:
+            base_username = normalize_username_segment(full_name) or "user"
+            username = ensure_unique_username(base_username)
+
+        if not email:
+            email = f"{username}@student.local"
+            validated_data["email"] = email
+
         password = validated_data.pop("password", None)
         school = validated_data.pop("school_id", None)
         phone_number = validated_data.pop("phone_number", "")
         roles = validated_data.pop("role_ids", [])
+        
         user = User.objects.create_user(password=password, username=username, **validated_data)
         profile, _ = Profile.objects.get_or_create(user=user)
         profile.phone_number = phone_number
@@ -272,14 +287,25 @@ class UserSerializer(serializers.ModelSerializer):
 
     def update(self, instance, validated_data):
         username = validated_data.pop("username", None)
+        email = validated_data.get("email", None)
         password = validated_data.pop("password", None)
         school = validated_data.pop("school_id", None)
         phone_number = validated_data.pop("phone_number", None)
         roles = validated_data.pop("role_ids", None)
+        
         for attr, value in validated_data.items():
-            setattr(instance, attr, value)
+            if attr != "email":
+                setattr(instance, attr, value)
+
         if username is not None:
             instance.username = username
+
+        if email is not None:
+            email = email.strip().lower()
+            if not email:
+                email = f"{instance.username}@student.local"
+            instance.email = email
+
         if password:
             instance.set_password(password)
         instance.save()

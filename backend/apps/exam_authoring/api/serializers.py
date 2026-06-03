@@ -23,6 +23,13 @@ class ExamScheduleWindowSerializer(serializers.ModelSerializer):
         fields = ("opens_at", "closes_at")
 
 
+class ExamQuestionOptionSerializer(serializers.ModelSerializer):
+    class Meta:
+        from apps.question_bank.models import QuestionOption
+        model = QuestionOption
+        fields = ("key", "text", "sort_order")
+
+
 class ExamQuestionRevisionSummarySerializer(serializers.Serializer):
     id = serializers.IntegerField(source="question_revision.id")
     question_id = serializers.IntegerField(source="question_revision.question_id")
@@ -30,6 +37,7 @@ class ExamQuestionRevisionSummarySerializer(serializers.Serializer):
     question_text = serializers.CharField(source="question_revision.question_text")
     question_type = serializers.CharField(source="question_revision.question.question_type")
     difficulty = serializers.CharField(source="question_revision.question.difficulty")
+    options = ExamQuestionOptionSerializer(source="question_revision.options", many=True, read_only=True)
 
 
 class ExamItemSerializer(serializers.ModelSerializer):

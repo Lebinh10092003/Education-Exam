@@ -43,7 +43,7 @@ def test_group_membership_import_creates_candidate_and_membership(api_client, ad
     assert profile.student_class == "12"
     assert profile.phone_number == "0901234567"
     assert profile.school.code == "HSB"
-    assert UserRole.objects.filter(user=membership.user, role__slug__in=["candidate", "student"], is_active=True).exists()
+    assert UserRole.objects.filter(user=membership.user, role__slug="candidate", is_active=True).exists()
 
 
 @pytest.mark.django_db

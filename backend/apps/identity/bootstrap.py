@@ -68,13 +68,6 @@ SYSTEM_ROLE_DEFINITIONS = {
             "notifications.manage",
         ],
     },
-    "student": {
-        "name": "Student",
-        "permission_codes": [
-            "notifications.view",
-            "notifications.manage",
-        ],
-    },
     "proctor": {
         "name": "Proctor",
         "permission_codes": [

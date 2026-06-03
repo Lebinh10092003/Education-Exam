@@ -6,7 +6,7 @@ from django.contrib.auth import get_user_model
 
 _NON_ALNUM_PATTERN = re.compile(r"[^a-z0-9]+")
 _MULTI_DOT_PATTERN = re.compile(r"\.+")
-STUDENT_SELF_SERVICE_ROLE_SLUGS = {"candidate", "student"}
+STUDENT_SELF_SERVICE_ROLE_SLUGS = {"candidate"}
 STAFF_ROLE_SLUGS = {"administrator", "examiner", "proctor"}
 
 

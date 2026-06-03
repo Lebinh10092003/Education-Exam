@@ -49,7 +49,7 @@ def test_student_import_creates_user_and_assignment(api_client, admin_token, sub
     assert assignment.user.profile.phone_number == "0901234567"
     assert assignment.user.profile.school == school
     assert assignment.user.check_password("le.van.binh.24082003.12")
-    assert UserRole.objects.filter(user=assignment.user, role__slug="student", is_active=True).exists()
+    assert UserRole.objects.filter(user=assignment.user, role__slug="candidate", is_active=True).exists()
 
 
 @pytest.mark.django_db

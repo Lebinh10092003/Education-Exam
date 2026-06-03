@@ -73,10 +73,10 @@ def _decode_csv_upload(uploaded_file):
     return list(reader)
 
 
-def _get_student_role():
+def _get_candidate_role():
     role, _ = Role.objects.get_or_create(
-        slug="student",
-        defaults={"name": "Student", "is_system": True},
+        slug="candidate",
+        defaults={"name": "Candidate", "is_system": True},
     )
     return role
 
@@ -108,7 +108,7 @@ def _is_email_available(*, email, current_user_id=None):
     return not queryset.exists()
 
 
-def _ensure_student_role(*, user, role):
+def _ensure_candidate_role(*, user, role):
     user_role, created = UserRole.objects.get_or_create(
         user=user,
         role=role,
@@ -146,7 +146,7 @@ def _sync_profile(*, profile, cccd, date_of_birth, student_class, phone_number, 
 
 
 @transaction.atomic
-def _import_student_row(*, exam, assigned_by, row, row_number, student_role):
+def _import_student_row(*, exam, assigned_by, row, row_number, candidate_role):
     user_model = get_user_model()
     full_name = (row.get("full_name") or "").strip()
     if not full_name:
@@ -189,7 +189,7 @@ def _import_student_row(*, exam, assigned_by, row, row_number, student_role):
             phone_number=phone_number,
             school=school,
         ) or changed
-        changed = _ensure_student_role(user=user, role=student_role) or changed
+        changed = _ensure_candidate_role(user=user, role=candidate_role) or changed
         _, assignment_created = ExamAssignment.objects.get_or_create(
             exam=exam,
             user=user,
@@ -228,7 +228,7 @@ def _import_student_row(*, exam, assigned_by, row, row_number, student_role):
         phone_number=phone_number,
         school=school,
     )
-    _ensure_student_role(user=user, role=student_role)
+    _ensure_candidate_role(user=user, role=candidate_role)
     ExamAssignment.objects.get_or_create(
         exam=exam,
         user=user,
@@ -244,7 +244,7 @@ def _import_student_row(*, exam, assigned_by, row, row_number, student_role):
 
 def import_students_to_exam(*, exam, assigned_by, uploaded_file):
     rows = _decode_csv_upload(uploaded_file)
-    student_role = _get_student_role()
+    candidate_role = _get_candidate_role()
     summary = {
         "total_rows": len(rows),
         "created_users": 0,
@@ -262,7 +262,7 @@ def import_students_to_exam(*, exam, assigned_by, uploaded_file):
                 assigned_by=assigned_by,
                 row=row,
                 row_number=index,
-                student_role=student_role,
+                candidate_role=candidate_role,
             )
         except ValueError as exc:
             summary["failed_rows"] += 1

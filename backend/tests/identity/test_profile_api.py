@@ -76,7 +76,7 @@ def test_candidate_profile_cannot_be_updated(api_client, candidate_user):
     from apps.identity.models import Profile, Role, UserRole
     from rest_framework_simplejwt.tokens import RefreshToken
 
-    role, _ = Role.objects.get_or_create(slug="student", defaults={"name": "Student", "is_system": True})
+    role, _ = Role.objects.get_or_create(slug="candidate", defaults={"name": "Candidate", "is_system": True})
     UserRole.objects.get_or_create(user=candidate_user, role=role, defaults={"is_active": True})
     profile = Profile.objects.create(user=candidate_user, phone_number="0900000000")
 

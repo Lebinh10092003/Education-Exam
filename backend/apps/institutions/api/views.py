@@ -67,7 +67,7 @@ class CandidateGroupViewSet(viewsets.ModelViewSet):
             queryset = queryset.filter(is_active=is_active == "true")
         return queryset
 
-    @action(detail=True, methods=["get", "post"], url_path="memberships")
+    @action(detail=True, methods=["get", "post", "delete"], url_path="memberships")
     def memberships(self, request, pk=None):
         group = self.get_object()
         if request.method == "GET":
@@ -75,6 +75,23 @@ class CandidateGroupViewSet(viewsets.ModelViewSet):
             page = self.paginate_queryset(queryset)
             serializer = GroupMembershipSerializer(page, many=True)
             return self.get_paginated_response(serializer.data)
+
+        if request.method == "DELETE":
+            user_id = request.query_params.get("user_id")
+            if not user_id:
+                return Response(
+                    {"detail": "user_id query parameter is required."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            try:
+                membership = group.memberships.get(user_id=user_id)
+                membership.delete()
+                return Response(status=status.HTTP_204_NO_CONTENT)
+            except GroupMembership.DoesNotExist:
+                return Response(
+                    {"detail": "Membership not found."},
+                    status=status.HTTP_404_NOT_FOUND,
+                )
 
         serializer = GroupMembershipSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)

@@ -137,7 +137,7 @@ def _create_user(
         status=status,
         is_staff=is_staff,
         is_superuser=is_superuser,
-        is_active=status != user_model.Status.LOCKED,
+        is_active=status == "active",
     )
     Profile.objects.create(
         user=user,
@@ -232,7 +232,7 @@ def _seed_users_and_roles(context: DemoSeedContext):
             email=email,
             username=username,
             full_name=full_name,
-            role_slugs=["candidate", "student"],
+            role_slugs=["candidate"],
             school=school,
             phone_number=f"09{cccd[-8:]}",
             student_class=student_class,

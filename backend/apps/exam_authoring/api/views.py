@@ -36,6 +36,7 @@ class ExamViewSet(viewsets.ModelViewSet):
             Exam.objects.select_related("subject", "current_version", "schedule_window")
             .prefetch_related(
                 "current_version__items__question_revision__question",
+                "current_version__items__question_revision__options",
                 "current_version__random_rules",
                 "assignments__user",
             )

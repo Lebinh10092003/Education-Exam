@@ -68,10 +68,17 @@ class User(AbstractBaseUser, PermissionsMixin, TimeStampedModel):
     def __str__(self):
         return self.username or self.email
 
+    def save(self, *args, **kwargs):
+        if self.status == self.Status.ACTIVE:
+            self.is_active = True
+        else:
+            self.is_active = False
+        super().save(*args, **kwargs)
+
     def has_platform_permission(self, code: str) -> bool:
         if self.is_superuser:
             return True
-        if not self.is_active or self.status == self.Status.LOCKED:
+        if not self.is_active or self.status != self.Status.ACTIVE:
             return False
 
         return self.user_roles.filter(
