@@ -1,0 +1,92 @@
+const landing = {
+  hero: {
+    title: "Hệ thống Thi Trực tuyến Toàn diện",
+    subtitle: "Trải nghiệm thi trực tuyến bảo mật, công bằng và chính xác cao cùng EduExam. Nền tảng đánh giá và đồng hành cùng sự phát triển giáo dục của bạn.",
+    ctaStart: "Bắt đầu ngay",
+    ctaExplore: "Khám phá kỳ thi",
+    portalButton: "Đến Cổng Học Sinh",
+    adminPortalButton: "Trang Quản Trị",
+    studentLogin: "Đăng nhập học sinh",
+  },
+  stats: {
+    title: "EduExam bằng những con số",
+    examsCreated: "Kỳ thi đã tạo",
+    candidates: "Thí sinh tham gia",
+    uptime: "Độ ổn định hệ thống",
+    testsTaken: "Lượt thi hoàn thành",
+  },
+  features: {
+    title: "Tính năng vượt trội của chúng tôi",
+    proctoring: {
+      title: "Giám sát AI thông minh",
+      desc: "Phát hiện gian lận tự động qua camera, mic và ghi hình màn hình thời gian thực.",
+    },
+    grading: {
+      title: "Tự động chấm điểm",
+      desc: "Hệ thống tự động chấm điểm các câu hỏi trắc nghiệm và hỗ trợ chấm tự luận nhanh chóng.",
+    },
+    questionBank: {
+      title: "Ngân hàng câu hỏi đa dạng",
+      desc: "Quản lý câu hỏi theo môn học, mức độ khó, hỗ trợ trộn câu hỏi tự động và thông minh.",
+    },
+    practice: {
+      title: "Chế độ luyện tập phong phú",
+      desc: "Thí sinh có thể luyện tập không giới hạn số lần để củng cố kiến thức trước kỳ thi thật.",
+    },
+  },
+  exams: {
+    title: "Các kỳ thi nổi bật",
+    subtitle: "Tham gia các kỳ thi chính thức hoặc luyện tập để đánh giá năng lực của bạn ngay hôm nay.",
+    tabs: {
+      all: "Tất cả",
+      math: "Toán học",
+      science: "Khoa học",
+      languages: "Ngoại ngữ",
+      it: "Tin học",
+    },
+    duration: "{{minutes}} phút",
+    questions: "{{count}} câu hỏi",
+    proctored: "Giám sát",
+    nonProctored: "Tự do",
+    practice: "Có luyện tập",
+    startBtn: "Vào thi ngay",
+    loginRequired: "Đăng nhập để thi",
+  },
+  security: {
+    title: "Bảo mật & Phòng chống gian lận",
+    subtitle: "EduExam áp dụng các quy chuẩn giám sát nghiêm ngặt để đảm bảo sự công bằng tuyệt đối cho mọi thí sinh.",
+    camera: {
+      title: "Xác thực & Giám sát Camera",
+      desc: "Yêu cầu quyền truy cập camera để xác minh danh tính thí sinh và giám sát trong suốt quá trình làm bài.",
+    },
+    fullscreen: {
+      title: "Chế độ khóa màn hình",
+      desc: "Hệ thống tự động ghi nhận và đưa ra cảnh báo hoặc đình chỉ thi nếu thí sinh thoát khỏi chế độ toàn màn hình hoặc đổi tab trình duyệt.",
+    },
+    clipboard: {
+      title: "Chống sao chép & Dán",
+      desc: "Ngăn chặn hành vi copy đề bài hoặc dán câu trả lời từ bên ngoài để đảm bảo tính khách quan của bài làm.",
+    },
+    liveSupervision: {
+      title: "Giám thị giám sát trực tiếp",
+      desc: "Hội đồng thi và giám thị có thể xem webcam, trạng thái kết nối của từng thí sinh theo thời gian thực.",
+    },
+  },
+  faqs: {
+    title: "Câu hỏi thường gặp",
+    q1: "Làm thế nào để tôi bắt đầu một kỳ thi?",
+    a1: "Bạn cần đăng nhập vào tài khoản học sinh, chọn mục 'Bài thi của tôi' ở thanh menu bên trái, tìm kỳ thi cần thực hiện và nhấn 'Bắt đầu'.",
+    q2: "Tôi có thể xem kết quả thi ở đâu?",
+    a2: "Sau khi hoàn thành bài thi và kỳ thi được chấm điểm xong, kết quả của bạn sẽ hiển thị trong mục 'Kết quả' trên Cổng thí sinh.",
+    q3: "Tôi cần chuẩn bị những gì trước khi thi có giám sát?",
+    a3: "Hãy đảm bảo thiết bị của bạn có camera hoạt động tốt, kết nối internet ổn định và bạn đang ngồi ở không gian yên tĩnh, đủ ánh sáng.",
+  },
+  footer: {
+    rights: "© 2026 EduExam. Tất cả các quyền được bảo lưu.",
+    contact: "Liên hệ hỗ trợ",
+    privacy: "Chính sách bảo mật",
+    terms: "Điều khoản sử dụng",
+  },
+};
+
+export default landing;

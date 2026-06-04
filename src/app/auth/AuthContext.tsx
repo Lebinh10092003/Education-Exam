@@ -61,7 +61,7 @@ export const getDefaultRouteForProfile = (profile: AuthProfile | null) => {
   }
 
   if (profile.roles.some((role) => ADMIN_ROLES.includes(role))) {
-    return "/";
+    return "/dashboard";
   }
 
   return "/candidate";

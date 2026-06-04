@@ -62,8 +62,8 @@ type NavGroupItem = {
 type NavEntry = NavLeafItem | NavGroupItem;
 
 const isPathActive = (path: string, location: NavLocation) => {
-  if (path === "/") {
-    return location.pathname === "/";
+  if (path === "/dashboard") {
+    return location.pathname === "/dashboard";
   }
   return location.pathname === path || location.pathname.startsWith(`${path}/`);
 };
@@ -85,7 +85,7 @@ const isExamListActive = (location: NavLocation) => {
 };
 
 const navEntries: NavEntry[] = [
-  { type: "item", icon: LayoutDashboard, labelKey: "admin.dashboard", path: "/" },
+  { type: "item", icon: LayoutDashboard, labelKey: "admin.dashboard", path: "/dashboard" },
   { type: "item", icon: Users, labelKey: "admin.users", path: "/users" },
   { type: "item", icon: UsersRound, labelKey: "admin.groups", path: "/groups" },
   { type: "item", icon: BookOpen, labelKey: "admin.subjects", path: "/subjects" },
@@ -320,7 +320,7 @@ export function AdminLayout() {
         }`}
       >
         <div className="flex h-16 items-center justify-between border-b border-gray-200 px-4 dark:border-white/[0.08]">
-          <Link to="/" className="flex items-center gap-2">
+          <Link to="/dashboard" className="flex items-center gap-2">
             <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-600">
               <span className="text-lg font-bold text-white">E</span>
             </div>
@@ -348,7 +348,7 @@ export function AdminLayout() {
       >
         <div className="flex h-16 items-center justify-between border-b border-gray-200 px-6 dark:border-white/[0.08]">
           {!sidebarCollapsed ? (
-            <Link to="/" className="flex items-center gap-2">
+            <Link to="/dashboard" className="flex items-center gap-2">
               <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-600">
                 <span className="text-lg font-bold text-white">E</span>
               </div>

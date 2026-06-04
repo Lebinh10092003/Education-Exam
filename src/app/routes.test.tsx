@@ -99,7 +99,7 @@ describe("protected layouts", () => {
           hasAnyRole: vi.fn().mockReturnValue(true),
         })}
       >
-        <MemoryRouter initialEntries={["/"]}>
+        <MemoryRouter initialEntries={["/dashboard"]}>
           <ProtectedAdminLayout />
         </MemoryRouter>
       </AuthContext.Provider>,

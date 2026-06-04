@@ -28,6 +28,7 @@ const lazyRoute = <
 };
 
 const DashboardRoute = lazyRoute(() => import("./pages/Dashboard"), "Dashboard");
+const LandingPageRoute = lazyRoute(() => import("./pages/LandingPage"), "LandingPage");
 const UserManagementRoute = lazyRoute(() => import("./pages/UserManagement"), "UserManagement");
 const GroupManagementRoute = lazyRoute(() => import("./pages/GroupManagement"), "GroupManagement");
 const SubjectManagementRoute = lazyRoute(() => import("./pages/SubjectManagement"), "SubjectManagement");
@@ -89,9 +90,13 @@ export const routeConfig = [
   },
   {
     path: "/",
+    Component: LandingPageRoute,
+  },
+  {
+    path: "/",
     Component: ProtectedAdminLayout,
     children: [
-      { index: true, Component: DashboardRoute },
+      { path: "dashboard", Component: DashboardRoute },
       { path: "users", Component: UserManagementRoute },
       { path: "groups", Component: GroupManagementRoute },
       { path: "subjects", Component: SubjectManagementRoute },

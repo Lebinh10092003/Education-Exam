@@ -1,0 +1,92 @@
+const landing = {
+  hero: {
+    title: "Comprehensive Online Examination System",
+    subtitle: "Experience secure, fair, and highly accurate online exams with EduExam. The assessment platform designed to support your educational growth.",
+    ctaStart: "Get Started Now",
+    ctaExplore: "Explore Exams",
+    portalButton: "Go to Student Portal",
+    adminPortalButton: "Admin Dashboard",
+    studentLogin: "Student Login",
+  },
+  stats: {
+    title: "EduExam by the numbers",
+    examsCreated: "Exams Created",
+    candidates: "Active Candidates",
+    uptime: "System Uptime",
+    testsTaken: "Completed Tests",
+  },
+  features: {
+    title: "Our Outstanding Features",
+    proctoring: {
+      title: "Smart AI Proctoring",
+      desc: "Automatically detect cheating patterns via webcam, microphone, and real-time screen recordings.",
+    },
+    grading: {
+      title: "Automatic Grading",
+      desc: "Instantly grade multiple-choice questions and support quick subjective question grading.",
+    },
+    questionBank: {
+      title: "Diverse Question Bank",
+      desc: "Manage questions by subject and difficulty, supporting smart automatic question shuffling.",
+    },
+    practice: {
+      title: "Rich Practice Mode",
+      desc: "Candidates can practice unlimited times to reinforce knowledge before taking real exams.",
+    },
+  },
+  exams: {
+    title: "Featured Exams",
+    subtitle: "Join official exams or practice sessions to assess your capabilities today.",
+    tabs: {
+      all: "All",
+      math: "Mathematics",
+      science: "Science",
+      languages: "Languages",
+      it: "Computer Science",
+    },
+    duration: "{{minutes}} mins",
+    questions: "{{count}} questions",
+    proctored: "Proctored",
+    nonProctored: "Self-paced",
+    practice: "Practice enabled",
+    startBtn: "Take Exam Now",
+    loginRequired: "Login to take exam",
+  },
+  security: {
+    title: "Security & Fraud Prevention",
+    subtitle: "EduExam applies strict monitoring standards to ensure absolute fairness for all candidates.",
+    camera: {
+      title: "Webcam Verification & Monitoring",
+      desc: "Requires webcam access to verify candidate identities and monitor throughout the exam process.",
+    },
+    fullscreen: {
+      title: "Screen Lock Mode",
+      desc: "The system logs and issues warnings or suspends the test if candidates exit fullscreen or switch browser tabs.",
+    },
+    clipboard: {
+      title: "Anti Copy & Paste",
+      desc: "Prevents copying exam questions or pasting answers from external sources to maintain objectivity.",
+    },
+    liveSupervision: {
+      title: "Live Proctor Supervision",
+      desc: "Exam committees and proctors can view webcams and connection statuses of each student in real time.",
+    },
+  },
+  faqs: {
+    title: "Frequently Asked Questions",
+    q1: "How do I start an exam?",
+    a1: "You need to log into your student account, navigate to 'My Exams' in the left menu, locate your exam, and click 'Start'.",
+    q2: "Where can I view my exam results?",
+    a2: "Once your exam is completed and graded, your results will appear in the 'Results' section of the Candidate Portal.",
+    q3: "What do I need to prepare before a proctored exam?",
+    a3: "Ensure your device has a functional camera, a stable internet connection, and you are seated in a quiet, well-lit space.",
+  },
+  footer: {
+    rights: "© 2026 EduExam. All rights reserved.",
+    contact: "Contact Support",
+    privacy: "Privacy Policy",
+    terms: "Terms of Service",
+  },
+};
+
+export default landing;
