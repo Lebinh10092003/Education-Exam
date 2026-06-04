@@ -97,6 +97,108 @@ const mockExams: MockExam[] = [
   },
 ];
 
+// Pure CSS/SVG Mock Browser Component representing the secure quiz environment
+function MockBrowser() {
+  const { t } = useTranslation(["landing"]);
+
+  return (
+    <div className="w-full rounded-2xl border border-slate-200 bg-white shadow-2xl dark:border-slate-800/80 dark:bg-slate-900 overflow-hidden text-left hover:shadow-3xl transition-shadow duration-300">
+      {/* Mac-style Window Title Bar */}
+      <div className="flex items-center gap-2 border-b border-slate-200/80 bg-slate-100/85 px-4 py-3 dark:border-slate-800/85 dark:bg-slate-950/85">
+        <div className="flex gap-1.5 shrink-0">
+          <span className="h-3 w-3 rounded-full bg-red-500/90" />
+          <span className="h-3 w-3 rounded-full bg-yellow-500/90" />
+          <span className="h-3 w-3 rounded-full bg-green-500/90" />
+        </div>
+        <div className="mx-auto max-w-sm w-full rounded-lg bg-white border border-slate-200/60 py-1 text-center text-[10px] font-mono text-slate-500 dark:bg-slate-900 dark:border-slate-800 dark:text-slate-400 select-none truncate">
+          {t("mockBrowser.address")}
+        </div>
+      </div>
+
+      {/* Main Workspace split */}
+      <div className="grid grid-cols-12 text-slate-800 dark:text-slate-200 text-xs">
+        {/* Left column: Question progress (3 cols) */}
+        <div className="col-span-3 border-r border-slate-200/80 p-3 bg-slate-50/50 dark:border-slate-800/80 dark:bg-slate-950/10">
+          <p className="font-bold text-[9px] text-slate-400 uppercase tracking-wider mb-2">Quiz Progress</p>
+          <div className="grid grid-cols-3 gap-1 text-center font-bold text-[10px]">
+            {[1, 2, 3, 4, 5].map((n) => (
+              <span key={n} className="rounded bg-green-500 text-white py-1">{n}</span>
+            ))}
+            <span className="rounded bg-blue-600 text-white py-1 ring-2 ring-blue-500/20">6</span>
+            {[7, 8, 9, 10, 11, 12].map((n) => (
+              <span key={n} className="rounded border border-slate-200 dark:border-slate-800 text-slate-400 dark:text-slate-500 py-1">{n}</span>
+            ))}
+          </div>
+        </div>
+
+        {/* Center column: Question content (6 cols) */}
+        <div className="col-span-6 p-4 flex flex-col justify-between min-h-[260px] bg-white dark:bg-slate-900/10">
+          <div>
+            <div className="flex items-center gap-1.5">
+              <span className="h-2 w-2 rounded-full bg-blue-600" />
+              <span className="text-[9px] font-extrabold text-blue-600 dark:text-blue-400 uppercase tracking-wide">{t("mockBrowser.subject")}</span>
+            </div>
+            <p className="mt-2 font-bold text-slate-900 dark:text-white leading-relaxed text-xs">
+              {t("mockBrowser.question")}
+            </p>
+          </div>
+          <div className="space-y-1.5 mt-3">
+            <div className="rounded-xl border border-slate-100 p-2 bg-slate-50/50 dark:border-slate-800 dark:bg-slate-900/30 flex items-center gap-2">
+              <span className="h-3 w-3 rounded-full border border-slate-300 dark:border-slate-700" />
+              <span className="text-[11px]">{t("mockBrowser.optA")}</span>
+            </div>
+            <div className="rounded-xl border border-blue-500/80 bg-blue-500/5 p-2 flex items-center gap-2 font-bold">
+              <span className="h-3 w-3 rounded-full bg-blue-600" />
+              <span className="text-blue-600 dark:text-blue-400 text-[11px]">{t("mockBrowser.optB")}</span>
+            </div>
+            <div className="rounded-xl border border-slate-100 p-2 bg-slate-50/50 dark:border-slate-800 dark:bg-slate-900/30 flex items-center gap-2">
+              <span className="h-3 w-3 rounded-full border border-slate-300 dark:border-slate-700" />
+              <span className="text-[11px]">{t("mockBrowser.optC")}</span>
+            </div>
+            <div className="rounded-xl border border-slate-100 p-2 bg-slate-50/50 dark:border-slate-800 dark:bg-slate-900/30 flex items-center gap-2">
+              <span className="h-3 w-3 rounded-full border border-slate-300 dark:border-slate-700" />
+              <span className="text-[11px]">{t("mockBrowser.optD")}</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Right column: AI camera proctoring (3 cols) */}
+        <div className="col-span-3 border-l border-slate-200/80 p-3 bg-slate-50/50 dark:border-slate-800/80 dark:bg-slate-950/10 flex flex-col justify-between">
+          <div>
+            <p className="font-bold text-[9px] text-slate-400 uppercase tracking-wider mb-2">{t("mockBrowser.proctoring")}</p>
+            {/* Camera Viewport Mockup */}
+            <div className="relative aspect-square w-full rounded-xl bg-slate-950 border border-slate-800 flex items-center justify-center overflow-hidden">
+              {/* Stylized Face wireframe */}
+              <svg className="stroke-blue-500/40 fill-none w-10/12 h-10/12" viewBox="0 0 100 100">
+                <ellipse cx="50" cy="45" rx="16" ry="22" strokeDasharray="3,3" />
+                <circle cx="43" cy="40" r="1.5" className="fill-blue-400 stroke-none" />
+                <circle cx="57" cy="40" r="1.5" className="fill-blue-400 stroke-none" />
+                <path d="M 38 63 Q 50 70 62 63" className="stroke-blue-400" />
+                <path d="M 50 15 L 50 75" strokeDasharray="2,2" className="stroke-blue-500/10" />
+                <path d="M 20 45 L 80 45" strokeDasharray="2,2" className="stroke-blue-500/10" />
+              </svg>
+              <div className="absolute top-1.5 left-1.5 flex items-center gap-1 bg-black/60 rounded px-1 text-[7px] font-bold text-white uppercase tracking-wider">
+                <span className="h-1 w-1 bg-red-500 rounded-full animate-ping" />
+                <span>REC</span>
+              </div>
+            </div>
+            <div className="mt-2.5 flex items-center gap-1">
+              <span className="h-1.5 w-1.5 rounded-full bg-green-500 animate-pulse" />
+              <span className="text-[9px] font-bold text-green-600 dark:text-green-400 uppercase leading-none">{t("mockBrowser.proctorStatus")}</span>
+            </div>
+            <p className="text-[8px] text-slate-500 dark:text-slate-400 mt-0.5 font-medium leading-none">{t("mockBrowser.focus")}</p>
+          </div>
+
+          <div className="border-t border-slate-200/80 pt-2 dark:border-slate-800/80">
+            <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wide">{t("mockBrowser.timer")}</span>
+            <p className="text-xs font-mono font-bold text-slate-900 dark:text-white mt-0.5">58:24</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function LandingPage() {
   const { t } = useTranslation(["landing", "auth", "common"]);
   const navigate = useNavigate();
@@ -289,21 +391,21 @@ export function LandingPage() {
               {/* Feature Pill */}
               <div className="inline-flex items-center gap-2 rounded-full border border-blue-200/80 bg-blue-50/50 px-4 py-1.5 text-xs font-semibold text-blue-700 dark:border-blue-500/30 dark:bg-blue-950/20 dark:text-blue-300">
                 <span className="flex h-2 w-2 rounded-full bg-blue-600 dark:bg-blue-400 animate-pulse" />
-                <span>✨ Phiên Bản Mới: Tích hợp Giám Sát AI 2.0</span>
+                <span>{t("hero.badge")}</span>
               </div>
 
               {/* Title */}
               <h1 className="text-4xl font-extrabold tracking-tight sm:text-5xl md:text-6xl text-slate-900 dark:text-white leading-[1.1]">
-                Nền tảng thi cử{" "}
+                {t("hero.titlePart1")}
                 <span className="bg-clip-text text-transparent bg-gradient-to-r from-blue-600 via-indigo-500 to-violet-600 dark:from-blue-400 dark:via-indigo-300 dark:to-purple-400">
-                  bảo mật & công bằng
-                </span>{" "}
-                hàng đầu
+                  {t("hero.titlePartGradient")}
+                </span>
+                {t("hero.titlePart2")}
               </h1>
 
               {/* Description */}
               <p className="text-lg text-slate-600 dark:text-slate-400 max-w-2xl mx-auto lg:mx-0 leading-relaxed">
-                EduExam cung cấp giải pháp thi trực tuyến toàn diện, an toàn tuyệt đối với công nghệ giám sát webcam, AI phát hiện gian lận và chấm tự động tức thì.
+                {t("hero.subtitle")}
               </p>
 
               {/* CTAs */}
@@ -325,19 +427,28 @@ export function LandingPage() {
                 </Button>
               </div>
 
-              {/* Marketing Visual / Floating Mockups Container */}
-              <div className="relative mt-12 w-full max-w-lg mx-auto lg:mx-0">
-                {/* Main Illustration */}
-                <div className="overflow-hidden rounded-2xl border border-slate-200/80 bg-white p-2 shadow-2xl dark:border-slate-800 dark:bg-slate-900">
-                  <img
-                    src="/hero_exam.png"
-                    alt="Online Exam Illustration"
-                    className="w-full h-auto rounded-xl object-cover"
-                  />
+              {/* Marketing Badges */}
+              <div className="flex flex-wrap justify-center lg:justify-start gap-4 pt-2">
+                <div className="flex items-center gap-1.5 text-sm text-slate-700 dark:text-slate-300">
+                  <CheckCircle className="h-4 w-4 text-green-600" />
+                  <span>{t("hero.featureWebcam")}</span>
                 </div>
+                <div className="flex items-center gap-1.5 text-sm text-slate-700 dark:text-slate-300">
+                  <CheckCircle className="h-4 w-4 text-green-600" />
+                  <span>{t("hero.featureSave")}</span>
+                </div>
+                <div className="flex items-center gap-1.5 text-sm text-slate-700 dark:text-slate-300">
+                  <CheckCircle className="h-4 w-4 text-green-600" />
+                  <span>{t("hero.featureGrading")}</span>
+                </div>
+              </div>
 
-                {/* Floating Webcam Widget */}
-                <div className="absolute -top-6 -right-6 md:-right-10 rounded-2xl border border-slate-200/80 bg-white/95 p-3.5 shadow-xl backdrop-blur-md dark:border-slate-800/80 dark:bg-slate-950/95 flex items-center gap-3 hover:scale-105 transition-transform duration-300">
+              {/* Interactive Mock Browser Wrapper (Replaces the checkerboard image) */}
+              <div className="relative mt-12 w-full max-w-2xl mx-auto lg:mx-0">
+                <MockBrowser />
+
+                {/* Floating Webcam status Card */}
+                <div className="absolute -top-6 -right-6 rounded-2xl border border-slate-200/80 bg-white/95 p-3.5 shadow-xl backdrop-blur-md dark:border-slate-800/80 dark:bg-slate-950/95 flex items-center gap-3 hover:scale-105 transition-transform duration-300 select-none">
                   <div className="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-red-100 text-red-600 dark:bg-red-950/40 dark:text-red-400">
                     <Video className="h-5 w-5" />
                     <span className="absolute top-1 right-1 flex h-2 w-2">
@@ -346,24 +457,18 @@ export function LandingPage() {
                     </span>
                   </div>
                   <div>
-                    <p className="text-xs font-bold text-slate-900 dark:text-white">Webcam Giám Sát</p>
-                    <p className="text-[10px] text-green-600 font-semibold uppercase tracking-wider">Hoạt động bình thường</p>
+                    <p className="text-xs font-bold text-slate-900 dark:text-white">{t("mockBrowser.statusWebcam")}</p>
+                    <p className="text-[10px] text-green-600 font-semibold uppercase tracking-wider">{t("mockBrowser.statusWebcamSub")}</p>
                   </div>
                 </div>
 
                 {/* Floating Warning Alert */}
-                <div className="absolute -bottom-6 -left-6 md:-left-10 rounded-2xl border border-red-200/80 bg-red-50/95 p-3 shadow-xl backdrop-blur-md dark:border-red-900/50 dark:bg-red-950/95 flex items-center gap-2.5 hover:scale-105 transition-transform duration-300">
+                <div className="absolute -bottom-6 -left-6 rounded-2xl border border-red-200/80 bg-red-50/95 p-3 shadow-xl backdrop-blur-md dark:border-red-900/50 dark:bg-red-950/95 flex items-center gap-2.5 hover:scale-105 transition-transform duration-300 select-none">
                   <AlertTriangle className="h-5 w-5 text-red-600 dark:text-red-400 shrink-0" />
                   <div>
-                    <p className="text-xs font-bold text-red-950 dark:text-red-100">Cảnh Báo Chuyển Tab</p>
-                    <p className="text-[10px] text-red-700/80 dark:text-red-400/80">Lần phạm lỗi: 0/3</p>
+                    <p className="text-xs font-bold text-red-950 dark:text-red-100">{t("mockBrowser.statusWarning")}</p>
+                    <p className="text-[10px] text-red-700/80 dark:text-red-400/80">{t("mockBrowser.statusWarningSub")}</p>
                   </div>
-                </div>
-
-                {/* Floating Timer Widget */}
-                <div className="absolute top-1/2 -left-12 rounded-2xl border border-slate-200/80 bg-white/95 p-3 shadow-lg backdrop-blur dark:border-slate-800/80 dark:bg-slate-950/95 hidden sm:flex items-center gap-2.5 hover:scale-105 transition-transform duration-300">
-                  <Clock className="h-4 w-4 text-blue-600 dark:text-blue-400" />
-                  <span className="text-xs font-mono font-bold text-slate-800 dark:text-slate-200">45:12</span>
                 </div>
               </div>
             </div>
@@ -380,13 +485,13 @@ export function LandingPage() {
                       {t("common:greeting", { name: profile.full_name }) || `Xin chào, ${profile.full_name}!`}
                     </CardTitle>
                     <CardDescription className="mt-2 text-slate-500 dark:text-slate-400 text-sm">
-                      Bạn đã đăng nhập dưới vai trò <span className="font-bold text-blue-600 dark:text-blue-400">{profile.roles[0]}</span>.
+                      {t("auth:login.demoCredentials")} <span className="font-bold text-blue-600 dark:text-blue-400">{profile.roles[0]}</span>.
                     </CardDescription>
                   </CardHeader>
                   <CardContent className="space-y-4">
                     <Button asChild size="lg" className="w-full rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 text-white hover:opacity-95 shadow-md shadow-blue-500/10">
                       <Link to={getDefaultRouteForProfile(profile)}>
-                        Vào trang Portal của bạn
+                        {t("hero.portalButton")}
                         <ChevronRight className="ml-1.5 h-5 w-5" />
                       </Link>
                     </Button>
@@ -467,15 +572,15 @@ export function LandingPage() {
                     <div className="mt-5 rounded-2xl border border-blue-100 bg-blue-50/40 p-4 text-xs text-blue-900 dark:border-blue-950/40 dark:bg-blue-950/20 dark:text-blue-200">
                       <p className="font-bold flex items-center gap-1.5 text-blue-800 dark:text-blue-300">
                         <GraduationCap className="h-4 w-4" />
-                        <span>Tài Khoản Đăng Nhập Demo</span>
+                        <span>{t("auth:login.demoCredentials")}</span>
                       </p>
                       <div className="mt-2 space-y-1.5">
                         <div className="flex justify-between border-b border-blue-100/50 pb-1.5 dark:border-blue-900/20">
-                          <span>Học sinh: <span className="font-mono font-semibold">candidate@example.com</span></span>
+                          <span>{t("hero.roleStudent")}: <span className="font-mono font-semibold">candidate@example.com</span></span>
                           <span className="font-mono bg-blue-100/80 px-1 rounded dark:bg-blue-900/40">admin123456</span>
                         </div>
                         <div className="flex justify-between">
-                          <span>Quản trị: <span className="font-mono font-semibold">admin@example.com</span></span>
+                          <span>{t("hero.roleAdmin")}: <span className="font-mono font-semibold">admin@example.com</span></span>
                           <span className="font-mono bg-blue-100/80 px-1 rounded dark:bg-blue-900/40">admin123456</span>
                         </div>
                       </div>
