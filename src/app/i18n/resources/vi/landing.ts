@@ -21,6 +21,8 @@ const landing = {
     featureGrading: "Báo cáo điểm tức thì",
     roleStudent: "Học sinh",
     roleAdmin: "Quản trị",
+    studentLoginDesc: "Đăng nhập vào tài khoản thí sinh được cấp để mở danh sách phòng thi được phân công, thực hiện thi trực tiếp có giám sát, hoặc tham gia luyện tập và tải xuống tài liệu học tập.",
+    loggedInAs: "Bạn đã đăng nhập dưới vai trò",
   },
   mockBrowser: {
     address: "eduexam.org/exam/take/104",
@@ -108,6 +110,13 @@ const landing = {
     liveSupervision: {
       title: "Giám thị giám sát trực tiếp",
       desc: "Hội đồng thi và giám thị có thể xem webcam, trạng thái kết nối của từng thí sinh theo thời gian thực.",
+    },
+    protocol: {
+      title: "Giao thức chống gian lận EduExam",
+      desc: "Lá chắn bảo mật của chúng tôi tự động chạy, kiểm soát việc khóa trình duyệt, xác thực camera và kiểm tra clipboard để bảo đảm điểm số công bằng 100%.",
+      lock: "Khóa tập trung",
+      webcam: "Webcam trực tiếp",
+      clipboard: "Bộ nhớ tạm an toàn",
     },
   },
   faqs: {

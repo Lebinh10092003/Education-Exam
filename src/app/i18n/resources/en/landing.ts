@@ -21,6 +21,8 @@ const landing = {
     featureGrading: "Instant grading report",
     roleStudent: "Student",
     roleAdmin: "Admin",
+    studentLoginDesc: "Log in with your candidate account to access assigned exams, take monitored tests, or practice and download study materials.",
+    loggedInAs: "You are logged in as",
   },
   mockBrowser: {
     address: "eduexam.org/exam/take/104",
@@ -108,6 +110,13 @@ const landing = {
     liveSupervision: {
       title: "Live Proctor Supervision",
       desc: "Exam committees and proctors can view webcams and connection statuses of each student in real time.",
+    },
+    protocol: {
+      title: "EduExam Anti-Cheating Protocol",
+      desc: "Our secure testing shield runs automatically, safeguarding browser lock, camera authentication, and clipboard validation to maintain a 100% fair grade distribution.",
+      lock: "Focus Locked",
+      webcam: "Webcam Live",
+      clipboard: "Clipboard Safe",
     },
   },
   faqs: {
