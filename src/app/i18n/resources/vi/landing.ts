@@ -1,4 +1,10 @@
 const landing = {
+  nav: {
+    features: "Tính năng",
+    exams: "Kỳ thi",
+    security: "Bảo mật",
+    faq: "Hỏi đáp",
+  },
   hero: {
     title: "Hệ thống Thi Trực tuyến Toàn diện",
     subtitle: "Trải nghiệm thi trực tuyến bảo mật, công bằng và chính xác cao cùng EduExam. Nền tảng đánh giá và đồng hành cùng sự phát triển giáo dục của bạn.",
@@ -43,6 +49,13 @@ const landing = {
       science: "Khoa học",
       languages: "Ngoại ngữ",
       it: "Tin học",
+    },
+    list: {
+      math12: "Đánh giá năng lực Toán học THPT",
+      ieltsMock: "Luyện thi IELTS Mock Test",
+      dsaCode: "Cấu trúc dữ liệu & Giải thuật",
+      physics12: "Khảo sát chất lượng Vật lý 12",
+      organicChem: "Ôn tập Hóa học Hữu cơ",
     },
     duration: "{{minutes}} phút",
     questions: "{{count}} câu hỏi",

@@ -1,4 +1,10 @@
 const landing = {
+  nav: {
+    features: "Features",
+    exams: "Exams",
+    security: "Security",
+    faq: "FAQ",
+  },
   hero: {
     title: "Comprehensive Online Examination System",
     subtitle: "Experience secure, fair, and highly accurate online exams with EduExam. The assessment platform designed to support your educational growth.",
@@ -43,6 +49,13 @@ const landing = {
       science: "Science",
       languages: "Languages",
       it: "Computer Science",
+    },
+    list: {
+      math12: "High School Mathematics Assessment",
+      ieltsMock: "IELTS Mock Test Prep",
+      dsaCode: "Data Structures & Algorithms",
+      physics12: "Grade 12 Physics Quality Survey",
+      organicChem: "Organic Chemistry Review",
     },
     duration: "{{minutes}} mins",
     questions: "{{count}} questions",
