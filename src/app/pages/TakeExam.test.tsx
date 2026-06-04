@@ -16,6 +16,11 @@ const mockCaptureTrackSnapshot = vi.fn();
 const mockConnectCandidatePublisher = vi.fn();
 const mockDisconnectRoom = vi.fn();
 const mockRequestFullscreen = vi.fn();
+const mockSaveSnapshotLocally = vi.fn();
+const mockGetTopViolationSnapshots = vi.fn();
+const mockClearSessionSnapshots = vi.fn();
+const mockCompressSnapshotForUpload = vi.fn();
+
 const websocketInstances: Array<{
   onopen: (() => void) | null;
   onmessage: ((event: { data: string }) => void) | null;
@@ -46,6 +51,15 @@ vi.mock("../lib/proctoringCapture", () => ({
   requestProctoringStreams: (...args: unknown[]) => mockRequestProctoringStreams(...args),
   captureTrackSnapshot: (...args: unknown[]) => mockCaptureTrackSnapshot(...args),
 }));
+
+vi.mock("../lib/snapshotStore", () => ({
+  saveSnapshotLocally: (...args: unknown[]) => mockSaveSnapshotLocally(...args),
+  getTopViolationSnapshots: (...args: unknown[]) => mockGetTopViolationSnapshots(...args),
+  clearSessionSnapshots: (...args: unknown[]) => mockClearSessionSnapshots(...args),
+  compressSnapshotForUpload: (...args: unknown[]) => mockCompressSnapshotForUpload(...args),
+  countSessionSnapshots: vi.fn().mockResolvedValue(0),
+}));
+
 
 vi.mock("../lib/proctoringMedia", async () => {
   const actual = await vi.importActual<typeof import("../lib/proctoringMedia")>("../lib/proctoringMedia");
@@ -395,10 +409,8 @@ describe("TakeExam", () => {
       );
     });
 
-    expect(mockApiRequest).toHaveBeenCalledWith(
-      "/api/v1/proctoring/sessions/77/evidence/",
-      expect.objectContaining({ method: "POST", body: expect.any(FormData) }),
-    );
+    expect(mockSaveSnapshotLocally).toHaveBeenCalled();
+
     expect(mockNotifyWarning).toHaveBeenCalledWith(
       "A proctoring warning was recorded. Candidate exited fullscreen mode.",
     );

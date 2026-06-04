@@ -23,7 +23,7 @@ const candidateProfile: AuthProfile = {
     name: "EduExam Academy",
     code: "EEA",
   },
-  roles: ["candidate", "student"],
+  roles: ["candidate"],
   avatar_url: "",
 };
 

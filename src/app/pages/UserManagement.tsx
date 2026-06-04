@@ -224,8 +224,8 @@ export function UserManagement() {
   };
 
   const saveUser = async () => {
-    if (!formState.full_name.trim() || !formState.email.trim()) {
-      notify.error("Full name and email are required.");
+    if (!formState.full_name.trim()) {
+      notify.error("Full name is required.");
       return;
     }
 
@@ -396,16 +396,63 @@ export function UserManagement() {
     });
   };
 
-  const handlePendingUserImport = () => {
+  const handlePendingUserImport = async () => {
     if (!importFile) {
       notify.error("Choose a CSV file to prepare for import.");
       return;
     }
 
-    notify.info(
-      "User import template is ready, but the backend CSV import endpoint is not exposed yet. The selected file remains local for now.",
-    );
+    const formData = new FormData();
+    formData.append("file", importFile);
+
+    await userMutation.run(async () => {
+      const response = await apiRequest<{
+        total_rows: number;
+        created_users: number;
+        updated_users: number;
+        failed_rows: number;
+        errors: Array<{ row_number: number; identifier: string; message: string }>;
+      }>("/api/v1/users/import-csv/", {
+        method: "POST",
+        body: formData,
+      });
+
+      await usersList.reload();
+      closeImportDialog(false);
+
+      if (response.failed_rows > 0) {
+        await notify.confirm({
+          icon: "warning",
+          title: "Import completed with errors",
+          html: `
+            <div style="text-align: left; font-size: 14px; line-height: 1.5;">
+              <p>Successfully processed ${response.total_rows} rows:</p>
+              <ul style="list-style-type: disc; padding-left: 20px;">
+                <li>Created: <strong>${response.created_users}</strong></li>
+                <li>Updated: <strong>${response.updated_users}</strong></li>
+                <li>Failed: <strong>${response.failed_rows}</strong></li>
+              </ul>
+              <div style="max-height: 160px; overflow-y: auto; border: 1px solid #e2e8f0; border-radius: 6px; padding: 8px; background-color: #f8fafc; margin-top: 8px; font-size: 12px; font-family: monospace;">
+                ${response.errors
+                  .map(
+                    (err) =>
+                      `<div>Row ${err.row_number} (${err.identifier}): ${err.message}</div>`
+                  )
+                  .join("")}
+              </div>
+            </div>
+          `,
+          confirmText: "OK",
+          cancelText: "Close",
+        });
+      } else {
+        notify.success(
+          `Import successful: Created ${response.created_users} and updated ${response.updated_users} users.`
+        );
+      }
+    });
   };
+
 
   const totalCount = usersList.data?.count ?? 0;
   const rangeStart = totalCount === 0 ? 0 : (page - 1) * PAGE_SIZE + 1;
@@ -800,9 +847,10 @@ export function UserManagement() {
               <ImportTemplateActions template={userImportTemplate} selectedFormat="csv" />
             </div>
 
-            <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-              This template is ready for the backend import phase. The current backend still does not expose a user CSV import endpoint, so this dialog is for file preparation and preview only.
+            <div className="rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-900">
+              Upload the CSV file below to import new users or update existing ones. The system will match users by email and assign the specified roles.
             </div>
+
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => closeImportDialog(false)}>
@@ -841,8 +889,8 @@ export function UserManagement() {
             <div>
               <Label htmlFor="user-email">Email Address</Label>
               <Input
-                id="user-email"
-                type="email"
+                id="user-email:text"
+                type="text"
                 className="mt-2"
                 value={formState.email}
                 onChange={(event) =>

@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Edit, Plus, Search, Trash2, UserPlus, Users } from "lucide-react";
+import { Edit, Plus, Search, Trash2, UserMinus, UserPlus, Users } from "lucide-react";
 import { notify } from "../lib/notify";
 
 import { PageHeader } from "../components/PageHeader";
@@ -79,7 +79,7 @@ const EMPTY_GROUP_FORM: GroupFormState = {
 };
 
 const PAGE_SIZE = 20;
-const CANDIDATE_ROLE_SLUGS = new Set(["candidate", "student"]);
+const CANDIDATE_ROLE_SLUGS = new Set(["candidate"]);
 
 const formatDate = (value: string) => {
   const parsedDate = new Date(value);
@@ -111,6 +111,15 @@ export function GroupManagement() {
   const [importFile, setImportFile] = useState<File | null>(null);
   const [importInputKey, setImportInputKey] = useState(0);
   const [importSummary, setImportSummary] = useState<GroupMembershipImportSummary | null>(null);
+
+  const [editingCandidateId, setEditingCandidateId] = useState<number | null>(null);
+  const [candidateFormState, setCandidateFormState] = useState({
+    full_name: "",
+    email: "",
+    phone_number: "",
+    password: "",
+  });
+  const [isCandidateEditingOpen, setIsCandidateEditingOpen] = useState(false);
 
   const debouncedSearch = useDebouncedValue(searchQuery, 350);
   const debouncedCandidateSearch = useDebouncedValue(candidateSearchQuery, 300);
@@ -292,6 +301,87 @@ export function GroupManagement() {
       setMembershipRefreshKey((previous) => previous + 1);
       await groupsList.reload();
       notify.success("Members added to the group.");
+    });
+  };
+
+  const openEditCandidateDialog = async (userId: number) => {
+    setEditingCandidateId(userId);
+    setCandidateFormState({
+      full_name: "",
+      email: "",
+      phone_number: "",
+      password: "",
+    });
+    setIsCandidateEditingOpen(true);
+    try {
+      const user = await apiRequest<{
+        full_name: string;
+        email: string;
+        phone_number: string;
+      }>(`/api/v1/users/${userId}/`);
+      setCandidateFormState({
+        full_name: user.full_name || "",
+        email: user.email || "",
+        phone_number: user.phone_number || "",
+        password: "",
+      });
+    } catch (err) {
+      notify.error("Failed to load candidate details.");
+      setIsCandidateEditingOpen(false);
+    }
+  };
+
+  const saveCandidate = async () => {
+    if (!editingCandidateId) return;
+    if (!candidateFormState.full_name.trim()) {
+      notify.error("Full name is required.");
+      return;
+    }
+
+    await mutation.run(async () => {
+      const payload: Record<string, unknown> = {
+        full_name: candidateFormState.full_name.trim(),
+        email: candidateFormState.email.trim(),
+        phone_number: candidateFormState.phone_number.trim(),
+      };
+      if (candidateFormState.password.trim()) {
+        payload.password = candidateFormState.password;
+      }
+
+      await apiRequest(`/api/v1/users/${editingCandidateId}/`, {
+        method: "PATCH",
+        body: payload,
+      });
+
+      setIsCandidateEditingOpen(false);
+      setMembershipRefreshKey((previous) => previous + 1);
+      notify.success("Candidate details updated.");
+    });
+  };
+
+  const removeMember = async (userId: number, userName: string) => {
+    if (!membersDialogGroup) return;
+    const confirmed = await notify.confirm({
+      title: "Remove member?",
+      text: `Remove "${userName}" from the group "${membersDialogGroup.name}"?`,
+      confirmText: "Remove Member",
+      confirmButtonColor: "#dc2626",
+    });
+    if (!confirmed) return;
+
+    await mutation.run(async () => {
+      await apiRequest(
+        `/api/v1/groups/${membersDialogGroup.id}/memberships/`,
+        {
+          method: "DELETE",
+          query: {
+            user_id: userId,
+          },
+        }
+      );
+      setMembershipRefreshKey((previous) => previous + 1);
+      await groupsList.reload();
+      notify.success("Member removed from group.");
     });
   };
 
@@ -687,12 +777,35 @@ export function GroupManagement() {
                   memberships.map((membership) => (
                     <div
                       key={membership.id}
-                      className="rounded-lg border border-gray-200 px-3 py-2"
+                      className="flex items-center justify-between rounded-lg border border-gray-200 px-3 py-2 hover:bg-gray-50 transition-colors"
                     >
-                      <p className="text-sm font-medium text-gray-900">
-                        {membership.user_name}
-                      </p>
-                      <p className="text-xs text-gray-500">{membership.user_email}</p>
+                      <div className="min-w-0 flex-1 pr-2">
+                        <p className="text-sm font-medium text-gray-900 truncate">
+                          {membership.user_name}
+                        </p>
+                        <p className="text-xs text-gray-500 truncate">{membership.user_email}</p>
+                      </div>
+                      <div className="flex gap-1 shrink-0">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-8 w-8 p-0"
+                          title="View / Edit Candidate"
+                          onClick={() => openEditCandidateDialog(membership.user_id)}
+                        >
+                          <Edit className="w-4 h-4 text-blue-600" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-8 w-8 p-0"
+                          title="Remove from Group"
+                          onClick={() => void removeMember(membership.user_id, membership.user_name)}
+                          disabled={mutation.isSubmitting}
+                        >
+                          <UserMinus className="w-4 h-4 text-red-600" />
+                        </Button>
+                      </div>
                     </div>
                   ))
                 )}
@@ -710,6 +823,77 @@ export function GroupManagement() {
               disabled={mutation.isSubmitting || selectedCandidateIds.length === 0}
             >
               {mutation.isSubmitting ? "Adding..." : `Add Selected (${selectedCandidateIds.length})`}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={isCandidateEditingOpen} onOpenChange={setIsCandidateEditingOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Chỉnh sửa thông tin thí sinh</DialogTitle>
+            <DialogDescription>
+              Xem, cập nhật thông tin chi tiết và đặt lại mật khẩu cho tài khoản thí sinh.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div>
+              <Label htmlFor="candidate-name">Họ và tên</Label>
+              <Input
+                id="candidate-name"
+                className="mt-2"
+                value={candidateFormState.full_name}
+                onChange={(event) =>
+                  setCandidateFormState((previous) => ({ ...previous, full_name: event.target.value }))
+                }
+                placeholder="Nhập họ và tên thí sinh"
+              />
+            </div>
+            <div>
+              <Label htmlFor="candidate-email">Địa chỉ Email</Label>
+              <Input
+                id="candidate-email"
+                type="text"
+                className="mt-2"
+                value={candidateFormState.email}
+                onChange={(event) =>
+                  setCandidateFormState((previous) => ({ ...previous, email: event.target.value }))
+                }
+                placeholder="candidate@example.com hoặc để trống"
+              />
+            </div>
+            <div>
+              <Label htmlFor="candidate-phone">Số điện thoại</Label>
+              <Input
+                id="candidate-phone"
+                className="mt-2"
+                value={candidateFormState.phone_number}
+                onChange={(event) =>
+                  setCandidateFormState((previous) => ({ ...previous, phone_number: event.target.value }))
+                }
+                placeholder="Nhập số điện thoại"
+              />
+            </div>
+            <div>
+              <Label htmlFor="candidate-password">Mật khẩu mới (Tự điền)</Label>
+              <Input
+                id="candidate-password"
+                type="password"
+                className="mt-2"
+                value={candidateFormState.password}
+                onChange={(event) =>
+                  setCandidateFormState((previous) => ({ ...previous, password: event.target.value }))
+                }
+                placeholder="Nhập mật khẩu mới nếu muốn đặt lại"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsCandidateEditingOpen(false)}>
+              Hủy
+            </Button>
+            <Button onClick={() => void saveCandidate()} disabled={mutation.isSubmitting}>
+              {mutation.isSubmitting ? "Đang lưu..." : "Lưu thay đổi"}
             </Button>
           </DialogFooter>
         </DialogContent>

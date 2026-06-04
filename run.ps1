@@ -71,7 +71,7 @@ if (!(Test-Path .env)) {
 }
 
 $envContent = Get-Content .env
-$envContent = $envContent -replace '^DATABASE_URL=.*', 'DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:5432/eduexam'
+$envContent = $envContent -replace '^DATABASE_URL=.*', 'DATABASE_URL=postgresql://postgres:abc@127.0.0.1:5432/eduexam'
 $envContent = $envContent -replace '^REDIS_URL=.*', 'REDIS_URL=redis://127.0.0.1:6379/0'
 $envContent = $envContent -replace '^CELERY_BROKER_URL=.*', 'CELERY_BROKER_URL=redis://127.0.0.1:6379/0'
 $envContent = $envContent -replace '^CELERY_RESULT_BACKEND=.*', 'CELERY_RESULT_BACKEND=redis://127.0.0.1:6379/1'

@@ -38,6 +38,8 @@ import { apiRequest, type PaginatedResponse } from "../lib/http";
 import { useAsyncList } from "../hooks/useAsyncList";
 import { useDebouncedValue } from "../hooks/useDebouncedValue";
 import { useMutationState } from "../hooks/useMutationState";
+import { buildApiUrl } from "../lib/env";
+import { getStoredTokens } from "../lib/storage";
 import { formatCertificateLevel } from "./disciplineShared";
 
 interface ExamOption {
@@ -101,55 +103,45 @@ const formatDuration = (minutes: number) => {
   return `${hours}h ${remainingMinutes}m`;
 };
 
-const exportResultsCsv = (results: ResultRecord[]) => {
-  const header = [
-    "Candidate",
-    "Candidate Email",
-    "Exam",
-    "Subject",
-    "Score",
-    "Original Score",
-    "Total Marks",
-    "Percentage",
-    "Original Percentage",
-    "Penalty Percent",
-    "Certificate",
-    "Workflow Status",
-    "Publish State",
-    "Completed Date",
-    "Time Taken (minutes)",
-  ];
-  const rows = results.map((result) => [
-    result.candidate.full_name,
-    result.candidate.email,
-    result.exam.name,
-    result.exam.subject_name,
-    result.score,
-    result.original_score,
-    result.total_marks,
-    result.percentage,
-    result.original_percentage,
-    result.penalty_percent_applied,
-    result.certificate_level,
-    result.workflow_status,
-    result.publish_state,
-    result.completed_date ?? "",
-    String(result.time_taken_minutes),
-  ]);
+const exportResultsCsv = async (searchQuery: string, examFilter: string) => {
+  try {
+    const tokens = getStoredTokens();
+    const headers: HeadersInit = {};
+    if (tokens?.access) {
+      headers["Authorization"] = `Bearer ${tokens.access}`;
+    }
+    const queryParams = new URLSearchParams();
+    if (searchQuery) {
+      queryParams.append("search", searchQuery);
+    }
+    if (examFilter !== "all") {
+      queryParams.append("exam", examFilter);
+    }
 
-  const csvContent = [header, ...rows]
-    .map((row) => row.map((cell) => `"${String(cell).replaceAll('"', '""')}"`).join(","))
-    .join("\n");
-  const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8" });
-  const url = URL.createObjectURL(blob);
-  const anchor = document.createElement("a");
-  anchor.href = url;
-  anchor.download = "eduexam-results.csv";
-  document.body.append(anchor);
-  anchor.click();
-  anchor.remove();
-  URL.revokeObjectURL(url);
+    const response = await fetch(buildApiUrl(`/api/v1/results/export-csv/?${queryParams.toString()}`), {
+      headers,
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to export CSV: ${response.statusText}`);
+    }
+
+    const blob = await response.blob();
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = "eduexam-results.csv";
+    document.body.append(anchor);
+    anchor.click();
+    anchor.remove();
+    URL.revokeObjectURL(url);
+    notify.success("Results exported successfully.");
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Unable to export results.";
+    notify.error(message);
+  }
 };
+
 
 export function ResultsReports() {
   const [searchQuery, setSearchQuery] = useState("");
@@ -238,10 +230,11 @@ export function ResultsReports() {
         title="Results & Reports"
         description="Live result data, publishing, and report export from the backend."
         action={
-          <Button onClick={() => exportResultsCsv(results)}>
+          <Button onClick={() => void exportResultsCsv(debouncedSearch, examFilter)}>
             <Download className="w-4 h-4 mr-2" />
-            Export Current Page
+            Export CSV
           </Button>
+
         }
       />
 

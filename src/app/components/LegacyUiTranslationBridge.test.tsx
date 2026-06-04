@@ -57,7 +57,7 @@ describe("LegacyUiTranslationBridge", () => {
       expect(screen.getByText(translateLegacyUiText("vi", "Pause Exam"))).toBeInTheDocument();
     });
 
-    await user.click(screen.getByRole("button", { name: /EN/i }));
+    await user.click(screen.getByRole("button", { name: /VI/i }));
     await user.click(await screen.findByRole("menuitemradio", { name: /^English$/i }));
 
     await waitFor(() => {

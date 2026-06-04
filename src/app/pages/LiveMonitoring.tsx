@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useParams, useSearchParams } from "react-router";
+import { Link, useParams, useSearchParams } from "react-router";
 import { RoomEvent } from "livekit-client";
 import {
   AlertTriangle,
@@ -8,11 +8,13 @@ import {
   ChevronRight,
   Clock,
   Download,
+  FileText,
   Globe,
   Pause,
   Play,
   RefreshCw,
   Search,
+  Shield,
   Users,
   Video,
   Wifi,
@@ -353,6 +355,28 @@ export function LiveMonitoring({ examId: examIdProp, embedded = false }: LiveMon
   const [selectedCaseDetail, setSelectedCaseDetail] = useState<ViolationCaseRecord | null>(null);
   const [selectedCaseLoading, setSelectedCaseLoading] = useState(false);
   const [selectedCaseError, setSelectedCaseError] = useState<string | null>(null);
+
+  const [viewingSessionId, setViewingSessionId] = useState<number | null>(null);
+  const [viewingSessionData, setViewingSessionData] = useState<any | null>(null);
+  const [viewingSessionLoading, setViewingSessionLoading] = useState(false);
+  const [viewingSessionError, setViewingSessionError] = useState<string | null>(null);
+
+  const fetchSessionDetail = async (sessionId: number) => {
+    setViewingSessionId(sessionId);
+    setViewingSessionLoading(true);
+    setViewingSessionError(null);
+    setViewingSessionData(null);
+    try {
+      const data = await apiRequest<any>(`/api/v1/exam-sessions/${sessionId}/`);
+      setViewingSessionData(data);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unable to load exam sheet details.";
+      setViewingSessionError(message);
+      notify.error(message);
+    } finally {
+      setViewingSessionLoading(false);
+    }
+  };
   const liveRoomRef = useRef<ConnectedMediaRoom | null>(null);
   const liveStageRef = useRef<HTMLDivElement | null>(null);
   const attachedElementsRef = useRef<HTMLElement[]>([]);
@@ -916,6 +940,12 @@ export function LiveMonitoring({ examId: examIdProp, embedded = false }: LiveMon
         </p>
       </div>
       <div className="flex flex-wrap gap-2">
+        <Button variant="outline" asChild>
+          <Link to={`/discipline/exams/${resolvedExamId}`}>
+            <Shield className="mr-2 h-4 w-4" />
+            Disciplinary Board
+          </Link>
+        </Button>
         <Button variant="outline" onClick={() => void snapshot.reload().catch(() => undefined)}>
           <RefreshCw className="mr-2 h-4 w-4" />
           Refresh
@@ -950,6 +980,12 @@ export function LiveMonitoring({ examId: examIdProp, embedded = false }: LiveMon
       }
       action={
         <div className="flex gap-2">
+          <Button variant="outline" asChild>
+            <Link to={`/discipline/exams/${resolvedExamId}`}>
+              <Shield className="mr-2 h-4 w-4" />
+              Disciplinary Board
+            </Link>
+          </Button>
           <Button
             variant="outline"
             onClick={() => void updateExamStatus(examStatus === "paused" ? "open" : "paused")}
@@ -1143,7 +1179,7 @@ export function LiveMonitoring({ examId: examIdProp, embedded = false }: LiveMon
                         <td className="px-4 py-3"><div className="space-y-1"><div className="flex items-center gap-2"><Progress value={candidateStatus.progress_percentage} className="w-28" /><span className="text-xs text-slate-600">{candidateStatus.progress_percentage}%</span></div><p className="text-xs text-slate-500">{candidateStatus.questions_answered}/{candidateStatus.total_questions} questions</p></div></td>
                         <td className="px-4 py-3"><p className="text-sm text-slate-900">{formatMinutes(candidateStatus.time_elapsed_minutes)}</p><p className="text-xs text-slate-500">{formatDate(candidateStatus.last_activity_at)}</p></td>
                         <td className="px-4 py-3"><div className="flex items-center gap-2"><Wifi className={cn("h-4 w-4", getConnectionTone(candidateStatus.connection_status))} /><span className="text-xs capitalize text-slate-600">{candidateStatus.connection_status}</span></div></td>
-                        <td className="px-4 py-3"><div className="space-y-2"><div className="rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-700"><p className="font-medium text-slate-900">{getWebcamStatusText(candidateStatus.media.webcam_publish_status)}</p><p className="mt-1">{getScreenStatusText(candidateStatus.media.screen_capture_status)}</p><p className="mt-1 text-slate-500">Last webcam publish: {formatDate(candidateStatus.media.last_publish_at)}</p>{candidateStatus.media.live_request_enabled ? <p className="mt-1 text-sky-600">Live request is active.</p> : <p className="mt-1 text-slate-500">Webcam stays local until requested.</p>}</div><div className="flex flex-wrap gap-2"><Button size="sm" variant={selectedSessionId === candidateStatus.session_id ? "secondary" : "outline"} disabled={!candidateStatus.session_id} onClick={() => void openLiveView(candidateStatus)}><Video className="mr-2 h-4 w-4" />Open Webcam</Button>{candidateStatus.session_id && latestCaseIdBySession.has(candidateStatus.session_id) ? <Button size="sm" variant="outline" onClick={() => openViolationCase(latestCaseIdBySession.get(candidateStatus.session_id) ?? null)}><AlertTriangle className="mr-2 h-4 w-4" />View Violation</Button> : null}</div></div></td>
+                        <td className="px-4 py-3"><div className="space-y-2"><div className="rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-700"><p className="font-medium text-slate-900">{getWebcamStatusText(candidateStatus.media.webcam_publish_status)}</p><p className="mt-1">{getScreenStatusText(candidateStatus.media.screen_capture_status)}</p><p className="mt-1 text-slate-500">Last webcam publish: {formatDate(candidateStatus.media.last_publish_at)}</p>{candidateStatus.media.live_request_enabled ? <p className="mt-1 text-sky-600">Live request is active.</p> : <p className="mt-1 text-slate-500">Webcam stays local until requested.</p>}</div><div className="flex flex-wrap gap-2"><Button size="sm" variant={selectedSessionId === candidateStatus.session_id ? "secondary" : "outline"} disabled={!candidateStatus.session_id} onClick={() => void openLiveView(candidateStatus)}><Video className="mr-2 h-4 w-4" />Open Webcam</Button><Button size="sm" variant="outline" disabled={!candidateStatus.session_id} onClick={() => void fetchSessionDetail(candidateStatus.session_id)}><FileText className="mr-2 h-4 w-4" />Xem bài thi</Button>{candidateStatus.session_id && latestCaseIdBySession.has(candidateStatus.session_id) ? <Button size="sm" variant="outline" onClick={() => openViolationCase(latestCaseIdBySession.get(candidateStatus.session_id) ?? null)}><AlertTriangle className="mr-2 h-4 w-4" />View Violation</Button> : null}</div></div></td>
                       </tr>
                     ))}
                     {!snapshot.isLoading && !paginatedCandidates.totalItems ? <tr><td className="px-4 py-10 text-center text-sm text-slate-500" colSpan={6}>No candidates matched the current filters.</td></tr> : null}
@@ -1218,6 +1254,127 @@ export function LiveMonitoring({ examId: examIdProp, embedded = false }: LiveMon
             <SheetDescription>Review evidence, notes, and current resolution state without leaving the monitoring workspace.</SheetDescription>
           </SheetHeader>
           <CaseDetailPanel caseRecord={selectedCase} isLoading={selectedCaseLoading} error={selectedCaseError} onDismiss={() => { if (selectedCase) { void resolveCase(selectedCase, "dismissed"); } }} onResolve={() => { if (selectedCase) { void resolveCase(selectedCase, "resolved"); } }} />
+        </SheetContent>
+      </Sheet>
+
+      <Sheet open={viewingSessionId !== null} onOpenChange={(open) => (!open ? setViewingSessionId(null) : undefined)}>
+        <SheetContent className="w-full overflow-y-auto px-6 py-6 sm:max-w-3xl">
+          <SheetHeader className="p-0 pr-12">
+            <SheetTitle>Chi tiết bài thi</SheetTitle>
+            <SheetDescription>Xem thông tin và nội dung câu trả lời của thí sinh.</SheetDescription>
+          </SheetHeader>
+          
+          {viewingSessionLoading && (
+            <div className="py-12 text-center text-sm text-slate-500">
+              Đang tải chi tiết bài thi...
+            </div>
+          )}
+
+          {viewingSessionError && (
+            <div className="my-4 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+              {viewingSessionError}
+            </div>
+          )}
+
+          {viewingSessionData && (
+            <div className="mt-6 space-y-6">
+              <div className="grid gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-4 sm:grid-cols-2">
+                <div>
+                  <p className="text-xs uppercase tracking-wide text-slate-400">Trạng thái làm bài</p>
+                  <div className="mt-1 flex items-center gap-2">
+                    <StatusBadge status={viewingSessionData.status} />
+                    <Badge variant="outline">Lần thi {viewingSessionData.attempt_number}</Badge>
+                  </div>
+                </div>
+                <div>
+                  <p className="text-xs uppercase tracking-wide text-slate-400">Điểm số trắc nghiệm</p>
+                  <p className="mt-1 font-semibold text-slate-900">
+                    {viewingSessionData.objective_score} / {viewingSessionData.max_score} điểm
+                  </p>
+                </div>
+                <div>
+                  <p className="text-xs uppercase tracking-wide text-slate-400">Bắt đầu lúc</p>
+                  <p className="mt-1 text-sm font-medium text-slate-900">
+                    {formatDate(viewingSessionData.started_at)}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-xs uppercase tracking-wide text-slate-400">Nộp bài lúc</p>
+                  <p className="mt-1 text-sm font-medium text-slate-900">
+                    {formatDate(viewingSessionData.submitted_at)}
+                  </p>
+                </div>
+              </div>
+
+              <div className="space-y-4">
+                <h3 className="text-lg font-semibold text-slate-900 font-sans">Danh sách câu hỏi ({viewingSessionData.total_questions})</h3>
+                {viewingSessionData.questions.map((question: any) => {
+                  const isEssay = question.question_type === "essay";
+                  const isMultipleChoice = question.question_type === "multiple_choice";
+                  const isTrueFalse = question.question_type === "true_false";
+
+                  return (
+                    <div key={question.id} className="rounded-2xl border border-slate-200 bg-white p-4 space-y-3 shadow-sm">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <Badge variant="outline">Câu {question.sort_order}</Badge>
+                        <Badge variant="outline" className="capitalize">
+                          {question.question_type.replace(/_/g, " ")}
+                        </Badge>
+                        <Badge variant="outline" className="capitalize">
+                          {question.difficulty}
+                        </Badge>
+                        <Badge variant="outline">
+                          {question.points} điểm
+                        </Badge>
+                        {question.is_marked_for_review && (
+                          <Badge variant="secondary" className="bg-amber-100 text-amber-800">
+                            Đánh dấu xem lại
+                          </Badge>
+                        )}
+                      </div>
+
+                      <p className="text-sm font-medium text-slate-900">{question.question_text}</p>
+
+                      {(isMultipleChoice || isTrueFalse) && (
+                        <div className="space-y-2 mt-2">
+                          {question.options.map((opt: any) => {
+                            const isSelected = question.selected_option_keys.includes(opt.key);
+                            return (
+                              <div
+                                key={opt.key}
+                                className={cn(
+                                  "flex items-start gap-3 rounded-xl border p-3 text-sm transition-colors",
+                                  isSelected
+                                    ? "border-blue-200 bg-blue-50/50 text-blue-900"
+                                    : "border-slate-100 bg-slate-50 text-slate-700"
+                                )}
+                              >
+                                <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-slate-300 bg-white text-xs font-semibold text-slate-500 shadow-sm">
+                                  {opt.key.toUpperCase()}
+                                </span>
+                                <span className="flex-1">{opt.text}</span>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+
+                      {isEssay && (
+                        <div className="mt-2 rounded-xl border border-slate-100 bg-slate-50 p-3">
+                          <p className="text-xs uppercase tracking-wide text-slate-400 font-semibold mb-1">
+                            Câu trả lời của thí sinh:
+                          </p>
+                          <p className="text-sm whitespace-pre-wrap text-slate-700">
+                            {question.answer_text || "Không có câu trả lời."}
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
         </SheetContent>
       </Sheet>
     </div>
