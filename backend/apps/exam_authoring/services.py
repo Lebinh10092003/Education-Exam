@@ -799,10 +799,10 @@ def _auto_publish_closed_results(*, exam, actor, request=None):
 def transition_exam_status(*, exam, next_status, actor, bonus_minutes=0, request=None):
     allowed_transitions = {
         Exam.Status.DRAFT: {Exam.Status.SCHEDULED, Exam.Status.OPEN},
-        Exam.Status.SCHEDULED: {Exam.Status.OPEN, Exam.Status.CLOSED},
-        Exam.Status.OPEN: {Exam.Status.PAUSED, Exam.Status.CLOSED},
-        Exam.Status.PAUSED: {Exam.Status.OPEN, Exam.Status.CLOSED},
-        Exam.Status.CLOSED: set(),
+        Exam.Status.SCHEDULED: {Exam.Status.DRAFT, Exam.Status.OPEN, Exam.Status.CLOSED},
+        Exam.Status.OPEN: {Exam.Status.SCHEDULED, Exam.Status.PAUSED, Exam.Status.CLOSED},
+        Exam.Status.PAUSED: {Exam.Status.SCHEDULED, Exam.Status.OPEN, Exam.Status.CLOSED},
+        Exam.Status.CLOSED: {Exam.Status.SCHEDULED, Exam.Status.DRAFT},
         Exam.Status.ARCHIVED: set(),
     }
     next_status = str(next_status)
@@ -833,9 +833,9 @@ def transition_exam_status(*, exam, next_status, actor, bonus_minutes=0, request
     exam.save(update_fields=["status", "updated_by", "updated_at"])
 
     transitioned_sessions = []
-    if current_status == Exam.Status.OPEN and next_status == Exam.Status.PAUSED:
+    if current_status == Exam.Status.OPEN and next_status in {Exam.Status.PAUSED, Exam.Status.SCHEDULED, Exam.Status.DRAFT}:
         transitioned_sessions = _freeze_exam_sessions(exam=exam, now=now)
-    elif current_status == Exam.Status.PAUSED and next_status == Exam.Status.OPEN:
+    elif current_status in {Exam.Status.PAUSED, Exam.Status.SCHEDULED, Exam.Status.DRAFT} and next_status == Exam.Status.OPEN:
         transitioned_sessions = _resume_exam_sessions(exam=exam, now=now, bonus_minutes=bonus_minutes)
     elif next_status == Exam.Status.CLOSED:
         transitioned_sessions = _force_close_exam_sessions(exam=exam, actor=actor)

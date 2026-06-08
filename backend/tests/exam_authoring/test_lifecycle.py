@@ -109,6 +109,20 @@ def test_transition_exam_status_freezes_resumes_and_closes_sessions(subject, adm
     session = start_or_resume_session(exam=exam, candidate=candidate_user)
     original_expires_at = session.expires_at
 
+    # Test open -> scheduled transition
+    transition_exam_status(exam=exam, next_status="scheduled", actor=admin_user)
+    session.refresh_from_db()
+    assert exam.status == "scheduled"
+    assert session.paused_at is not None
+    assert session.remaining_seconds_at_pause is not None
+
+    # Test scheduled -> open transition
+    transition_exam_status(exam=exam, next_status="open", actor=admin_user)
+    session.refresh_from_db()
+    assert exam.status == "open"
+    assert session.paused_at is None
+    assert session.remaining_seconds_at_pause is None
+
     transition_exam_status(exam=exam, next_status="paused", actor=admin_user)
     session.refresh_from_db()
     assert session.paused_at is not None
