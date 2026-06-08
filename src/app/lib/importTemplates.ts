@@ -70,9 +70,9 @@ const examStudentCsvTemplate = [
 ].join("\n");
 
 const groupMembershipCsvTemplate = [
-  "full_name,email,phone_number,student_class,cccd,date_of_birth,school_code",
-  "Le Van Binh,,0901234567,12,012345678901,24/08/2003,SMOKE-SCHOOL",
-  "Tran Thi Hoa,hoa@student.local,0901234568,12A1,012345678902,15/01/2004,SMOKE-SCHOOL",
+  "full_name,username,password,date_of_birth,school_code,ward,national_exam_subject,exam_block,candidate_number,email,phone_number,cccd",
+  "Le Van Binh,imo001,imo-pass-001,24/08/2003,SMOKE-SCHOOL,Phuong 1,Toan,A00,IMO001,binh@example.com,0901234567,012345678901",
+  "Tran Thi Hoa,imo002,imo-pass-002,15/01/2004,SMOKE-SCHOOL,Phuong 2,Toan,A01,IMO002,hoa@example.com,0901234568,012345678902",
 ].join("\n");
 
 export const questionImportTemplate: ImportTemplateDefinition = {
@@ -158,20 +158,21 @@ export const examStudentImportTemplate: ImportTemplateDefinition = {
 
 export const groupMembershipImportTemplate: ImportTemplateDefinition = {
   title: "Group Members Import Template",
-  description: "Import candidates or students into a specific group. The backend can match existing users by email or CCCD, or create new candidate accounts when needed.",
+  description: "Import candidates or students into a specific group with roster details and admin-visible login credentials.",
   footerNote:
-    "Each row must include either email or CCCD. Use DD/MM/YYYY for date_of_birth, and school_code only when the member should belong to a specific school.",
+    "Use DD/MM/YYYY for date_of_birth. school_code must match an existing school. password is stored for admin roster display for newly created or reset candidate accounts.",
   formats: [
     {
       key: "csv",
       label: "CSV",
       fileName: "group-members-import-template.csv",
       mimeType: "text/csv;charset=utf-8",
-      requiredFields: ["full_name", "student_class", "email or cccd"],
+      requiredFields: ["full_name"],
       mappingNotes: [
-        "Provide email, CCCD, or both. At least one identifier is required so the backend can match or create the account.",
+        "username becomes the candidate login account. If username is blank, the backend generates one.",
+        "password becomes both the login password and the admin-visible roster password. If blank for a new account, the backend uses the generated username.",
         "date_of_birth must use DD/MM/YYYY, for example 24/08/2003.",
-        "If school_code matches an existing school, the imported profile will be linked to that school.",
+        "candidate_number maps to SBD. exam_block maps to Khoi thi.",
       ],
       sample: groupMembershipCsvTemplate,
       downloadContent: groupMembershipCsvTemplate,

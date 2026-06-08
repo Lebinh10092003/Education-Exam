@@ -71,7 +71,27 @@ class CandidateGroupViewSet(viewsets.ModelViewSet):
     def memberships(self, request, pk=None):
         group = self.get_object()
         if request.method == "GET":
-            queryset = group.memberships.select_related("user").order_by("user__email")
+            queryset = group.memberships.select_related(
+                "user",
+                "user__profile",
+                "user__profile__school",
+            )
+            search = (request.query_params.get("search") or "").strip()
+            if search:
+                queryset = queryset.filter(
+                    Q(user__full_name__icontains=search)
+                    | Q(user__email__icontains=search)
+                    | Q(user__username__icontains=search)
+                    | Q(user__profile__phone_number__icontains=search)
+                    | Q(user__profile__candidate_number__icontains=search)
+                    | Q(user__profile__school__name__icontains=search)
+                    | Q(user__profile__school__code__icontains=search)
+                )
+            queryset = queryset.order_by(
+                "user__profile__candidate_number",
+                "user__full_name",
+                "user__email",
+            )
             page = self.paginate_queryset(queryset)
             serializer = GroupMembershipSerializer(page, many=True)
             return self.get_paginated_response(serializer.data)

@@ -223,6 +223,24 @@ class UserSerializer(serializers.ModelSerializer):
     )
     school = serializers.SerializerMethodField(read_only=True)
     phone_number = serializers.CharField(required=False, allow_blank=True)
+    date_of_birth = serializers.DateField(source="profile.date_of_birth", required=False, allow_null=True)
+    student_class = serializers.CharField(source="profile.student_class", required=False, allow_blank=True)
+    ward = serializers.CharField(source="profile.ward", required=False, allow_blank=True)
+    national_exam_subject = serializers.CharField(
+        source="profile.national_exam_subject",
+        required=False,
+        allow_blank=True,
+    )
+    exam_block = serializers.CharField(source="profile.exam_block", required=False, allow_blank=True)
+    candidate_number = serializers.CharField(
+        source="profile.candidate_number",
+        required=False,
+        allow_blank=True,
+    )
+    visible_password = serializers.CharField(
+        source="profile.visible_password",
+        read_only=True,
+    )
     last_login = serializers.SerializerMethodField(read_only=True)
     role_ids = serializers.PrimaryKeyRelatedField(
         queryset=Role.objects.all(),
@@ -244,6 +262,13 @@ class UserSerializer(serializers.ModelSerializer):
             "is_staff",
             "password",
             "phone_number",
+            "date_of_birth",
+            "student_class",
+            "ward",
+            "national_exam_subject",
+            "exam_block",
+            "candidate_number",
+            "visible_password",
             "last_login",
             "school_id",
             "school",
@@ -282,6 +307,7 @@ class UserSerializer(serializers.ModelSerializer):
             validated_data["email"] = email
 
         password = validated_data.pop("password", None)
+        profile_data = validated_data.pop("profile", {})
         school = validated_data.pop("school_id", None)
         phone_number = validated_data.pop("phone_number", "")
         roles = validated_data.pop("role_ids", [])
@@ -290,6 +316,10 @@ class UserSerializer(serializers.ModelSerializer):
         profile, _ = Profile.objects.get_or_create(user=user)
         profile.phone_number = phone_number
         profile.school = school
+        for field_name, value in profile_data.items():
+            setattr(profile, field_name, value or "" if value is not None else None)
+        if password:
+            profile.visible_password = password
         profile.save()
         if roles:
             user.user_roles.all().delete()
@@ -301,6 +331,7 @@ class UserSerializer(serializers.ModelSerializer):
         username = validated_data.pop("username", None)
         email = validated_data.get("email", None)
         password = validated_data.pop("password", None)
+        profile_data = validated_data.pop("profile", {})
         school = validated_data.pop("school_id", None)
         phone_number = validated_data.pop("phone_number", None)
         roles = validated_data.pop("role_ids", None)
@@ -327,6 +358,10 @@ class UserSerializer(serializers.ModelSerializer):
             profile.phone_number = phone_number
         if "school_id" in self.initial_data:
             profile.school = school
+        for field_name, value in profile_data.items():
+            setattr(profile, field_name, value or "" if value is not None else None)
+        if password:
+            profile.visible_password = password
         profile.save()
 
         if roles is not None:

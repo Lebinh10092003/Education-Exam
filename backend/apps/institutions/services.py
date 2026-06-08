@@ -71,13 +71,31 @@ def _resolve_school(school_code):
     return None
 
 
-def _resolve_existing_user(*, email, cccd):
+def _resolve_school_from_import(*, school_code, school_name):
+    school = _resolve_school(school_code)
+    if school is not None:
+        return school
+
+    normalized_name = (school_name or "").strip()
+    if normalized_name:
+        school = School.objects.filter(name__iexact=normalized_name).first()
+        if school is None:
+            raise ValueError(f"Unknown school: {normalized_name}")
+        return school
+    return None
+
+
+def _resolve_existing_user(*, email, cccd, username):
     user_model = get_user_model()
     profile = None
     if cccd:
         profile = Profile.objects.select_related("user").filter(cccd=cccd).first()
         if profile is not None:
             return profile.user, profile
+    if username:
+        user = user_model.objects.filter(username__iexact=username).first()
+        if user is not None:
+            return user, Profile.objects.filter(user=user).first()
     if email:
         user = user_model.objects.filter(email__iexact=email).first()
         if user is not None:
@@ -93,8 +111,10 @@ def _is_email_available(*, email, current_user_id=None):
     return not queryset.exists()
 
 
-def _resolve_username(*, full_name, email, date_of_birth, student_class, exclude_user_id=None):
-    if email:
+def _resolve_username(*, full_name, email, date_of_birth, student_class, username="", exclude_user_id=None):
+    if username:
+        base_username = normalize_username_segment(username) or username.strip()
+    elif email:
         base_username = build_email_username(email)
     elif date_of_birth or student_class:
         base_username = build_student_username(
@@ -120,7 +140,20 @@ def _ensure_candidate_role(*, user, role):
     return created
 
 
-def _sync_profile(*, profile, cccd, date_of_birth, student_class, phone_number, school):
+def _sync_profile(
+    *,
+    profile,
+    cccd,
+    date_of_birth,
+    student_class,
+    phone_number,
+    school,
+    ward="",
+    national_exam_subject="",
+    exam_block="",
+    candidate_number="",
+    visible_password=None,
+):
     changed = False
 
     if cccd and profile.cccd != cccd:
@@ -138,6 +171,21 @@ def _sync_profile(*, profile, cccd, date_of_birth, student_class, phone_number, 
     if profile.school != school:
         profile.school = school
         changed = True
+    if (profile.ward or "") != ward:
+        profile.ward = ward
+        changed = True
+    if (profile.national_exam_subject or "") != national_exam_subject:
+        profile.national_exam_subject = national_exam_subject
+        changed = True
+    if (profile.exam_block or "") != exam_block:
+        profile.exam_block = exam_block
+        changed = True
+    if (profile.candidate_number or "") != candidate_number:
+        profile.candidate_number = candidate_number
+        changed = True
+    if visible_password is not None and (profile.visible_password or "") != visible_password:
+        profile.visible_password = visible_password
+        changed = True
 
     if changed:
         profile.save()
@@ -152,20 +200,41 @@ def _import_group_member_row(*, group, row, candidate_role):
         raise ValueError("full_name is required.")
 
     email = (row.get("email") or "").strip().lower()
+    username = (row.get("username") or "").strip()
     cccd = _normalize_cccd(row.get("cccd"))
-    if not email and not cccd:
-        raise ValueError("email or cccd is required.")
-
     phone_number = (row.get("phone_number") or "").strip()
     student_class = (row.get("student_class") or "").strip()
+    ward = (row.get("ward") or row.get("xa_phuong") or row.get("xa/phuong") or "").strip()
+    national_exam_subject = (row.get("national_exam_subject") or row.get("mon_thi_quoc_gia") or "").strip()
+    exam_block = (row.get("exam_block") or row.get("khoi_thi") or student_class).strip()
+    candidate_number = (
+        row.get("candidate_number")
+        or row.get("sbd")
+        or row.get("SBD")
+        or ""
+    ).strip()
+    raw_password = (row.get("password") or row.get("mat_khau") or "").strip()
     date_of_birth = _parse_optional_date(row.get("date_of_birth"))
-    explicit_school = _resolve_school(row.get("school_code"))
+    explicit_school = _resolve_school_from_import(
+        school_code=row.get("school_code"),
+        school_name=row.get("school"),
+    )
 
-    user, profile = _resolve_existing_user(email=email, cccd=cccd)
+    user, profile = _resolve_existing_user(email=email, cccd=cccd, username=username)
 
     if user is not None:
         resolved_school = explicit_school if explicit_school is not None else getattr(profile, "school", None)
         changed = False
+        if username and username != user.username:
+            user.username = _resolve_username(
+                full_name=full_name,
+                email=email,
+                date_of_birth=date_of_birth,
+                student_class=student_class,
+                username=username,
+                exclude_user_id=user.id,
+            )
+            changed = True
         if full_name != user.full_name:
             user.full_name = full_name
             changed = True
@@ -174,8 +243,11 @@ def _import_group_member_row(*, group, row, candidate_role):
                 raise ValueError(f"email already belongs to another user: {email}")
             user.email = email
             changed = True
+        if raw_password:
+            user.set_password(raw_password)
+            changed = True
         if changed:
-            user.save(update_fields=["full_name", "email", "updated_at"])
+            user.save()
 
         profile = profile or Profile.objects.get_or_create(user=user)[0]
         changed = _sync_profile(
@@ -185,6 +257,11 @@ def _import_group_member_row(*, group, row, candidate_role):
             student_class=student_class,
             phone_number=phone_number,
             school=resolved_school,
+            ward=ward,
+            national_exam_subject=national_exam_subject,
+            exam_block=exam_block,
+            candidate_number=candidate_number,
+            visible_password=raw_password or None,
         ) or changed
         changed = _ensure_candidate_role(user=user, role=candidate_role) or changed
 
@@ -211,15 +288,17 @@ def _import_group_member_row(*, group, row, candidate_role):
         email=email,
         date_of_birth=date_of_birth,
         student_class=student_class,
+        username=username,
     )
     resolved_email = email or f"{username}@student.local"
     if not _is_email_available(email=resolved_email):
         raise ValueError(f"email already belongs to another user: {resolved_email}")
+    resolved_password = raw_password or username
 
     user = user_model.objects.create_user(
         username=username,
         email=resolved_email,
-        password=username,
+        password=resolved_password,
         full_name=full_name,
         status=user_model.Status.ACTIVE,
     )
@@ -231,6 +310,11 @@ def _import_group_member_row(*, group, row, candidate_role):
         student_class=student_class,
         phone_number=phone_number,
         school=explicit_school,
+        ward=ward,
+        national_exam_subject=national_exam_subject,
+        exam_block=exam_block,
+        candidate_number=candidate_number,
+        visible_password=resolved_password,
     )
     _ensure_candidate_role(user=user, role=candidate_role)
     GroupMembership.objects.get_or_create(group=group, user=user, defaults={"is_active": True})

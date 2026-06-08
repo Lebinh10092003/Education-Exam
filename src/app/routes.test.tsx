@@ -58,6 +58,7 @@ describe("route configuration", () => {
     expect(matchRoutes(routeConfig, "/")).toBeTruthy();
     expect(matchRoutes(routeConfig, "/reset-password")).toBeTruthy();
     expect(matchRoutes(routeConfig, "/users")).toBeTruthy();
+    expect(matchRoutes(routeConfig, "/groups/7/members")).toBeTruthy();
     expect(matchRoutes(routeConfig, "/materials")).toBeTruthy();
     expect(matchRoutes(routeConfig, "/manual-grading")).toBeTruthy();
     expect(matchRoutes(routeConfig, "/notifications")).toBeTruthy();

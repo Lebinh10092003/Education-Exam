@@ -108,6 +108,11 @@ class Profile(TimeStampedModel):
     cccd = models.CharField(max_length=32, null=True, blank=True, unique=True)
     date_of_birth = models.DateField(null=True, blank=True)
     student_class = models.CharField(max_length=64, blank=True)
+    ward = models.CharField(max_length=255, blank=True)
+    national_exam_subject = models.CharField(max_length=255, blank=True)
+    exam_block = models.CharField(max_length=64, blank=True)
+    candidate_number = models.CharField(max_length=64, blank=True)
+    visible_password = models.CharField(max_length=255, blank=True)
     school = models.ForeignKey(
         "institutions.School",
         null=True,
