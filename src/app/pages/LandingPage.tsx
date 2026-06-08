@@ -257,8 +257,10 @@ export function LandingPage() {
       </header>
 
       <main>
-        <section className="relative overflow-hidden border-b border-slate-200 bg-slate-50 dark:border-slate-800 dark:bg-slate-950">
-          <div className="mx-auto grid max-w-7xl gap-12 px-4 py-16 sm:px-6 sm:py-20 lg:grid-cols-[1.05fr_0.95fr] lg:items-center lg:px-8 lg:py-24">
+        <section className="relative overflow-hidden border-b border-slate-200 bg-slate-50 dark:border-slate-800 dark:bg-slate-950 min-h-[600px] flex items-center">
+          <div className="absolute inset-0 z-0 pointer-events-none opacity-45 dark:opacity-20 bg-no-repeat bg-cover bg-center" style={{ backgroundImage: 'url("/hero-bg.png")' }} />
+          <div className="absolute inset-0 bg-gradient-to-tr from-white via-white/85 to-white/10 dark:from-slate-950 dark:via-slate-950/90 dark:to-slate-950/20 z-0 pointer-events-none" />
+          <div className="relative z-10 mx-auto grid max-w-7xl gap-12 px-4 py-16 sm:px-6 sm:py-20 lg:grid-cols-[1.05fr_0.95fr] lg:items-center lg:px-8 lg:py-24 w-full">
             <div>
               <div className="inline-flex items-center gap-2 rounded-full border border-blue-200 bg-white px-3 py-1 text-xs font-bold text-blue-800 shadow-sm dark:border-blue-800 dark:bg-blue-950/50 dark:text-blue-200">
                 <Sparkles className="h-3.5 w-3.5" />
@@ -272,7 +274,7 @@ export function LandingPage() {
               </p>
 
               <div className="mt-8 flex flex-col gap-3 sm:flex-row">
-                <Button asChild size="lg" className="rounded-lg bg-blue-700 px-6 text-white hover:bg-blue-800">
+                <Button asChild size="lg" className="rounded-lg bg-blue-700 px-6 text-white hover:bg-blue-800 transition-all duration-200 hover:shadow-lg hover:shadow-blue-700/20">
                   <a href={REGISTRATION_URL} target="_blank" rel="noreferrer">
                     {t("hero.ctaRegister")}
                     <ExternalLink className="ml-2 h-4 w-4" />
@@ -281,7 +283,7 @@ export function LandingPage() {
                 <Button
                   size="lg"
                   variant="outline"
-                  className="rounded-lg border-slate-300 bg-white px-6 dark:bg-slate-950"
+                  className="rounded-lg border-slate-300 bg-white px-6 dark:bg-slate-950 transition-all duration-200 hover:border-slate-400"
                   onClick={() => scrollToId("competitions")}
                 >
                   {t("hero.ctaExplore")}
@@ -298,7 +300,7 @@ export function LandingPage() {
                   ["3", t("hero.statsPartners")],
                   ["1-12", t("hero.statsGrades")],
                 ].map(([value, label]) => (
-                  <div key={label} className="rounded-lg border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
+                  <div key={label} className="rounded-lg border border-slate-200 bg-white/85 backdrop-blur-sm p-4 dark:border-slate-800/70 dark:bg-slate-900/50 transition duration-300 hover:shadow-md hover:-translate-y-0.5 hover:border-blue-400 dark:hover:border-blue-500">
                     <p className="text-2xl font-bold text-blue-700 dark:text-blue-300">{value}</p>
                     <p className="mt-1 text-xs font-semibold text-slate-600 dark:text-slate-400">{label}</p>
                   </div>
@@ -307,7 +309,7 @@ export function LandingPage() {
             </div>
 
             <div className="relative">
-              <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-xl shadow-slate-200/60 dark:border-slate-800 dark:bg-slate-900 dark:shadow-none">
+              <div className="rounded-lg border border-slate-200 bg-white/70 backdrop-blur-md p-5 shadow-xl shadow-slate-200/50 dark:border-slate-800/80 dark:bg-slate-900/60 dark:shadow-none transition-all duration-300 hover:shadow-2xl hover:-translate-y-1">
                 <div className="flex items-start justify-between gap-4 border-b border-slate-100 pb-5 dark:border-slate-800">
                   <div>
                     <p className="text-xs font-bold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
@@ -358,31 +360,55 @@ export function LandingPage() {
           </div>
         </section>
 
-        <section id="partners" className="border-b border-slate-200 py-14 dark:border-slate-800">
+        <section id="partners" className="border-b border-slate-200 py-16 dark:border-slate-800">
           <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
             <SectionHeading title={t("partners.title")} subtitle={t("partners.subtitle")} />
-            <div className="mt-10 grid gap-4 md:grid-cols-3">
-              {partnerItems.map((partner) => (
-                <a
-                  key={partner.key}
-                  href={partner.href}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="rounded-lg border border-slate-200 bg-white p-5 transition hover:-translate-y-0.5 hover:border-blue-300 hover:shadow-md dark:border-slate-800 dark:bg-slate-900"
-                >
-                  <div className="flex items-start gap-4">
-                    <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-white p-1 border border-slate-200 shadow-sm">
-                      <img src={partner.logo} alt={partner.initials} className="h-full w-full object-contain" />
-                    </div>
+            <div className="mt-10 grid gap-8 lg:grid-cols-3">
+              {partnerItems.map((partner) => {
+                const points = t(`partners.${partner.key}.points`, { returnObjects: true }) as string[];
+
+                return (
+                  <div
+                    key={partner.key}
+                    className="rounded-xl border border-slate-200/80 bg-white/70 backdrop-blur-md p-6 shadow-lg hover:shadow-2xl hover:-translate-y-1 transition-all duration-300 dark:border-slate-800/80 dark:bg-slate-900/60 flex flex-col justify-between"
+                  >
                     <div>
-                      <h3 className="font-bold text-slate-950 dark:text-white">{t(`partners.${partner.key}.name`)}</h3>
-                      <p className="mt-2 text-sm leading-6 text-slate-600 dark:text-slate-300">
+                      <div className="flex items-center gap-4 border-b border-slate-100 pb-4 dark:border-slate-800">
+                        <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-xl bg-white p-2 border border-slate-200 shadow-sm">
+                          <img src={partner.logo} alt={partner.initials} className="h-full w-full object-contain" />
+                        </div>
+                        <div>
+                          <h3 className="text-lg font-bold text-slate-950 dark:text-white leading-tight">
+                            {t(`partners.${partner.key}.name`)}
+                          </h3>
+                          <a
+                            href={partner.href}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="mt-1 text-xs font-semibold text-blue-700 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 inline-flex items-center gap-1"
+                          >
+                            Visit website
+                            <ExternalLink className="h-3 w-3" />
+                          </a>
+                        </div>
+                      </div>
+
+                      <p className="mt-4 text-sm font-semibold leading-relaxed text-slate-800 dark:text-slate-200">
                         {t(`partners.${partner.key}.desc`)}
                       </p>
+
+                      <ul className="mt-5 space-y-3">
+                        {Array.isArray(points) && points.map((point, idx) => (
+                          <li key={idx} className="flex gap-2.5 items-start text-xs text-slate-600 dark:text-slate-300">
+                            <CheckCircle className="h-4 w-4 shrink-0 text-emerald-600 dark:text-emerald-500 mt-0.5" />
+                            <span className="leading-normal">{point}</span>
+                          </li>
+                        ))}
+                      </ul>
                     </div>
                   </div>
-                </a>
-              ))}
+                );
+              })}
             </div>
           </div>
         </section>

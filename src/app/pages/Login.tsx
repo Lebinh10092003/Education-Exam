@@ -80,8 +80,11 @@ export function Login() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-950 dark:bg-slate-950 dark:text-slate-100">
-      <header className="border-b border-slate-200 bg-white/95 backdrop-blur dark:border-slate-800 dark:bg-slate-950/90">
+    <div className="min-h-screen bg-slate-50 text-slate-950 dark:bg-slate-950 dark:text-slate-100 relative overflow-hidden flex flex-col justify-between">
+      <div className="absolute inset-0 z-0 pointer-events-none opacity-30 dark:opacity-10 bg-no-repeat bg-cover bg-center" style={{ backgroundImage: 'url("/login-bg.png")' }} />
+      <div className="absolute inset-0 bg-gradient-to-b from-white/95 via-white/80 to-white/95 dark:from-slate-950/95 dark:via-slate-950/85 dark:to-slate-950/95 z-0 pointer-events-none" />
+
+      <header className="relative z-10 border-b border-slate-200 bg-white/90 backdrop-blur-md dark:border-slate-800 dark:bg-slate-950/80">
         <div className="mx-auto flex h-16 max-w-7xl items-center justify-between gap-4 px-4 sm:px-6 lg:px-8">
           <Link to="/" className="flex items-center gap-3">
             <img src="/fermat-logo.png" alt="FermatTech" className="h-10 w-10 object-contain rounded-lg" />
@@ -94,7 +97,7 @@ export function Login() {
           </Link>
           <div className="flex items-center gap-2">
             <LanguageSwitcher />
-            <Button asChild variant="outline" className="rounded-lg border-slate-300 px-3" aria-label="Trang chủ">
+            <Button asChild variant="outline" className="rounded-lg border-slate-300 px-3 bg-white/50 dark:bg-slate-950/50" aria-label="Trang chủ">
               <Link to="/">
                 <ArrowLeft className="mr-2 h-4 w-4" />
                 <span className="hidden sm:inline">Trang chủ</span>
@@ -104,7 +107,7 @@ export function Login() {
         </div>
       </header>
 
-      <main className="mx-auto grid max-w-7xl gap-8 px-4 py-10 sm:px-6 lg:grid-cols-[0.95fr_1.05fr] lg:px-8 lg:py-16">
+      <main className="relative z-10 mx-auto grid max-w-7xl gap-8 px-4 py-10 sm:px-6 lg:grid-cols-[0.95fr_1.05fr] lg:px-8 lg:py-16 w-full flex-grow items-center">
         <section className="flex flex-col justify-center">
           <div className="inline-flex w-fit items-center gap-2 rounded-full border border-blue-200 bg-white px-3 py-1 text-xs font-bold text-blue-800 shadow-sm dark:border-blue-800 dark:bg-blue-950/50 dark:text-blue-200">
             <ShieldCheck className="h-3.5 w-3.5" />
@@ -121,7 +124,7 @@ export function Login() {
             {partners.map((partner) => (
               <div
                 key={partner.name}
-                className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900 flex flex-col items-start"
+                className="rounded-lg border border-slate-200 bg-white/80 backdrop-blur-sm p-4 shadow-sm dark:border-slate-800/80 dark:bg-slate-900/50 flex flex-col items-start transition duration-200 hover:-translate-y-0.5 hover:shadow-md"
               >
                 <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-white p-1 border border-slate-200">
                   <img src={partner.logo} alt={partner.initials} className="h-full w-full object-contain" />
@@ -131,7 +134,7 @@ export function Login() {
             ))}
           </div>
 
-          <div className="mt-8 rounded-lg border border-blue-200 bg-blue-50 p-6 dark:border-blue-900 dark:bg-blue-950/30">
+          <div className="mt-8 rounded-lg border border-blue-200 bg-blue-50/70 backdrop-blur-sm p-6 dark:border-blue-900/60 dark:bg-blue-950/20">
             <div className="flex items-center gap-3">
               <img src="/fermat-logo.png" className="h-6 w-6 object-contain" alt="FermatTech" />
               <h2 className="text-lg font-black uppercase tracking-wide text-slate-950 dark:text-white">
@@ -146,21 +149,21 @@ export function Login() {
                 href={SUPPORT_ZALO_URL}
                 target="_blank"
                 rel="noreferrer"
-                className="flex items-center justify-between rounded-lg border border-blue-200 bg-white px-4 py-3 text-sm font-bold text-blue-900 hover:border-blue-400 dark:border-blue-800 dark:bg-slate-950 dark:text-blue-200"
+                className="flex items-center justify-between rounded-lg border border-blue-200 bg-white px-4 py-3 text-sm font-bold text-blue-900 hover:border-blue-400 dark:border-blue-800 dark:bg-slate-950 dark:text-blue-200 transition"
               >
                 <span>Zalo OA: {SUPPORT_ZALO_URL}</span>
                 <ExternalLink className="h-4 w-4" />
               </a>
               <a
                 href={`tel:${SUPPORT_PHONE.replace(/\s/g, "")}`}
-                className="flex items-center gap-3 rounded-lg border border-blue-200 bg-white px-4 py-3 text-sm font-bold text-slate-900 hover:border-blue-400 dark:border-blue-800 dark:bg-slate-950 dark:text-white"
+                className="flex items-center gap-3 rounded-lg border border-blue-200 bg-white px-4 py-3 text-sm font-bold text-slate-900 hover:border-blue-400 dark:border-blue-800 dark:bg-slate-950 dark:text-white transition"
               >
                 <Phone className="h-4 w-4 text-blue-700 dark:text-blue-300" />
                 Hotline: {SUPPORT_PHONE}
               </a>
               <a
                 href={`mailto:${SUPPORT_EMAIL}`}
-                className="flex items-center gap-3 rounded-lg border border-blue-200 bg-white px-4 py-3 text-sm font-bold text-slate-900 hover:border-blue-400 dark:border-blue-800 dark:bg-slate-950 dark:text-white"
+                className="flex items-center gap-3 rounded-lg border border-blue-200 bg-white px-4 py-3 text-sm font-bold text-slate-900 hover:border-blue-400 dark:border-blue-800 dark:bg-slate-950 dark:text-white transition"
               >
                 <Mail className="h-4 w-4 text-blue-700 dark:text-blue-300" />
                 Email: {SUPPORT_EMAIL}
@@ -171,7 +174,7 @@ export function Login() {
         </section>
 
         <section className="flex items-center justify-center">
-          <Card className="w-full max-w-md rounded-lg border-slate-200 bg-white shadow-xl dark:border-slate-800 dark:bg-slate-900">
+          <Card className="w-full max-w-md rounded-lg border-slate-200 bg-white/85 backdrop-blur-md shadow-xl dark:border-slate-800/80 dark:bg-slate-900/70">
             <CardHeader className="pb-5 text-center">
               <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-lg bg-blue-700 text-white shadow-sm">
                 <LockKeyhole className="h-7 w-7" />

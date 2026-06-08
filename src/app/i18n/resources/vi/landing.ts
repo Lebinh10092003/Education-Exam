@@ -32,14 +32,29 @@ const landing = {
     schoolConnect: {
       name: "School Connect Online",
       desc: "Olympiad quốc tế, hỗ trợ tiếng Việt, chứng chỉ và giải thưởng cho học sinh Việt Nam.",
+      points: [
+        "Sân chơi Olympiad trực tuyến uy tín cho học sinh từ Lớp 1 đến Lớp 12 trên toàn thế giới.",
+        "Đa dạng lĩnh vực thi: Toán học, Khoa học, Tiếng Anh, Lập trình (Coding), Trí tuệ nhân tạo (AI) và Kỹ năng sống.",
+        "Hỗ trợ hệ thống học tập thông minh: cung cấp đề ôn luyện, bài giảng video và phân tích kết quả học tập chi tiết."
+      ]
     },
     aysbc: {
       name: "AYSBC",
-      desc: "Sân chơi STEM huy hiệu khoa học trẻ Châu Á dành cho học sinh yêu thích khám phá.",
+      desc: "Sân chơi STEM huy hiệu khoa học trẻ Châu Á (Asia Young Scientist Badge Competition) dành cho học sinh yêu thích khám phá.",
+      points: [
+        "Truyền cảm hứng và cấp chứng nhận theo khung chuẩn 'Young Scientist Badge Scheme' từ Trung tâm Khoa học Singapore (Science Centre Singapore).",
+        "Phương pháp học tập trải nghiệm thực tế: tự chọn chủ đề nghiên cứu (côn trùng, thực vật, thực phẩm...) và hoàn thành các thử thách.",
+        "Cơ hội tham gia Vòng Chung kết khu vực (Regional Round) trực tiếp tại Singapore cho các học sinh đạt thành tích cao."
+      ]
     },
     fermatTech: {
       name: "FermatTech",
       desc: "Đại diện và đối tác triển khai tại Việt Nam, tập trung chuyển đổi số giáo dục và AI.",
+      points: [
+        "Đại diện và đối tác độc quyền triển khai các kỳ thi quốc tế của SCO và AYSBC tại thị trường Việt Nam.",
+        "Đi đầu trong chuyển đổi số giáo dục, ứng dụng công nghệ AI và nền tảng khảo thí trực tuyến thông minh, bảo mật.",
+        "Đơn vị cầu nối hỗ trợ phụ huynh, học sinh và nhà trường trong việc đăng ký, cung cấp tài liệu và giải quyết thắc mắc."
+      ]
     },
   },
   categories: {

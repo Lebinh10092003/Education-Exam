@@ -32,14 +32,29 @@ const landing = {
     schoolConnect: {
       name: "School Connect Online",
       desc: "International Olympiads with Vietnamese support, certificates, and awards for students in Vietnam.",
+      points: [
+        "A prestigious online Olympiad platform for students from Grades 1 to 12 worldwide.",
+        "Wide range of subjects: Mathematics, Science, English, Coding, Artificial Intelligence (AI), and Life Skills.",
+        "Smart preparation ecosystem with mock tests, video lectures, and student performance analytics."
+      ]
     },
     aysbc: {
       name: "AYSBC",
-      desc: "An Asian young scientist badge STEM competition for curious students.",
+      desc: "An Asian young scientist badge STEM competition (Asia Young Scientist Badge Competition) for curious students.",
+      points: [
+        "Inspired by the prestigious 'Young Scientist Badge Scheme' from the Science Centre Singapore.",
+        "Practical task-based learning: students choose age-appropriate science badges (Entomologist, Botanist, Food Scientist...) and complete challenges.",
+        "Opportunity to attend the Regional Round directly at the Science Centre Singapore for high achievers."
+      ]
     },
     fermatTech: {
       name: "FermatTech",
       desc: "Vietnam representative and implementation partner focused on education digital transformation and AI.",
+      points: [
+        "Official exclusive representative and implementation partner for SCO and AYSBC in the Vietnam market.",
+        "Pioneer in education digital transformation, applying AI proctoring and secure, user-friendly online exam systems.",
+        "Dedicated local support system assisting schools, parents, and students with registration, guidebooks, and mock materials."
+      ]
     },
   },
   categories: {
