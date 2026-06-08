@@ -124,7 +124,7 @@ export function ExamAssignment() {
         },
       });
       await Promise.all([examDetails.reload(), groupsList.reload()]);
-      notify.success("Assignments saved.");
+      notify.success(isClass ? "Đã gán học viên vào lớp." : "Đã gán nhóm thí sinh vào kỳ thi.");
       navigate("/exams");
     });
   };
@@ -166,13 +166,13 @@ export function ExamAssignment() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title={isClass ? "Assign Class" : "Assign Exam"}
+        title={isClass ? "Gán học viên vào lớp" : "Gán nhóm thí sinh vào kỳ thi"}
         description={
           exam
-            ? `${exam.name} • ${exam.subject.name} • ${exam.assignment_summary.total_candidates} total ${isClass ? "learners" : "candidates"}`
+            ? `${exam.name} • ${exam.subject.name} • ${exam.assignment_summary.total_candidates} ${isClass ? "học viên" : "thí sinh"}`
             : isClass
-              ? "Load class enrollment targets"
-              : "Load exam assignment targets"
+              ? "Tải danh sách nhóm học viên"
+              : "Tải danh sách nhóm thí sinh"
         }
         action={
           <Button
@@ -181,10 +181,10 @@ export function ExamAssignment() {
           >
             <UserPlus className="mr-2 h-4 w-4" />
             {assignmentMutation.isSubmitting
-              ? "Saving..."
+              ? "Đang lưu..."
               : isClass
-                ? "Save Enrollment"
-                : "Save Group Assignment"}
+                ? "Lưu gán học viên"
+                : "Lưu gán nhóm thí sinh"}
           </Button>
         }
       />
@@ -201,7 +201,7 @@ export function ExamAssignment() {
             <div className="relative max-w-md">
               <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
               <Input
-                placeholder="Search groups..."
+                placeholder="Tìm nhóm..."
                 value={searchQuery}
                 onChange={(event) => setSearchQuery(event.target.value)}
                 className="pl-10"
@@ -212,10 +212,10 @@ export function ExamAssignment() {
           <div className="space-y-3">
             {groupsList.isLoading ? (
               <div className="py-12 text-center text-sm text-gray-500">
-                {isClass ? "Loading class enrollment groups..." : "Loading group assignments..."}
+                {isClass ? "Đang tải nhóm học viên..." : "Đang tải nhóm thí sinh..."}
               </div>
             ) : groups.length === 0 ? (
-              <div className="py-12 text-center text-sm text-gray-500">No groups matched the current search.</div>
+              <div className="py-12 text-center text-sm text-gray-500">Không có nhóm nào phù hợp.</div>
             ) : (
               groups.map((group) => (
                 <label
@@ -229,10 +229,10 @@ export function ExamAssignment() {
                   <div className="flex-1">
                     <div className="flex items-center gap-2">
                       <p className="font-medium text-gray-900">{group.name}</p>
-                      {group.assigned && <Badge variant="outline">Assigned</Badge>}
+                      {group.assigned && <Badge variant="outline">Đã gán</Badge>}
                     </div>
                     <p className="text-sm text-gray-500">
-                      {group.member_count} members
+                      {group.member_count} thành viên
                     </p>
                   </div>
                 </label>
@@ -245,7 +245,7 @@ export function ExamAssignment() {
       <Card>
         <CardHeader className="space-y-2">
           <CardTitle>
-            {isClass ? "Import Students Directly To This Class" : "Import Students Directly To This Exam"}
+            {isClass ? "Import học viên trực tiếp vào lớp" : "Import thí sinh trực tiếp vào kỳ thi"}
           </CardTitle>
           <p className="text-sm text-gray-600">
             Upload a CSV to create or update `student` accounts by CCCD, then assign them straight
@@ -306,7 +306,7 @@ export function ExamAssignment() {
                   <p className="mt-1 text-2xl font-semibold text-gray-900">{importSummary.updated_users}</p>
                 </div>
                 <div className="rounded-lg border border-gray-200 bg-gray-50 p-3">
-                  <p className="text-xs uppercase tracking-wide text-gray-500">Assigned</p>
+                  <p className="text-xs uppercase tracking-wide text-gray-500">Đã gán</p>
                   <p className="mt-1 text-2xl font-semibold text-gray-900">{importSummary.assigned_users}</p>
                 </div>
                 <div className="rounded-lg border border-gray-200 bg-gray-50 p-3">

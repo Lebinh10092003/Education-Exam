@@ -64,6 +64,7 @@ describe("route configuration", () => {
     expect(matchRoutes(routeConfig, "/notifications")).toBeTruthy();
     expect(matchRoutes(routeConfig, "/audit")).toBeTruthy();
     expect(matchRoutes(routeConfig, "/roles-permissions")).toBeTruthy();
+    expect(matchRoutes(routeConfig, "/results/9/review")).toBeTruthy();
     expect(matchRoutes(routeConfig, "/exams/monitoring")?.at(-1)?.route.path).toBe("exams/monitoring");
     expect(matchRoutes(routeConfig, "/exams/42")).toBeTruthy();
     expect(matchRoutes(routeConfig, "/exams/42/monitor")).toBeTruthy();

@@ -56,6 +56,7 @@ const PracticeSessionRoute = lazyRoute(() => import("./pages/PracticeSession"), 
 const PracticeReviewRoute = lazyRoute(() => import("./pages/PracticeReview"), "PracticeReview");
 const MaterialsLibraryRoute = lazyRoute(() => import("./pages/MaterialsLibrary"), "MaterialsLibrary");
 const ResultsReportsRoute = lazyRoute(() => import("./pages/ResultsReports"), "ResultsReports");
+const AdminResultReviewRoute = lazyRoute(() => import("./pages/AdminResultReview"), "AdminResultReview");
 const DisciplinaryManagementRoute = lazyRoute(
   () => import("./pages/DisciplinaryManagement"),
   "DisciplinaryManagement",
@@ -113,6 +114,7 @@ export const routeConfig = [
       { path: "manual-grading", Component: ManualGradingRoute },
       { path: "materials", Component: MaterialsLibraryRoute },
       { path: "results", Component: ResultsReportsRoute },
+      { path: "results/:id/review", Component: AdminResultReviewRoute },
       { path: "discipline", Component: DisciplinaryManagementRoute },
       { path: "discipline/exams/:id", Component: DisciplinaryExamSheetRoute },
       { path: "roles-permissions", Component: RolesPermissionsRoute },

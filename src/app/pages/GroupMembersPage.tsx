@@ -290,7 +290,7 @@ export function GroupMembersPage() {
       }
       setCandidateFormState(nextFormState);
     } catch (error) {
-      notify.error(error instanceof Error ? error.message : "Khong the tai thong tin thi sinh.");
+      notify.error(error instanceof Error ? error.message : "Không thể tải thông tin thí sinh.");
       setCandidateDialogMode(null);
       setEditingUserId(null);
     }
@@ -340,15 +340,15 @@ export function GroupMembersPage() {
       return;
     }
     if (!candidateFormState.full_name.trim()) {
-      notify.error("Ho ten la bat buoc.");
+      notify.error("Họ tên là bắt buộc.");
       return;
     }
     if (!candidateFormState.username.trim()) {
-      notify.error("Tai khoan la bat buoc.");
+      notify.error("Tài khoản là bắt buộc.");
       return;
     }
     if (candidateDialogMode === "create" && !candidateFormState.password.trim()) {
-      notify.error("Mat khau la bat buoc khi tao thi sinh moi.");
+      notify.error("Mật khẩu là bắt buộc khi tạo thí sinh mới.");
       return;
     }
 
@@ -365,13 +365,13 @@ export function GroupMembersPage() {
             is_active: true,
           },
         });
-        notify.success("Da tao thi sinh va them vao nhom.");
+        notify.success("Đã tạo thí sinh và thêm vào nhóm.");
       } else if (editingUserId) {
         await apiRequest(`/api/v1/users/${editingUserId}/`, {
           method: "PATCH",
           body: buildCandidatePayload(false),
         });
-        notify.success("Da cap nhat thong tin thi sinh.");
+        notify.success("Đã cập nhật thông tin thí sinh.");
       }
 
       closeCandidateDialog(false);
@@ -384,9 +384,9 @@ export function GroupMembersPage() {
       return;
     }
     const confirmed = await notify.confirm({
-      title: "Bo thi sinh khoi nhom?",
-      text: `Bo "${member.full_name}" khoi nhom "${group?.name ?? ""}"?`,
-      confirmText: "Bo khoi nhom",
+      title: "Bỏ thí sinh khỏi nhóm?",
+      text: `Bỏ "${member.full_name}" khỏi nhóm "${group?.name ?? ""}"?`,
+      confirmText: "Bỏ khỏi nhóm",
       confirmButtonColor: "#dc2626",
     });
     if (!confirmed) {
@@ -399,15 +399,15 @@ export function GroupMembersPage() {
         query: { user_id: member.user_id },
       });
       await reloadRoster();
-      notify.success("Da bo thi sinh khoi nhom.");
+      notify.success("Đã bỏ thí sinh khỏi nhóm.");
     });
   };
 
   const deleteCandidateAccount = async (member: GroupMembershipRecord) => {
     const confirmed = await notify.confirm({
-      title: "Xoa tai khoan thi sinh?",
-      text: `Tai khoan "${member.full_name}" se bi xoa vinh vien khoi he thong.`,
-      confirmText: "Xoa tai khoan",
+      title: "Xóa tài khoản thí sinh?",
+      text: `Tài khoản "${member.full_name}" sẽ bị xóa vĩnh viễn khỏi hệ thống.`,
+      confirmText: "Xóa tài khoản",
       confirmButtonColor: "#dc2626",
     });
     if (!confirmed) {
@@ -419,7 +419,7 @@ export function GroupMembersPage() {
         method: "DELETE",
       });
       await reloadRoster();
-      notify.success("Da xoa tai khoan thi sinh.");
+      notify.success("Đã xóa tài khoản thí sinh.");
     });
   };
 
@@ -446,8 +446,8 @@ export function GroupMembersPage() {
       await reloadRoster();
       notify.success(
         summary.failed_rows
-          ? `Import ${summary.assigned_users} thanh vien, co ${summary.failed_rows} dong loi.`
-          : `Da import ${summary.assigned_users} thanh vien.`,
+          ? `Import ${summary.assigned_users} thành viên, có ${summary.failed_rows} dòng lỗi.`
+          : `Đã import ${summary.assigned_users} thành viên.`,
       );
     });
   };
@@ -455,19 +455,19 @@ export function GroupMembersPage() {
   return (
     <div>
       <PageHeader
-        title={group ? `Thanh vien - ${group.name}` : "Thanh vien nhom"}
-        description="Danh sach thi sinh day du thong tin, tai khoan va mat khau cho quan tri vien."
+        title={group ? `Thành viên - ${group.name}` : "Thành viên nhóm"}
+        description="Danh sách thí sinh đầy đủ thông tin, tài khoản và mật khẩu cho quản trị viên."
         action={
           <>
             <Button asChild variant="outline">
               <Link to="/groups">
                 <ArrowLeft className="h-4 w-4" />
-                Ve danh sach nhom
+                Về danh sách nhóm
               </Link>
             </Button>
             <Button onClick={openCreateCandidateDialog}>
               <Plus className="h-4 w-4" />
-              Them thi sinh
+              Thêm thí sinh
             </Button>
           </>
         }
@@ -485,7 +485,7 @@ export function GroupMembersPage() {
             <div className="relative min-w-0 flex-1">
               <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
               <Input
-                placeholder="Tim theo ten, email, tai khoan, SBD, truong..."
+                placeholder="Tìm theo tên, email, tài khoản, SBD, trường..."
                 className="pl-10"
                 value={searchQuery}
                 onChange={(event) => setSearchQuery(event.target.value)}
@@ -493,16 +493,16 @@ export function GroupMembersPage() {
             </div>
             <Badge variant="outline" className="w-fit">
               <Users className="mr-1 h-4 w-4" />
-              {totalCount} thanh vien
+              {totalCount} thành viên
             </Badge>
           </div>
 
           <div className="rounded-lg border border-dashed border-blue-200 bg-blue-50/60 p-4">
             <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
               <div className="min-w-0">
-                <h3 className="text-sm font-semibold text-gray-900">Import thanh vien tu CSV</h3>
+                <h3 className="text-sm font-semibold text-gray-900">Import thành viên từ CSV</h3>
                 <p className="mt-1 text-xs text-gray-600">
-                  Ho tro cac cot: full_name, username, password, date_of_birth, school_code,
+                  Hỗ trợ các cột: full_name, username, password, date_of_birth, school_code,
                   ward, national_exam_subject, exam_block, candidate_number, email, phone_number.
                 </p>
               </div>
@@ -522,29 +522,29 @@ export function GroupMembersPage() {
                 className="lg:w-auto"
               >
                 <Upload className="h-4 w-4" />
-                {mutation.isSubmitting && importFile ? "Dang import..." : "Import CSV"}
+                {mutation.isSubmitting && importFile ? "Đang import..." : "Import CSV"}
               </Button>
             </div>
             {importFile ? (
-              <p className="mt-2 text-xs text-gray-500">File da chon: {importFile.name}</p>
+              <p className="mt-2 text-xs text-gray-500">File đã chọn: {importFile.name}</p>
             ) : null}
           </div>
 
           {importSummary ? (
             <div className="rounded-lg border border-gray-200 bg-gray-50 p-4">
               <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                <h3 className="text-sm font-semibold text-gray-900">Ket qua import gan nhat</h3>
+                <h3 className="text-sm font-semibold text-gray-900">Kết quả import gần nhất</h3>
                 <Badge variant={importSummary.failed_rows ? "secondary" : "outline"}>
-                  {importSummary.failed_rows ? `${importSummary.failed_rows} dong loi` : "Thanh cong"}
+                  {importSummary.failed_rows ? `${importSummary.failed_rows} dòng lỗi` : "Thành công"}
                 </Badge>
               </div>
               <div className="mt-3 grid grid-cols-2 gap-3 text-sm text-gray-600 md:grid-cols-3">
-                <div>Tong dong: <strong>{importSummary.total_rows}</strong></div>
-                <div>Tao moi: <strong>{importSummary.created_users}</strong></div>
-                <div>Cap nhat: <strong>{importSummary.updated_users}</strong></div>
-                <div>Gan nhom: <strong>{importSummary.assigned_users}</strong></div>
-                <div>Bo qua: <strong>{importSummary.skipped_rows}</strong></div>
-                <div>Loi: <strong>{importSummary.failed_rows}</strong></div>
+                <div>Tổng dòng: <strong>{importSummary.total_rows}</strong></div>
+                <div>Tạo mới: <strong>{importSummary.created_users}</strong></div>
+                <div>Cập nhật: <strong>{importSummary.updated_users}</strong></div>
+                <div>Gán nhóm: <strong>{importSummary.assigned_users}</strong></div>
+                <div>Bỏ qua: <strong>{importSummary.skipped_rows}</strong></div>
+                <div>Lỗi: <strong>{importSummary.failed_rows}</strong></div>
               </div>
               {importSummary.errors.length ? (
                 <div className="mt-4 max-h-40 space-y-2 overflow-y-auto">
@@ -569,31 +569,31 @@ export function GroupMembersPage() {
             <TableHeader>
               <TableRow>
                 <TableHead className="w-16 px-4">STT</TableHead>
-                <TableHead className="min-w-56">Ho ten</TableHead>
-                <TableHead className="min-w-32">Ngay sinh</TableHead>
-                <TableHead className="min-w-56">Truong</TableHead>
-                <TableHead className="min-w-36">Xa/Phuong</TableHead>
-                <TableHead className="min-w-44">Mon thi quoc gia</TableHead>
-                <TableHead className="min-w-28">Khoi thi</TableHead>
+                <TableHead className="min-w-56">Họ tên</TableHead>
+                <TableHead className="min-w-32">Ngày sinh</TableHead>
+                <TableHead className="min-w-56">Trường</TableHead>
+                <TableHead className="min-w-36">Xã/Phường</TableHead>
+                <TableHead className="min-w-44">Môn thi đăng ký</TableHead>
+                <TableHead className="min-w-28">Khối thi</TableHead>
                 <TableHead className="min-w-28">SBD</TableHead>
-                <TableHead className="min-w-56">Email lien lac</TableHead>
-                <TableHead className="min-w-36">SDT lien lac</TableHead>
-                <TableHead className="min-w-36">Tai khoan</TableHead>
-                <TableHead className="min-w-36">Mat khau</TableHead>
-                <TableHead className="min-w-40 text-right">Thao tac</TableHead>
+                <TableHead className="min-w-56">Email liên lạc</TableHead>
+                <TableHead className="min-w-36">SĐT liên lạc</TableHead>
+                <TableHead className="min-w-36">Tài khoản</TableHead>
+                <TableHead className="min-w-36">Mật khẩu</TableHead>
+                <TableHead className="min-w-40 text-right">Thao tác</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {membershipsList.isLoading ? (
                 <TableRow>
                   <TableCell colSpan={13} className="h-32 text-center text-sm text-gray-500">
-                    Dang tai danh sach thanh vien...
+                    Đang tải danh sách thành viên...
                   </TableCell>
                 </TableRow>
               ) : memberships.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={13} className="h-32 text-center text-sm text-gray-500">
-                    Chua co thanh vien nao phu hop.
+                    Chưa có thành viên nào phù hợp.
                   </TableCell>
                 </TableRow>
               ) : (
@@ -623,7 +623,7 @@ export function GroupMembersPage() {
                           variant="ghost"
                           size="sm"
                           className="h-8 w-8 p-0"
-                          title="Xem chi tiet"
+                          title="Xem chi tiết"
                           onClick={() => void loadCandidateForDialog(member.user_id, "detail")}
                         >
                           <Eye className="h-4 w-4 text-slate-600" />
@@ -632,7 +632,7 @@ export function GroupMembersPage() {
                           variant="ghost"
                           size="sm"
                           className="h-8 w-8 p-0"
-                          title="Sua thi sinh"
+                          title="Sửa thí sinh"
                           onClick={() => void loadCandidateForDialog(member.user_id, "edit")}
                         >
                           <Edit className="h-4 w-4 text-blue-600" />
@@ -641,7 +641,7 @@ export function GroupMembersPage() {
                           variant="ghost"
                           size="sm"
                           className="h-8 w-8 p-0"
-                          title="Bo khoi nhom"
+                          title="Bỏ khỏi nhóm"
                           onClick={() => void removeMember(member)}
                           disabled={mutation.isSubmitting}
                         >
@@ -651,7 +651,7 @@ export function GroupMembersPage() {
                           variant="ghost"
                           size="sm"
                           className="h-8 w-8 p-0"
-                          title="Xoa tai khoan"
+                          title="Xóa tài khoản"
                           onClick={() => void deleteCandidateAccount(member)}
                           disabled={mutation.isSubmitting}
                         >
@@ -669,7 +669,7 @@ export function GroupMembersPage() {
 
       <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <p className="text-sm text-gray-600">
-          Hien thi <strong>{rangeStart}-{rangeEnd}</strong> tren <strong>{totalCount}</strong> thanh vien
+          Hiển thị <strong>{rangeStart}-{rangeEnd}</strong> trên <strong>{totalCount}</strong> thành viên
         </p>
         <div className="flex gap-2">
           <Button
@@ -699,19 +699,19 @@ export function GroupMembersPage() {
           <DialogHeader>
             <DialogTitle>
               {candidateDialogMode === "create"
-                ? "Them thi sinh"
+                ? "Thêm thí sinh"
                 : candidateDialogMode === "edit"
-                  ? "Sua thong tin thi sinh"
-                  : "Chi tiet thi sinh"}
+                  ? "Sửa thông tin thí sinh"
+                  : "Chi tiết thí sinh"}
             </DialogTitle>
             <DialogDescription>
-              Quan tri vien co the xem tai khoan, mat khau va cap nhat thong tin thanh vien.
+              Quản trị viên có thể xem tài khoản, mật khẩu và cập nhật thông tin thành viên.
             </DialogDescription>
           </DialogHeader>
 
           <div className="grid gap-4 py-4 md:grid-cols-2">
             <div>
-              <Label htmlFor="candidate-full-name">Ho ten</Label>
+              <Label htmlFor="candidate-full-name">Họ tên</Label>
               <Input
                 id="candidate-full-name"
                 className="mt-2"
@@ -726,7 +726,7 @@ export function GroupMembersPage() {
               />
             </div>
             <div>
-              <Label htmlFor="candidate-date-of-birth">Ngay sinh</Label>
+              <Label htmlFor="candidate-date-of-birth">Ngày sinh</Label>
               <Input
                 id="candidate-date-of-birth"
                 type="date"
@@ -742,7 +742,7 @@ export function GroupMembersPage() {
               />
             </div>
             <div>
-              <Label htmlFor="candidate-school">Truong</Label>
+              <Label htmlFor="candidate-school">Trường</Label>
               <Select
                 value={candidateFormState.school_id}
                 disabled={isDialogReadonly}
@@ -751,10 +751,10 @@ export function GroupMembersPage() {
                 }
               >
                 <SelectTrigger id="candidate-school" className="mt-2">
-                  <SelectValue placeholder="Chon truong" />
+                  <SelectValue placeholder="Chọn trường" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="none">Khong gan truong</SelectItem>
+                  <SelectItem value="none">Không gán trường</SelectItem>
                   {schools.map((school) => (
                     <SelectItem key={school.id} value={String(school.id)}>
                       {school.name} ({school.code})
@@ -764,7 +764,7 @@ export function GroupMembersPage() {
               </Select>
             </div>
             <div>
-              <Label htmlFor="candidate-ward">Xa/Phuong</Label>
+              <Label htmlFor="candidate-ward">Xã/Phường</Label>
               <Input
                 id="candidate-ward"
                 className="mt-2"
@@ -776,7 +776,7 @@ export function GroupMembersPage() {
               />
             </div>
             <div>
-              <Label htmlFor="candidate-national-subject">Mon thi quoc gia</Label>
+              <Label htmlFor="candidate-national-subject">Môn thi đăng ký</Label>
               <Input
                 id="candidate-national-subject"
                 className="mt-2"
@@ -791,7 +791,7 @@ export function GroupMembersPage() {
               />
             </div>
             <div>
-              <Label htmlFor="candidate-exam-block">Khoi thi</Label>
+              <Label htmlFor="candidate-exam-block">Khối thi</Label>
               <Input
                 id="candidate-exam-block"
                 className="mt-2"
@@ -821,7 +821,7 @@ export function GroupMembersPage() {
               />
             </div>
             <div>
-              <Label htmlFor="candidate-email">Email lien lac</Label>
+              <Label htmlFor="candidate-email">Email liên lạc</Label>
               <Input
                 id="candidate-email"
                 className="mt-2"
@@ -833,7 +833,7 @@ export function GroupMembersPage() {
               />
             </div>
             <div>
-              <Label htmlFor="candidate-phone">SDT lien lac</Label>
+              <Label htmlFor="candidate-phone">SĐT liên lạc</Label>
               <Input
                 id="candidate-phone"
                 className="mt-2"
@@ -848,7 +848,7 @@ export function GroupMembersPage() {
               />
             </div>
             <div>
-              <Label htmlFor="candidate-username">Tai khoan</Label>
+              <Label htmlFor="candidate-username">Tài khoản</Label>
               <Input
                 id="candidate-username"
                 className="mt-2 font-mono"
@@ -864,7 +864,7 @@ export function GroupMembersPage() {
             </div>
             <div>
               <Label htmlFor="candidate-password">
-                {candidateDialogMode === "edit" ? "Mat khau moi" : "Mat khau"}
+                {candidateDialogMode === "edit" ? "Mật khẩu mới" : "Mật khẩu"}
               </Label>
               <Input
                 id="candidate-password"
@@ -874,8 +874,8 @@ export function GroupMembersPage() {
                 disabled={isDialogReadonly}
                 placeholder={
                   candidateDialogMode === "edit"
-                    ? "De trong neu khong doi"
-                    : "Nhap mat khau"
+                    ? "Để trống nếu không đổi"
+                    : "Nhập mật khẩu"
                 }
                 onChange={(event) =>
                   setCandidateFormState((previous) => ({
@@ -886,7 +886,7 @@ export function GroupMembersPage() {
               />
               {candidateDialogMode === "detail" ? (
                 <p className="mt-2 text-xs text-gray-500">
-                  Mat khau hien thi trong bang roster. Neu tai khoan cu chua co du lieu, o nay co the trong.
+                  Mật khẩu hiển thị trong bảng roster. Nếu tài khoản cũ chưa có dữ liệu, ô này có thể trống.
                 </p>
               ) : null}
             </div>
@@ -898,7 +898,7 @@ export function GroupMembersPage() {
             </Button>
             {candidateDialogMode !== "detail" ? (
               <Button onClick={() => void saveCandidate()} disabled={mutation.isSubmitting}>
-                {mutation.isSubmitting ? "Dang luu..." : "Luu thong tin"}
+                {mutation.isSubmitting ? "Đang lưu..." : "Lưu thông tin"}
               </Button>
             ) : null}
           </DialogFooter>

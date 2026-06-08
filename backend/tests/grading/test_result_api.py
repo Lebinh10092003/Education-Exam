@@ -1,6 +1,8 @@
 from datetime import timedelta
+from io import BytesIO
 
 import pytest
+from openpyxl import load_workbook
 from django.utils import timezone
 
 
@@ -116,3 +118,71 @@ def test_admin_can_export_results_via_csv(api_client, admin_token, subject, admi
     assert len(lines) >= 2
     assert "Candidate,Candidate Email" in lines[0]
     assert candidate_user.email in content
+
+
+@pytest.mark.django_db
+def test_admin_can_review_result_answers(api_client, admin_token, subject, admin_user, candidate_user):
+    result = _build_finalized_result(subject=subject, admin_user=admin_user, candidate_user=candidate_user)
+    api_client.credentials(HTTP_AUTHORIZATION=f"Bearer {admin_token}")
+
+    response = api_client.get(f"/api/v1/results/{result.id}/review/")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["candidate"]["email"] == candidate_user.email
+    assert payload["exam"]["name"] == "Mathematics Final Exam"
+    assert payload["questions"][0]["question_text"] == "What is the derivative of x squared?"
+    assert payload["questions"][0]["selected_option_keys"] == ["A"]
+    assert payload["questions"][0]["correct_option_keys"] == ["A"]
+
+
+@pytest.mark.django_db
+def test_admin_can_export_single_result_review_xlsx(api_client, admin_token, subject, admin_user, candidate_user):
+    result = _build_finalized_result(subject=subject, admin_user=admin_user, candidate_user=candidate_user)
+    api_client.credentials(HTTP_AUTHORIZATION=f"Bearer {admin_token}")
+
+    response = api_client.get(f"/api/v1/results/{result.id}/review-export/")
+
+    assert response.status_code == 200
+    assert response["Content-Type"] == "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    workbook = load_workbook(BytesIO(response.content))
+    assert workbook.sheetnames == ["Tổng quan", "Bài làm"]
+    assert workbook["Bài làm"]["B2"].value == "What is the derivative of x squared?"
+
+
+@pytest.mark.django_db
+def test_admin_can_export_results_via_xlsx(api_client, admin_token, subject, admin_user, candidate_user):
+    _build_finalized_result(subject=subject, admin_user=admin_user, candidate_user=candidate_user)
+    api_client.credentials(HTTP_AUTHORIZATION=f"Bearer {admin_token}")
+
+    response = api_client.get("/api/v1/results/export-xlsx/")
+
+    assert response.status_code == 200
+    workbook = load_workbook(BytesIO(response.content))
+    assert workbook.sheetnames == ["Kết quả"]
+    assert workbook["Kết quả"]["B2"].value == candidate_user.email
+
+
+@pytest.mark.django_db
+def test_admin_can_export_exam_roster_with_submitted_and_not_submitted_sheets(
+    api_client,
+    admin_token,
+    subject,
+    admin_user,
+    candidate_user,
+    user,
+):
+    from apps.institutions.models import GroupMembership
+
+    result = _build_finalized_result(subject=subject, admin_user=admin_user, candidate_user=candidate_user)
+    group = result.session.exam.assignments.filter(group__isnull=False).first().group
+    GroupMembership.objects.create(group=group, user=user)
+    api_client.credentials(HTTP_AUTHORIZATION=f"Bearer {admin_token}")
+
+    response = api_client.get(f"/api/v1/results/exam-roster-export/?exam={result.session.exam_id}")
+
+    assert response.status_code == 200
+    workbook = load_workbook(BytesIO(response.content))
+    assert workbook.sheetnames == ["Kết quả", "Đã thi", "Chưa thi"]
+    assert workbook["Đã thi"]["I2"].value == candidate_user.email
+    assert workbook["Chưa thi"]["I2"].value == user.email

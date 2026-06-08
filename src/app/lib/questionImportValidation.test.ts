@@ -27,6 +27,27 @@ describe("validateQuestionImportFile", () => {
     expect(result.missingSubjectRows).toEqual([]);
   });
 
+  it("accepts csv rows with unicode math symbols", async () => {
+    const file = new File(
+      [
+        [
+          "subject_code,difficulty,question_type,question_text,option_A,option_B,correct_option_keys",
+          'MATH101,easy,multiple_choice,"Tính √(x²) ≤ 3 và π > 3?",Đúng,Sai,A',
+        ].join("\n"),
+      ],
+      "questions.csv",
+      { type: "text/csv" },
+    );
+
+    const result = await validateQuestionImportFile({
+      file,
+      sourceFormat: "csv",
+      expectedSubjectCode: "MATH101",
+    });
+
+    expect(result.ok).toBe(true);
+  });
+
   it("rejects csv rows with mismatched subject codes", async () => {
     const file = new File(
       [
@@ -91,5 +112,19 @@ describe("validateQuestionImportFile", () => {
 
     expect(result.ok).toBe(false);
     expect(result.missingSubjectRows).toEqual([1]);
+  });
+
+  it("leaves xlsx subject validation to the backend", async () => {
+    const file = new File(["not parsed in the browser"], "questions.xlsx", {
+      type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    });
+
+    const result = await validateQuestionImportFile({
+      file,
+      sourceFormat: "xlsx",
+      expectedSubjectCode: "MATH101",
+    });
+
+    expect(result.ok).toBe(true);
   });
 });

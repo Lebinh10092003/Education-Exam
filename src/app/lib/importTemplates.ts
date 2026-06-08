@@ -77,8 +77,8 @@ const groupMembershipCsvTemplate = [
 
 export const questionImportTemplate: ImportTemplateDefinition = {
   title: "Question Import Template",
-  description: "Use backend-compatible CSV or JSON rows so the question import endpoint can create revisioned questions directly.",
-  footerNote: "List-style fields such as tags, correct_option_keys, and acceptable_answers use the pipe character `|` in CSV files.",
+  description: "Use backend-compatible CSV, JSON, or XLSX rows so the question import endpoint can create revisioned questions directly.",
+  footerNote: "List-style fields such as tags, correct_option_keys, and acceptable_answers use the pipe character `|` in CSV/XLSX files. XLSX imports use the first worksheet and the same column names as CSV.",
   formats: [
     {
       key: "csv",
@@ -172,7 +172,7 @@ export const groupMembershipImportTemplate: ImportTemplateDefinition = {
         "username becomes the candidate login account. If username is blank, the backend generates one.",
         "password becomes both the login password and the admin-visible roster password. If blank for a new account, the backend uses the generated username.",
         "date_of_birth must use DD/MM/YYYY, for example 24/08/2003.",
-        "candidate_number maps to SBD. exam_block maps to Khoi thi.",
+        "national_exam_subject stores one or more registered subjects; separate multiple subjects with semicolons. candidate_number maps to SBD. exam_block maps to Khối thi.",
       ],
       sample: groupMembershipCsvTemplate,
       downloadContent: groupMembershipCsvTemplate,

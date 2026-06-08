@@ -168,3 +168,77 @@ class ResultSummarySerializer(serializers.Serializer):
     average_percentage = serializers.DecimalField(max_digits=8, decimal_places=2)
     score_distribution = ScoreDistributionBucketSerializer(many=True)
 
+
+class ResultReviewSerializer(serializers.Serializer):
+    def to_representation(self, obj):
+        session = obj.session
+        candidate = session.candidate
+        exam = session.exam
+        result = ResultSerializer(obj).data
+        questions = []
+
+        for session_question in session.questions.all():
+            revision = session_question.question_revision
+            answer_key = getattr(revision, "answer_key", None)
+            answer = getattr(session_question, "answer", None)
+            manual_task = getattr(session_question, "manual_grading_task", None)
+            manual_grade = getattr(manual_task, "manual_grade", None) if manual_task else None
+            correct_option_keys = getattr(answer_key, "correct_option_keys", []) if answer_key else []
+            selected_option_keys = getattr(answer, "selected_option_keys", []) if answer else []
+
+            questions.append(
+                {
+                    "id": session_question.id,
+                    "sort_order": session_question.sort_order,
+                    "points": session_question.points,
+                    "awarded_points": getattr(answer, "awarded_points", None),
+                    "question_text": revision.question_text,
+                    "question_type": revision.question.question_type,
+                    "difficulty": revision.question.difficulty,
+                    "options": [
+                        {
+                            "key": option.key,
+                            "text": option.text,
+                            "is_correct": option.key in correct_option_keys,
+                            "is_selected": option.key in selected_option_keys,
+                        }
+                        for option in revision.options.all()
+                    ],
+                    "selected_option_keys": selected_option_keys,
+                    "correct_option_keys": correct_option_keys,
+                    "answer_text": getattr(answer, "answer_text", "") if answer else "",
+                    "is_answered": getattr(answer, "is_answered", False) if answer else False,
+                    "is_correct": getattr(answer, "is_correct", None) if answer else None,
+                    "essay_rubric": getattr(answer_key, "essay_rubric", "") if answer_key else "",
+                    "sample_answer": getattr(answer_key, "sample_answer", "") if answer_key else "",
+                    "manual_feedback": getattr(manual_grade, "feedback", "") if manual_grade else "",
+                    "manual_score_awarded": getattr(manual_grade, "score_awarded", None) if manual_grade else None,
+                }
+            )
+
+        return {
+            "id": obj.id,
+            "candidate": {
+                "id": candidate.id,
+                "email": candidate.email,
+                "full_name": candidate.full_name,
+                "username": candidate.username,
+            },
+            "exam": {
+                "id": exam.id,
+                "name": exam.name,
+                "subject_name": exam.subject.name,
+            },
+            "session": {
+                "id": session.id,
+                "status": session.status,
+                "attempt_number": session.attempt_number,
+                "started_at": session.started_at,
+                "submitted_at": session.submitted_at,
+                "objective_score": session.objective_score,
+                "max_score": session.max_score,
+            },
+            "result": result,
+            "questions": questions,
+        }
+

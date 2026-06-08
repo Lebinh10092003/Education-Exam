@@ -1,9 +1,10 @@
 import csv
 import json
-from io import StringIO
+from io import BytesIO, StringIO
 
 from django.db import transaction
 from django.utils.text import slugify
+from openpyxl import load_workbook
 
 from apps.academics.models import Subject
 
@@ -224,6 +225,26 @@ def _build_question_payload_from_import(row, subjects_cache=None):
     }
 
 
+def _parse_xlsx_rows(content):
+    workbook = load_workbook(BytesIO(content), read_only=True, data_only=False)
+    worksheet = workbook.active
+    values = list(worksheet.iter_rows(values_only=True))
+    if not values:
+        return []
+
+    headers = [str(value or "").strip() for value in values[0]]
+    rows = []
+    for row_values in values[1:]:
+        row = {
+            header: "" if value is None else str(value).strip()
+            for header, value in zip(headers, row_values)
+            if header
+        }
+        if any(value for value in row.values()):
+            rows.append(row)
+    return rows
+
+
 @transaction.atomic
 def import_questions_from_upload(*, uploaded_by, source_format, uploaded_file):
     batch = QuestionImportBatch.objects.create(
@@ -235,10 +256,14 @@ def import_questions_from_upload(*, uploaded_by, source_format, uploaded_file):
     created_question_ids = []
     subjects_cache = {}
 
-    content = uploaded_file.read().decode("utf-8-sig")
+    raw_content = uploaded_file.read()
     if source_format == QuestionImportBatch.SourceFormat.JSON:
+        content = raw_content.decode("utf-8-sig")
         rows = json.loads(content)
+    elif source_format == QuestionImportBatch.SourceFormat.XLSX:
+        rows = _parse_xlsx_rows(raw_content)
     else:
+        content = raw_content.decode("utf-8-sig")
         rows = list(csv.DictReader(StringIO(content)))
 
     batch.total_records = len(rows)

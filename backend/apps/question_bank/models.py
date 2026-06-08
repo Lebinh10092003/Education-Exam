@@ -140,6 +140,7 @@ class QuestionImportBatch(TimeStampedModel):
     class SourceFormat(models.TextChoices):
         CSV = "csv", "CSV"
         JSON = "json", "JSON"
+        XLSX = "xlsx", "XLSX"
 
     class Status(models.TextChoices):
         PENDING = "pending", "Pending"

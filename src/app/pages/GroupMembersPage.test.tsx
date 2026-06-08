@@ -80,8 +80,8 @@ describe("GroupMembersPage", () => {
     renderPage();
 
     expect(await screen.findByText("Le Van Binh")).toBeInTheDocument();
-    expect(screen.getByText("Tai khoan")).toBeInTheDocument();
-    expect(screen.getByText("Mat khau")).toBeInTheDocument();
+    expect(screen.getByText("Tài khoản")).toBeInTheDocument();
+    expect(screen.getByText("Mật khẩu")).toBeInTheDocument();
     expect(screen.getByText("imo001")).toBeInTheDocument();
     expect(screen.getByText("imo-pass")).toBeInTheDocument();
     expect(screen.getByText("IMO001")).toBeInTheDocument();

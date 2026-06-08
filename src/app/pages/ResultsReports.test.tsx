@@ -1,4 +1,5 @@
 import { cleanup, render, screen, within } from "@testing-library/react";
+import { MemoryRouter } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { ResultsReports } from "./ResultsReports";
@@ -60,8 +61,12 @@ describe("ResultsReports", () => {
               workflow_status: "finalized",
               publish_state: "draft",
               score: "0.00",
+              original_score: "0.00",
               total_marks: "3.00",
               percentage: "0.00",
+              original_percentage: "0.00",
+              penalty_percent_applied: "0.00",
+              certificate_level: "none",
               result_status: "Fail",
               passed: false,
               completed_date: "2026-03-24T11:49:00Z",
@@ -96,7 +101,11 @@ describe("ResultsReports", () => {
   });
 
   it("renders failed finalized results with a red result badge", async () => {
-    render(<ResultsReports />);
+    render(
+      <MemoryRouter>
+        <ResultsReports />
+      </MemoryRouter>,
+    );
 
     const rowEmail = (await screen.findAllByText("candidate@example.com")).find((node) => node.closest("tr"));
     expect(rowEmail).toBeDefined();
@@ -107,5 +116,16 @@ describe("ResultsReports", () => {
     const failBadge = within(row as HTMLTableRowElement).getByText("Fail");
     expect(failBadge).toHaveClass("bg-red-100");
     expect(failBadge).not.toHaveClass("bg-green-100");
+  });
+
+  it("links each result to the admin answer review page", async () => {
+    render(
+      <MemoryRouter>
+        <ResultsReports />
+      </MemoryRouter>,
+    );
+
+    const reviewLinks = await screen.findAllByRole("link", { name: /rà bài/i });
+    expect(reviewLinks.some((link) => link.getAttribute("href") === "/results/9/review")).toBe(true);
   });
 });

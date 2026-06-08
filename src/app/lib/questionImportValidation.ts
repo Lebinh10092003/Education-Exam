@@ -1,4 +1,4 @@
-export type QuestionImportSourceFormat = "csv" | "json";
+export type QuestionImportSourceFormat = "csv" | "json" | "xlsx";
 
 export interface QuestionImportValidationResult {
   ok: boolean;
@@ -129,6 +129,14 @@ export async function validateQuestionImportFile({
   const normalizedExpectedSubjectCode = normalizeSubjectCode(expectedSubjectCode);
 
   try {
+    if (sourceFormat === "xlsx") {
+      return {
+        ok: true,
+        mismatchedSubjectCodes: [],
+        missingSubjectRows: [],
+      };
+    }
+
     const content = await file.text();
     if (!content.trim()) {
       return {

@@ -16,6 +16,7 @@ import {
 
 import { Button } from "../components/ui/button";
 import { Card, CardContent } from "../components/ui/card";
+import { MathText } from "../components/MathText";
 import { RadioGroup, RadioGroupItem } from "../components/ui/radio-group";
 import { Label } from "../components/ui/label";
 import { Badge } from "../components/ui/badge";
@@ -1490,7 +1491,9 @@ export function TakeExam() {
                       {currentQuestion.is_marked_for_review ? t("examSession.unmark") : t("examSession.markForReview")}
                     </Button>
                   </div>
-                  <p className="text-base leading-relaxed text-gray-800 sm:text-lg">{currentQuestion.question_text}</p>
+                  <p className="text-base leading-relaxed text-gray-800 sm:text-lg">
+                    <MathText text={currentQuestion.question_text} />
+                  </p>
                 </div>
 
                 {currentQuestion.question_type === "essay" ? (
@@ -1521,7 +1524,7 @@ export function TakeExam() {
                             <RadioGroupItem value={option.key} id={`option-${option.key}`} />
                             <Label htmlFor={`option-${option.key}`} className="flex-1 cursor-pointer text-base">
                               <span className="font-medium text-gray-700 mr-2">{String.fromCharCode(65 + index)}.</span>
-                              {option.text}
+                              <MathText text={option.text} />
                             </Label>
                           </label>
                         );

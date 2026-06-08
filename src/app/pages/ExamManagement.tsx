@@ -1,6 +1,6 @@
 import { Link } from "react-router";
 import { useEffect, useState } from "react";
-import { Copy, Edit, Eye, Plus, Search, Trash2, Users } from "lucide-react";
+import { Activity, Copy, Edit, Eye, Plus, Search, Trash2, Users } from "lucide-react";
 import { notify } from "../lib/notify";
 
 import { PageHeader } from "../components/PageHeader";
@@ -306,7 +306,7 @@ export function ExamManagement() {
                       </div>
                       <div>
                         <p className="text-xs uppercase tracking-wide text-gray-400">
-                          {exam.mode === "exam" ? "Assigned" : "Enrollment"}
+                          {exam.mode === "exam" ? "Gán nhóm" : "Ghi danh"}
                         </p>
                         <p>{totalCandidates} {exam.mode === "exam" ? "candidates" : "learners"}</p>
                         <p>{exam.assignment_summary.group_count} groups</p>
@@ -342,7 +342,7 @@ export function ExamManagement() {
                         (exam.status === "open" || exam.delivery_summary.in_progress_sessions > 0) && (
                         <Link to={`/exams/${exam.id}?tab=monitoring`}>
                           <Button size="sm" variant="outline">
-                            <Eye className="mr-2 h-4 w-4" />
+                            <Activity className="mr-2 h-4 w-4" />
                             Monitor
                           </Button>
                         </Link>
@@ -394,7 +394,7 @@ export function ExamManagement() {
                   <th className="text-left py-3 px-4 text-sm font-semibold text-gray-700">Status</th>
                   <th className="text-left py-3 px-4 text-sm font-semibold text-gray-700">Schedule</th>
                   <th className="text-left py-3 px-4 text-sm font-semibold text-gray-700">Composition</th>
-                  <th className="text-left py-3 px-4 text-sm font-semibold text-gray-700">Assigned</th>
+                  <th className="text-left py-3 px-4 text-sm font-semibold text-gray-700">Gán nhóm</th>
                   <th className="text-left py-3 px-4 text-sm font-semibold text-gray-700">Progress</th>
                   <th className="text-left py-3 px-4 text-sm font-semibold text-gray-700">Actions</th>
                 </tr>
@@ -527,7 +527,7 @@ export function ExamManagement() {
                               (exam.status === "open" || exam.delivery_summary.in_progress_sessions > 0) && (
                               <Link to={`/exams/${exam.id}?tab=monitoring`}>
                                 <Button size="sm" variant="ghost" title="Monitor">
-                                  <Eye className="w-4 h-4" />
+                                  <Activity className="w-4 h-4" />
                                 </Button>
                               </Link>
                               )}

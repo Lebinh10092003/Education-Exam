@@ -87,7 +87,7 @@ interface QuestionRecord {
 
 interface QuestionImportBatchResult {
   id: number;
-  source_format: "csv" | "json";
+  source_format: "csv" | "json" | "xlsx";
   file_name: string;
   status: string;
   total_records: number;
@@ -251,7 +251,7 @@ export function ExamCreationWizard() {
   const [groupSearchQuery, setGroupSearchQuery] = useState("");
   const [formState, setFormState] = useState<ExamFormState>(buildDefaultFormState);
   const [isImportDialogOpen, setIsImportDialogOpen] = useState(false);
-  const [importFormat, setImportFormat] = useState<"csv" | "json">("csv");
+  const [importFormat, setImportFormat] = useState<"csv" | "json" | "xlsx">("csv");
   const [importFile, setImportFile] = useState<File | null>(null);
   const [importResult, setImportResult] = useState<QuestionImportBatchResult | null>(null);
   const [studentImportFile, setStudentImportFile] = useState<File | null>(null);
@@ -1255,7 +1255,7 @@ export function ExamCreationWizard() {
               <Label>File Format</Label>
               <Select
                 value={importFormat}
-                onValueChange={(value: "csv" | "json") => setImportFormat(value)}
+                onValueChange={(value: "csv" | "json" | "xlsx") => setImportFormat(value)}
               >
                 <SelectTrigger className="mt-2">
                   <SelectValue placeholder="Select format" />
@@ -1263,6 +1263,7 @@ export function ExamCreationWizard() {
                 <SelectContent>
                   <SelectItem value="csv">CSV</SelectItem>
                   <SelectItem value="json">JSON</SelectItem>
+                  <SelectItem value="xlsx">Excel XLSX</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -1271,7 +1272,13 @@ export function ExamCreationWizard() {
               <Input
                 type="file"
                 className="mt-2"
-                accept={importFormat === "csv" ? ".csv,text/csv" : ".json,application/json"}
+                accept={
+                  importFormat === "csv"
+                    ? ".csv,text/csv"
+                    : importFormat === "json"
+                      ? ".json,application/json"
+                      : ".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                }
                 onChange={(event) => setImportFile(event.target.files?.[0] ?? null)}
               />
             </div>
@@ -1284,7 +1291,7 @@ export function ExamCreationWizard() {
               </div>
               <ImportTemplateActions
                 template={questionImportTemplate}
-                selectedFormat={importFormat}
+                selectedFormat={importFormat === "xlsx" ? "csv" : importFormat}
               />
             </div>
             <div className="rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-900">

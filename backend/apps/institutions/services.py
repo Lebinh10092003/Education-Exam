@@ -202,6 +202,8 @@ def _import_group_member_row(*, group, row, candidate_role):
     email = (row.get("email") or "").strip().lower()
     username = (row.get("username") or "").strip()
     cccd = _normalize_cccd(row.get("cccd"))
+    if not (username or email or cccd):
+        raise ValueError("username, email, or cccd is required.")
     phone_number = (row.get("phone_number") or "").strip()
     student_class = (row.get("student_class") or "").strip()
     ward = (row.get("ward") or row.get("xa_phuong") or row.get("xa/phuong") or "").strip()

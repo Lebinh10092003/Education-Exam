@@ -25,6 +25,6 @@ describe("ImportTemplateActions", () => {
     const dialogContent = dialogTitle.closest('[data-slot="dialog-content"]');
 
     expect(dialogContent).toHaveClass("sm:max-w-5xl");
-    expect(screen.getByText(/backend-compatible csv or json rows/i)).toBeInTheDocument();
+    expect(screen.getByText(/backend-compatible csv, json, or xlsx rows/i)).toBeInTheDocument();
   });
 });

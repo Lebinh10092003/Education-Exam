@@ -67,7 +67,7 @@ describe("GroupManagement", () => {
       </MemoryRouter>,
     );
 
-    const membersLink = await screen.findByRole("link", { name: /thanh vien/i });
+    const membersLink = await screen.findByRole("link", { name: /thành viên/i });
     expect(membersLink).toHaveAttribute("href", "/groups/7/members");
   });
 });

@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { Link } from "react-router";
 import { notify } from "../lib/notify";
 import {
   Bar,
@@ -12,7 +13,7 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import { Download, Eye, Search, TrendingUp } from "lucide-react";
+import { Download, Eye, FileSearch, FileSpreadsheet, Search, TrendingUp } from "lucide-react";
 
 import { PageHeader } from "../components/PageHeader";
 import { StatusBadge } from "../components/StatusBadge";
@@ -103,43 +104,68 @@ const formatDuration = (minutes: number) => {
   return `${hours}h ${remainingMinutes}m`;
 };
 
-const exportResultsCsv = async (searchQuery: string, examFilter: string) => {
+const buildResultExportQuery = (searchQuery: string, examFilter: string) => {
+  const queryParams = new URLSearchParams();
+  if (searchQuery) {
+    queryParams.append("search", searchQuery);
+  }
+  if (examFilter !== "all") {
+    queryParams.append("exam", examFilter);
+  }
+  const queryString = queryParams.toString();
+  return queryString ? `?${queryString}` : "";
+};
+
+const downloadApiFile = async (path: string, fallbackFileName: string, successMessage: string) => {
   try {
     const tokens = getStoredTokens();
     const headers: HeadersInit = {};
     if (tokens?.access) {
       headers["Authorization"] = `Bearer ${tokens.access}`;
     }
-    const queryParams = new URLSearchParams();
-    if (searchQuery) {
-      queryParams.append("search", searchQuery);
-    }
-    if (examFilter !== "all") {
-      queryParams.append("exam", examFilter);
-    }
 
-    const response = await fetch(buildApiUrl(`/api/v1/results/export-csv/?${queryParams.toString()}`), {
-      headers,
-    });
+    const response = await fetch(buildApiUrl(path), { headers });
 
     if (!response.ok) {
-      throw new Error(`Failed to export CSV: ${response.statusText}`);
+      throw new Error(`Unable to export file: ${response.statusText}`);
     }
 
     const blob = await response.blob();
     const url = URL.createObjectURL(blob);
     const anchor = document.createElement("a");
     anchor.href = url;
-    anchor.download = "eduexam-results.csv";
+    anchor.download = fallbackFileName;
     document.body.append(anchor);
     anchor.click();
     anchor.remove();
     URL.revokeObjectURL(url);
-    notify.success("Results exported successfully.");
+    notify.success(successMessage);
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Unable to export results.";
+    const message = error instanceof Error ? error.message : "Unable to export file.";
     notify.error(message);
   }
+};
+
+const exportResultsFile = async (format: "csv" | "xlsx", searchQuery: string, examFilter: string) => {
+  const endpoint = format === "csv" ? "export-csv" : "export-xlsx";
+  const extension = format === "csv" ? "csv" : "xlsx";
+  await downloadApiFile(
+    `/api/v1/results/${endpoint}/${buildResultExportQuery(searchQuery, examFilter)}`,
+    `eduexam-results.${extension}`,
+    format === "csv" ? "Đã xuất kết quả CSV." : "Đã xuất kết quả XLSX.",
+  );
+};
+
+const exportExamRosterFile = async (examFilter: string) => {
+  if (examFilter === "all") {
+    notify.error("Chọn một kỳ thi trước khi xuất danh sách thí sinh.");
+    return;
+  }
+  await downloadApiFile(
+    `/api/v1/results/exam-roster-export/?exam=${encodeURIComponent(examFilter)}`,
+    `eduexam-exam-roster-${examFilter}.xlsx`,
+    "Đã xuất danh sách thí sinh theo kỳ thi.",
+  );
 };
 
 
@@ -230,11 +256,24 @@ export function ResultsReports() {
         title="Results & Reports"
         description="Live result data, publishing, and report export from the backend."
         action={
-          <Button onClick={() => void exportResultsCsv(debouncedSearch, examFilter)}>
-            <Download className="w-4 h-4 mr-2" />
-            Export CSV
-          </Button>
-
+          <div className="flex flex-wrap gap-2">
+            <Button variant="outline" onClick={() => void exportResultsFile("csv", debouncedSearch, examFilter)}>
+              <Download className="mr-2 h-4 w-4" />
+              Export CSV
+            </Button>
+            <Button variant="outline" onClick={() => void exportResultsFile("xlsx", debouncedSearch, examFilter)}>
+              <FileSpreadsheet className="mr-2 h-4 w-4" />
+              Export XLSX
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => void exportExamRosterFile(examFilter)}
+              disabled={examFilter === "all"}
+            >
+              <FileSpreadsheet className="mr-2 h-4 w-4" />
+              Xuất DS thí sinh
+            </Button>
+          </div>
         }
       />
 
@@ -401,6 +440,12 @@ export function ResultsReports() {
                       <Download className="mr-2 h-4 w-4" />
                       Export
                     </Button>
+                    <Button size="sm" variant="outline" asChild>
+                      <Link to={`/results/${result.id}/review`}>
+                        <FileSearch className="mr-2 h-4 w-4" />
+                        Rà bài
+                      </Link>
+                    </Button>
                     {result.workflow_status === "finalized" && result.publish_state !== "published" ? (
                       <Button size="sm" onClick={() => void publishResult(result)}>
                         Publish
@@ -483,6 +528,11 @@ export function ResultsReports() {
                           </Button>
                           <Button size="sm" variant="ghost" onClick={() => downloadSingleResult(result)}>
                             <Download className="w-4 h-4" />
+                          </Button>
+                          <Button size="sm" variant="ghost" title="Rà bài" asChild>
+                            <Link to={`/results/${result.id}/review`}>
+                              <FileSearch className="h-4 w-4" />
+                            </Link>
                           </Button>
                           {result.workflow_status === "finalized" && result.publish_state !== "published" ? (
                             <Button size="sm" variant="outline" onClick={() => void publishResult(result)}>

@@ -116,7 +116,7 @@ export function GroupManagement() {
 
   const saveGroup = async () => {
     if (!formState.name.trim()) {
-      notify.error("Ten nhom la bat buoc.");
+      notify.error("Tên nhóm là bắt buộc.");
       return;
     }
 
@@ -141,15 +141,15 @@ export function GroupManagement() {
 
       await groupsList.reload();
       closeGroupDialog(false);
-      notify.success(editingGroup ? "Da cap nhat nhom." : "Da tao nhom.");
+      notify.success(editingGroup ? "Đã cập nhật nhóm." : "Đã tạo nhóm.");
     });
   };
 
   const deleteGroup = async (group: GroupRecord) => {
     const confirmed = await notify.confirm({
-      title: "Xoa nhom nay?",
-      text: `Nhom "${group.name}" se bi xoa vinh vien.`,
-      confirmText: "Xoa nhom",
+      title: "Xóa nhóm này?",
+      text: `Nhóm "${group.name}" sẽ bị xóa vĩnh viễn.`,
+      confirmText: "Xóa nhóm",
       confirmButtonColor: "#dc2626",
     });
     if (!confirmed) {
@@ -161,7 +161,7 @@ export function GroupManagement() {
         method: "DELETE",
       });
       await groupsList.reload();
-      notify.success("Da xoa nhom.");
+      notify.success("Đã xóa nhóm.");
     });
   };
 
@@ -172,12 +172,12 @@ export function GroupManagement() {
   return (
     <div>
       <PageHeader
-        title="Nhom thi sinh"
-        description="Quan ly cac nhom thi sinh va mo trang danh sach thanh vien chi tiet."
+        title="Nhóm thí sinh"
+        description="Quản lý các nhóm thí sinh và mở trang danh sách thành viên chi tiết."
         action={
           <Button onClick={openCreateDialog}>
             <Plus className="h-4 w-4" />
-            Tao nhom
+            Tạo nhóm
           </Button>
         }
       />
@@ -186,7 +186,7 @@ export function GroupManagement() {
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
           <Input
-            placeholder="Tim kiem nhom..."
+            placeholder="Tìm kiếm nhóm..."
             value={searchQuery}
             onChange={(event) => setSearchQuery(event.target.value)}
             className="pl-10"
@@ -204,7 +204,7 @@ export function GroupManagement() {
         {groupsList.isLoading ? (
           <Card className="md:col-span-2 xl:col-span-3">
             <CardContent className="py-16 text-center text-sm text-gray-500">
-              Dang tai danh sach nhom...
+              Đang tải danh sách nhóm...
             </CardContent>
           </Card>
         ) : groups.length === 0 ? (
@@ -225,26 +225,26 @@ export function GroupManagement() {
                     <div className="min-w-0">
                       <CardTitle className="truncate text-lg">{group.name}</CardTitle>
                       <p className="mt-1 text-sm text-gray-500">
-                        Tao ngay {formatDate(group.created_at)}
+                        Tạo ngày {formatDate(group.created_at)}
                       </p>
                     </div>
                   </div>
                   <Badge variant={group.is_active ? "outline" : "secondary"}>
-                    {group.is_active ? "Dang hoat dong" : "Tam dung"}
+                    {group.is_active ? "Đang hoạt động" : "Tạm dừng"}
                   </Badge>
                 </div>
               </CardHeader>
               <CardContent>
                 <p className="min-h-[40px] text-sm text-gray-600">
-                  {group.description || "Chua co mo ta."}
+                  {group.description || "Chưa có mô tả."}
                 </p>
 
                 <div className="mt-4 flex flex-wrap gap-2">
                   <Badge variant="outline" className="bg-blue-50">
-                    {group.member_count} thanh vien
+                    {group.member_count} thành viên
                   </Badge>
                   <Badge variant="outline" className="bg-green-50">
-                    {group.exams_count} ky thi
+                    {group.exams_count} kỳ thi
                   </Badge>
                 </div>
 
@@ -252,7 +252,7 @@ export function GroupManagement() {
                   <Button asChild variant="outline" size="sm" className="flex-1">
                     <Link to={`/groups/${group.id}/members`}>
                       <Users className="h-4 w-4" />
-                      Thanh vien
+                      Thành viên
                     </Link>
                   </Button>
                   <Button variant="ghost" size="sm" onClick={() => openEditDialog(group)}>
@@ -275,7 +275,7 @@ export function GroupManagement() {
 
       <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <p className="text-sm text-gray-600">
-          Hien thi <strong>{rangeStart}-{rangeEnd}</strong> tren <strong>{totalCount}</strong> nhom
+          Hiển thị <strong>{rangeStart}-{rangeEnd}</strong> trên <strong>{totalCount}</strong> nhóm
         </p>
         <div className="flex gap-2">
           <Button
@@ -303,14 +303,14 @@ export function GroupManagement() {
       <Dialog open={isDialogOpen} onOpenChange={closeGroupDialog}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>{editingGroup ? "Sua nhom" : "Tao nhom moi"}</DialogTitle>
+            <DialogTitle>{editingGroup ? "Sửa nhóm" : "Tạo nhóm mới"}</DialogTitle>
             <DialogDescription>
-              Luu thong tin nhom de quan ly danh sach thi sinh va gan ky thi.
+              Lưu thông tin nhóm để quản lý danh sách thí sinh và gán kỳ thi.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div>
-              <Label htmlFor="group-name">Ten nhom</Label>
+              <Label htmlFor="group-name">Tên nhóm</Label>
               <Input
                 id="group-name"
                 className="mt-2"
@@ -334,7 +334,7 @@ export function GroupManagement() {
                     description: event.target.value,
                   }))
                 }
-                placeholder="Mo ta ngan ve nhom"
+                placeholder="Mô tả ngắn về nhóm"
               />
             </div>
             <label className="flex cursor-pointer items-center gap-2">
@@ -347,7 +347,7 @@ export function GroupManagement() {
                   }))
                 }
               />
-              <span className="text-sm text-gray-700">Nhom dang hoat dong</span>
+              <span className="text-sm text-gray-700">Nhóm đang hoạt động</span>
             </label>
           </div>
           <DialogFooter>
@@ -356,10 +356,10 @@ export function GroupManagement() {
             </Button>
             <Button onClick={() => void saveGroup()} disabled={mutation.isSubmitting}>
               {mutation.isSubmitting
-                ? "Dang luu..."
+                ? "Đang lưu..."
                 : editingGroup
-                  ? "Luu thay doi"
-                  : "Tao nhom"}
+                  ? "Lưu thay đổi"
+                  : "Tạo nhóm"}
             </Button>
           </DialogFooter>
         </DialogContent>

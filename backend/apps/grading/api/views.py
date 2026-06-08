@@ -1,22 +1,302 @@
 from decimal import Decimal
+from datetime import datetime
+from io import BytesIO
 
+from django.contrib.auth import get_user_model
 from django.db.models import Avg, Q
+from django.http import HttpResponse
+from django.shortcuts import get_object_or_404
+from django.utils import timezone
+from openpyxl import Workbook
 from rest_framework import generics, mixins, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
-from apps.exam_authoring.models import Exam
+from apps.exam_authoring.models import Exam, ExamAssignment
 from apps.identity.permissions import HasAPIPermissionCode
+from apps.institutions.models import GroupMembership
 
 from ..models import ManualGradingTask, Result
 from ..services import grade_manual_task, publish_result
 from .serializers import (
     ManualGradingTaskGradeSerializer,
     ManualGradingTaskSerializer,
+    ResultReviewSerializer,
     ResultSerializer,
     ResultSummarySerializer,
 )
+
+
+EXCEL_CONTENT_TYPE = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+
+
+def _serialize_workbook(workbook):
+    output = BytesIO()
+    workbook.save(output)
+    return output.getvalue()
+
+
+def _xlsx_response(workbook, filename):
+    response = HttpResponse(_serialize_workbook(workbook), content_type=EXCEL_CONTENT_TYPE)
+    response["Content-Disposition"] = f'attachment; filename="{filename}"'
+    return response
+
+
+def _write_sheet(sheet, headers, rows):
+    sheet.append(headers)
+    for row in rows:
+        sheet.append([_excel_value(value) for value in row])
+    for column_cells in sheet.columns:
+        max_length = max(len(str(cell.value or "")) for cell in column_cells)
+        sheet.column_dimensions[column_cells[0].column_letter].width = min(max(max_length + 2, 12), 48)
+
+
+def _excel_value(value):
+    if isinstance(value, datetime) and timezone.is_aware(value):
+        return timezone.localtime(value).replace(tzinfo=None)
+    return value
+
+
+def _candidate_profile(user):
+    return getattr(user, "profile", None)
+
+
+def _candidate_roster_values(user):
+    profile = _candidate_profile(user)
+    school = getattr(profile, "school", None) if profile else None
+    return [
+        user.full_name,
+        getattr(profile, "date_of_birth", "") or "",
+        getattr(school, "name", "") or "",
+        getattr(profile, "ward", "") or "",
+        getattr(profile, "national_exam_subject", "") or "",
+        getattr(profile, "exam_block", "") or "",
+        getattr(profile, "candidate_number", "") or "",
+        user.email,
+        getattr(profile, "phone_number", "") or "",
+        user.username,
+        getattr(profile, "visible_password", "") or "",
+    ]
+
+
+def _result_row(result):
+    candidate = result.session.candidate
+    exam = result.session.exam
+    return [
+        candidate.full_name,
+        candidate.email,
+        candidate.username,
+        exam.name,
+        exam.subject.name,
+        result.total_score,
+        result.original_total_score,
+        result.max_score,
+        result.percentage,
+        result.original_percentage,
+        result.penalty_percent_applied,
+        result.workflow_status,
+        result.publish_state,
+        result.session.submitted_at,
+        result.session.attempt_number,
+    ]
+
+
+def _result_export_workbook(results):
+    workbook = Workbook()
+    sheet = workbook.active
+    sheet.title = "Kết quả"
+    _write_sheet(
+        sheet,
+        [
+            "Thí sinh",
+            "Email",
+            "Tài khoản",
+            "Kỳ thi",
+            "Môn thi",
+            "Điểm",
+            "Điểm gốc",
+            "Tổng điểm",
+            "Tỷ lệ %",
+            "Tỷ lệ gốc %",
+            "Phạt %",
+            "Trạng thái chấm",
+            "Trạng thái công bố",
+            "Thời gian nộp",
+            "Lần thi",
+        ],
+        [_result_row(result) for result in results],
+    )
+    return workbook
+
+
+def _assigned_exam_candidates(exam):
+    group_ids = ExamAssignment.objects.filter(exam=exam, group__isnull=False).values_list("group_id", flat=True)
+    direct_user_ids = ExamAssignment.objects.filter(exam=exam, user__isnull=False).values_list("user_id", flat=True)
+    group_user_ids = GroupMembership.objects.filter(
+        group_id__in=group_ids,
+        is_active=True,
+    ).values_list("user_id", flat=True)
+    user_ids = set(direct_user_ids) | set(group_user_ids)
+    User = get_user_model()
+    return (
+        User.objects.filter(id__in=user_ids)
+        .select_related("profile", "profile__school")
+        .order_by("full_name", "email", "username")
+    )
+
+
+ROSTER_HEADERS = [
+    "STT",
+    "Họ tên",
+    "Ngày sinh",
+    "Trường",
+    "Xã/Phường",
+    "Môn thi đăng ký",
+    "Khối thi",
+    "SBD",
+    "Email liên lạc",
+    "SĐT liên lạc",
+    "Tài khoản",
+    "Mật khẩu",
+    "Kỳ thi",
+    "Môn kỳ thi",
+    "Trạng thái",
+    "Điểm",
+    "Tỷ lệ %",
+    "Thời gian nộp",
+]
+
+
+def _exam_roster_workbook(exam):
+    candidates = list(_assigned_exam_candidates(exam))
+    results = list(
+        Result.objects.select_related("session", "session__candidate", "session__exam", "session__exam__subject")
+        .filter(session__exam=exam)
+        .order_by("session__candidate__full_name", "session__candidate__email", "session__attempt_number")
+    )
+    latest_result_by_candidate = {}
+    for result in results:
+        latest_result_by_candidate[result.session.candidate_id] = result
+
+    workbook = Workbook()
+    result_sheet = workbook.active
+    result_sheet.title = "Kết quả"
+    _write_sheet(result_sheet, ROSTER_HEADERS, [
+        [
+            index,
+            *_candidate_roster_values(result.session.candidate),
+            exam.name,
+            exam.subject.name,
+            result.workflow_status,
+            result.total_score,
+            result.percentage,
+            result.session.submitted_at,
+        ]
+        for index, result in enumerate(results, start=1)
+    ])
+
+    submitted_sheet = workbook.create_sheet("Đã thi")
+    submitted_candidates = [
+        candidate
+        for candidate in candidates
+        if candidate.id in latest_result_by_candidate
+    ]
+    _write_sheet(submitted_sheet, ROSTER_HEADERS, [
+        [
+            index,
+            *_candidate_roster_values(candidate),
+            exam.name,
+            exam.subject.name,
+            "Đã nộp",
+            latest_result_by_candidate[candidate.id].total_score,
+            latest_result_by_candidate[candidate.id].percentage,
+            latest_result_by_candidate[candidate.id].session.submitted_at,
+        ]
+        for index, candidate in enumerate(submitted_candidates, start=1)
+    ])
+
+    not_submitted_sheet = workbook.create_sheet("Chưa thi")
+    sessions_by_candidate = {
+        session.candidate_id: session
+        for session in exam.sessions.select_related("candidate").exclude(candidate_id__in=latest_result_by_candidate)
+    }
+    not_submitted_candidates = [
+        candidate
+        for candidate in candidates
+        if candidate.id not in latest_result_by_candidate
+    ]
+    _write_sheet(not_submitted_sheet, ROSTER_HEADERS, [
+        [
+            index,
+            *_candidate_roster_values(candidate),
+            exam.name,
+            exam.subject.name,
+            getattr(sessions_by_candidate.get(candidate.id), "status", "Chưa bắt đầu"),
+            "",
+            "",
+            getattr(sessions_by_candidate.get(candidate.id), "submitted_at", "") or "",
+        ]
+        for index, candidate in enumerate(not_submitted_candidates, start=1)
+    ])
+
+    return workbook
+
+
+def _review_workbook(result):
+    review = ResultReviewSerializer(result).data
+    workbook = Workbook()
+    overview = workbook.active
+    overview.title = "Tổng quan"
+    candidate = review["candidate"]
+    exam = review["exam"]
+    result_data = review["result"]
+    _write_sheet(
+        overview,
+        ["Trường", "Giá trị"],
+        [
+            ["Thí sinh", candidate["full_name"]],
+            ["Email", candidate["email"]],
+            ["Tài khoản", candidate["username"]],
+            ["Kỳ thi", exam["name"]],
+            ["Môn thi", exam["subject_name"]],
+            ["Điểm", result_data["score"]],
+            ["Tổng điểm", result_data["total_marks"]],
+            ["Tỷ lệ %", result_data["percentage"]],
+            ["Trạng thái", result_data["result_status"]],
+        ],
+    )
+
+    answers = workbook.create_sheet("Bài làm")
+    _write_sheet(
+        answers,
+        [
+            "STT",
+            "Câu hỏi",
+            "Loại",
+            "Đáp án thí sinh",
+            "Đáp án đúng",
+            "Điểm tối đa",
+            "Điểm đạt",
+            "Đúng/Sai",
+            "Feedback tự luận",
+        ],
+        [
+            [
+                question["sort_order"],
+                question["question_text"],
+                question["question_type"],
+                ", ".join(question["selected_option_keys"]) or question["answer_text"],
+                ", ".join(question["correct_option_keys"]) or question["sample_answer"],
+                question["points"],
+                question["awarded_points"] or question["manual_score_awarded"] or "",
+                question["is_correct"],
+                question["manual_feedback"],
+            ]
+            for question in review["questions"]
+        ],
+    )
+    return workbook
 
 
 class ManualGradingTaskViewSet(
@@ -149,10 +429,51 @@ class ResultViewSet(
         output = ResultSerializer(result)
         return Response(output.data, status=status.HTTP_200_OK)
 
+    @action(detail=True, methods=["get"], url_path="review")
+    def review(self, request, pk=None):
+        result = (
+            Result.objects.select_related(
+                "session",
+                "session__candidate",
+                "session__exam",
+                "session__exam__subject",
+                "published_by",
+            )
+            .prefetch_related(
+                "session__questions__question_revision__question",
+                "session__questions__question_revision__options",
+                "session__questions__question_revision__answer_key",
+                "session__questions__answer",
+                "session__questions__manual_grading_task__manual_grade",
+            )
+            .get(pk=self.get_object().pk)
+        )
+        output = ResultReviewSerializer(result)
+        return Response(output.data)
+
+    @action(detail=True, methods=["get"], url_path="review-export")
+    def review_export(self, request, pk=None):
+        result = (
+            Result.objects.select_related(
+                "session",
+                "session__candidate",
+                "session__exam",
+                "session__exam__subject",
+            )
+            .prefetch_related(
+                "session__questions__question_revision__question",
+                "session__questions__question_revision__options",
+                "session__questions__question_revision__answer_key",
+                "session__questions__answer",
+                "session__questions__manual_grading_task__manual_grade",
+            )
+            .get(pk=self.get_object().pk)
+        )
+        return _xlsx_response(_review_workbook(result), f"eduexam-result-review-{result.id}.xlsx")
+
     @action(detail=False, methods=["get"], url_path="export-csv")
     def export_csv(self, request):
         import csv
-        from django.http import HttpResponse
 
         queryset = self.filter_queryset(self.get_queryset())
         data = ResultSerializer(queryset, many=True).data
@@ -202,6 +523,19 @@ class ResultViewSet(
             ])
 
         return response
+
+    @action(detail=False, methods=["get"], url_path="export-xlsx")
+    def export_xlsx(self, request):
+        queryset = self.filter_queryset(self.get_queryset())
+        return _xlsx_response(_result_export_workbook(queryset), "eduexam-results.xlsx")
+
+    @action(detail=False, methods=["get"], url_path="exam-roster-export")
+    def exam_roster_export(self, request):
+        exam_id = request.query_params.get("exam")
+        if not exam_id:
+            return Response({"detail": "exam is required."}, status=status.HTTP_400_BAD_REQUEST)
+        exam = get_object_or_404(Exam.objects.select_related("subject"), pk=exam_id)
+        return _xlsx_response(_exam_roster_workbook(exam), f"eduexam-exam-roster-{exam.id}.xlsx")
 
 
 class CandidateResultListView(generics.ListAPIView):
