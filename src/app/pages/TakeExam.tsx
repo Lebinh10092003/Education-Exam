@@ -8,6 +8,8 @@ import {
   ChevronLeft,
   ChevronRight,
   Clock,
+  Eye,
+  EyeOff,
   Flag,
   Wifi,
 } from "lucide-react";
@@ -18,6 +20,7 @@ import { RadioGroup, RadioGroupItem } from "../components/ui/radio-group";
 import { Label } from "../components/ui/label";
 import { Badge } from "../components/ui/badge";
 import { Textarea } from "../components/ui/textarea";
+import { cn } from "../components/ui/utils";
 import { buildWsUrl } from "../lib/env";
 import { apiRequest } from "../lib/http";
 import {
@@ -184,6 +187,63 @@ const getCandidateConnectionStatus = (failedHeartbeatCount: number): ConnectionS
 const parseLiveRequestEnabled = (value: boolean | string | undefined) =>
   value === true || value === "1" || value === "true";
 
+const saveToLocalStorage = (sessionId: number, questionId: number, payload: any) => {
+  try {
+    const key = `eduexam_pending_sync_${sessionId}`;
+    const dataStr = localStorage.getItem(key);
+    const pending = dataStr ? JSON.parse(dataStr) : {};
+    pending[questionId] = {
+      payload,
+      timestamp: Date.now()
+    };
+    localStorage.setItem(key, JSON.stringify(pending));
+  } catch (err) {
+    console.error("Failed to save answer to local storage", err);
+  }
+};
+
+const removeFromLocalStorage = (sessionId: number, questionId: number) => {
+  try {
+    const key = `eduexam_pending_sync_${sessionId}`;
+    const dataStr = localStorage.getItem(key);
+    if (dataStr) {
+      const pending = JSON.parse(dataStr);
+      delete pending[questionId];
+      if (Object.keys(pending).length === 0) {
+        localStorage.removeItem(key);
+      } else {
+        localStorage.setItem(key, JSON.stringify(pending));
+      }
+    }
+  } catch (err) {
+    console.error("Failed to remove answer from local storage", err);
+  }
+};
+
+const syncLocalStorageQueue = async (sessionId: number) => {
+  try {
+    const key = `eduexam_pending_sync_${sessionId}`;
+    const dataStr = localStorage.getItem(key);
+    if (!dataStr) return;
+    const pending = JSON.parse(dataStr);
+    const questionIds = Object.keys(pending);
+    for (const questionId of questionIds) {
+      const { payload } = pending[questionId];
+      try {
+        await apiRequest(`/api/v1/exam-sessions/${sessionId}/answers/${questionId}/`, {
+          method: "PUT",
+          body: payload,
+        });
+        removeFromLocalStorage(sessionId, Number(questionId));
+      } catch (err) {
+        break;
+      }
+    }
+  } catch (err) {
+    console.error("Failed to sync local storage queue", err);
+  }
+};
+
 export function TakeExam() {
   const { t, i18n } = useTranslation("common");
   const { id } = useParams();
@@ -192,6 +252,7 @@ export function TakeExam() {
   const locale = i18n.resolvedLanguage ?? i18n.language;
 
   const [session, setSession] = useState<CandidateSession | null>(null);
+  const [focusMode, setFocusMode] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
@@ -354,6 +415,8 @@ export function TakeExam() {
     }
 
     setIsSaving(true);
+    saveToLocalStorage(session.id, questionId, payload);
+    
     try {
       const response = await enqueueSessionMutation(() =>
         apiRequest<SessionAnswerResponse>(`/api/v1/exam-sessions/${session.id}/answers/${questionId}/`, {
@@ -369,6 +432,7 @@ export function TakeExam() {
       });
       setLastSavedAt(response.updated_at);
       dirtyEssayQuestionIdsRef.current.delete(questionId);
+      removeFromLocalStorage(session.id, questionId);
     } catch (saveError) {
       const message = saveError instanceof Error ? saveError.message : t("examSession.saveAnswerError");
       notify.error(message);
@@ -562,6 +626,7 @@ export function TakeExam() {
         0,
       );
       setCurrentQuestionIndex(nextIndex === -1 ? 0 : nextIndex);
+      void syncLocalStorageQueue(nextSession.id).catch(() => undefined);
     } catch (loadError) {
       setError(loadError instanceof Error ? loadError.message : t("examSession.unavailableDescription"));
     } finally {
@@ -716,18 +781,19 @@ export function TakeExam() {
       return;
     }
 
-    const intervalId = window.setInterval(() => {
-      setTimeRemaining((current) => {
-        if (current <= 1) {
-          window.clearInterval(intervalId);
-          return 0;
-        }
-        return current - 1;
-      });
-    }, 1000);
+    const expiresTime = new Date(session.expires_at).getTime();
+
+    const updateTimer = () => {
+      const now = new Date().getTime();
+      const diffSeconds = Math.max(0, Math.ceil((expiresTime - now) / 1000));
+      setTimeRemaining(diffSeconds);
+    };
+
+    updateTimer();
+    const intervalId = window.setInterval(updateTimer, 1000);
 
     return () => window.clearInterval(intervalId);
-  }, [session?.id, session?.status]);
+  }, [session?.id, session?.status, session?.expires_at]);
 
   useEffect(() => {
     const tokens = getStoredTokens();
@@ -821,6 +887,7 @@ export function TakeExam() {
     }
 
     const autosave = () => {
+      void syncLocalStorageQueue(session.id).catch(() => undefined);
       if (autosavePendingRef.current || !autosaveDirtyRef.current) {
         return;
       }
@@ -899,6 +966,8 @@ export function TakeExam() {
     const handleVisibilityChange = () => {
       if (document.hidden) {
         void reportViolation("tab_switch", "warning", t("examSession.tabSwitchWarning"));
+      } else {
+        void syncLocalStorageQueue(session.id).catch(() => undefined);
       }
     };
 
@@ -908,7 +977,10 @@ export function TakeExam() {
       }
     };
 
-    const handleOnline = () => setConnectionStatus("unstable");
+    const handleOnline = () => {
+      setConnectionStatus("unstable");
+      void syncLocalStorageQueue(session.id).catch(() => undefined);
+    };
     const handleOffline = () => setConnectionStatus("offline");
 
     sendHeartbeat();
@@ -1017,6 +1089,35 @@ export function TakeExam() {
     updateQuestion(currentQuestion.id, { is_marked_for_review: nextMarked });
     await saveAnswer(currentQuestion.id, { is_marked_for_review: nextMarked });
   };
+
+  useEffect(() => {
+    if (!session || session.status !== "in_progress") {
+      return;
+    }
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      // If Alt + ArrowLeft or Alt + P -> Previous
+      if ((event.altKey && event.key === "ArrowLeft") || (event.altKey && event.key === "p") || (event.altKey && event.key === "P")) {
+        event.preventDefault();
+        void goToQuestion(currentQuestionIndex - 1);
+      }
+      // If Alt + ArrowRight or Alt + N -> Next
+      else if ((event.altKey && event.key === "ArrowRight") || (event.altKey && event.key === "n") || (event.altKey && event.key === "N")) {
+        event.preventDefault();
+        void goToQuestion(currentQuestionIndex + 1);
+      }
+      // If Alt + F -> Toggle Flag
+      else if (event.altKey && (event.key === "f" || event.key === "F")) {
+        event.preventDefault();
+        void toggleMarked();
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [session, currentQuestionIndex, currentQuestion]);
 
   /**
    * Upload top-3 snapshot vi pham (theo severity) len server truoc khi nop bai.
@@ -1322,6 +1423,15 @@ export function TakeExam() {
               <span className="font-mono font-semibold text-blue-900">{formatTime(timeRemaining)}</span>
             </div>
 
+            <Button
+              variant="outline"
+              className="w-full sm:w-auto gap-2"
+              onClick={() => setFocusMode(!focusMode)}
+            >
+              {focusMode ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+              {focusMode ? "Exit Focus" : "Focus Mode"}
+            </Button>
+
             <Button className="w-full sm:w-auto" onClick={() => void confirmSubmit()} disabled={isSubmitting}>
               {t("examSession.submitExam")}
             </Button>
@@ -1330,8 +1440,11 @@ export function TakeExam() {
       </header>
 
       <div className="flex-1 p-4 sm:p-6">
-        <div className="mx-auto grid max-w-7xl grid-cols-1 gap-6 lg:grid-cols-4">
-          <div className="lg:col-span-3">
+        <div className={cn(
+          "mx-auto grid gap-6",
+          focusMode ? "max-w-4xl grid-cols-1" : "max-w-7xl grid-cols-1 lg:grid-cols-4"
+        )}>
+          <div className={focusMode ? "lg:col-span-1" : "lg:col-span-3"}>
             {latestViolationNotice ? (
               <div
                 className={`mb-4 rounded-xl border px-4 py-4 text-sm ${
@@ -1435,10 +1548,26 @@ export function TakeExam() {
             </Card>
           </div>
 
-          <div className="lg:col-span-1">
-            <Card className="lg:sticky lg:top-24">
-              <CardContent className="p-4 sm:p-6">
-                <h3 className="font-semibold text-gray-900 mb-4">{t("examSession.questionNavigator")}</h3>
+          {!focusMode && (
+            <div className="lg:col-span-1">
+              <Card className="lg:sticky lg:top-24">
+                <CardContent className="p-4 sm:p-6">
+                  <h3 className="font-semibold text-gray-900 mb-4">{t("examSession.questionNavigator")}</h3>
+                  
+                  <div className="mb-4">
+                    <div className="w-full h-3 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden flex border border-slate-200/50">
+                      <div 
+                        style={{ width: `${((session.questions.filter(q => q.is_answered && !q.is_marked_for_review).length) / session.questions.length) * 100}%` }} 
+                        className="h-full bg-emerald-500 transition-all duration-500 ease-out"
+                        title="Answered"
+                      />
+                      <div 
+                        style={{ width: `${((session.questions.filter(q => q.is_marked_for_review).length) / session.questions.length) * 100}%` }} 
+                        className="h-full bg-amber-500 transition-all duration-500 ease-out animate-pulse"
+                        title="Marked for Review"
+                      />
+                    </div>
+                  </div>
 
                 {session.enable_proctoring ? (
                   <div className="mb-4 rounded-xl border border-sky-200 bg-sky-50 p-3">
@@ -1529,10 +1658,20 @@ export function TakeExam() {
                     <span className="text-gray-600">{t("examSession.marked")}</span>
                   </div>
                   {isSaving ? <p className="text-xs text-blue-600 pt-2">{t("examSession.savingAnswer")}</p> : null}
+
+                  <div className="mt-4 pt-4 border-t border-gray-200">
+                    <p className="text-xs font-semibold text-slate-500 mb-2">⌨️ CS Shortcuts (Alt+):</p>
+                    <div className="grid grid-cols-2 gap-1 text-[11px] text-slate-500">
+                      <div><kbd className="px-1 bg-slate-100 border rounded">Alt</kbd>+<kbd className="px-1 bg-slate-100 border rounded">←</kbd> Prev</div>
+                      <div><kbd className="px-1 bg-slate-100 border rounded">Alt</kbd>+<kbd className="px-1 bg-slate-100 border rounded">→</kbd> Next</div>
+                      <div><kbd className="px-1 bg-slate-100 border rounded">Alt</kbd>+<kbd className="px-1 bg-slate-100 border rounded">F</kbd> Flag</div>
+                    </div>
+                  </div>
                 </div>
               </CardContent>
             </Card>
           </div>
+          )}
         </div>
       </div>
 

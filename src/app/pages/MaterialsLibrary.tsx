@@ -449,7 +449,7 @@ export function MaterialsLibrary() {
                         <Button size="sm" variant="ghost" onClick={() => openMaterialPreview(material)}>
                           <Eye className="w-4 h-4" />
                         </Button>
-                        <Button size="sm" variant="ghost" onClick={() => void downloadMaterial(material)}>
+                        <Button className="btn-micro-animate" size="sm" variant="ghost" onClick={() => void downloadMaterial(material)}>
                           <Download className="w-4 h-4" />
                         </Button>
                         <Button size="sm" variant="ghost" onClick={() => void deleteMaterial(material)}>
@@ -543,7 +543,7 @@ export function MaterialsLibrary() {
             </Button>
             {selectedMaterial ? (
               <>
-                <Button variant="outline" onClick={() => void downloadMaterial(selectedMaterial)}>
+                <Button className="btn-micro-animate" variant="outline" onClick={() => void downloadMaterial(selectedMaterial)}>
                   <Download className="w-4 h-4 mr-2" />
                   {t("common:actions.download")}
                 </Button>

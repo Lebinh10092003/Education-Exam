@@ -760,6 +760,27 @@ export function LiveMonitoring({ examId: examIdProp, embedded = false }: LiveMon
   const data = snapshot.data;
   const examStatus = exam.data?.status ?? "open";
 
+  const activeCandidateStatus = useMemo(() => {
+    if (!liveView || !snapshot.data?.candidate_statuses) return null;
+    return snapshot.data.candidate_statuses.find(
+      (c) => c.session_id === liveView.sessionId
+    ) ?? null;
+  }, [liveView, snapshot.data?.candidate_statuses]);
+
+  const hasViolationOrAlert = useMemo(() => {
+    if (!liveView) return false;
+    if (activeCandidateStatus) {
+      if (activeCandidateStatus.connection_status === "offline") return true;
+      if (activeCandidateStatus.media.webcam_publish_status === "failed") return true;
+    }
+    if (snapshot.data?.alerts) {
+      return snapshot.data.alerts.some(
+        (alert) => alert.session_id === liveView.sessionId && (alert.severity === "critical" || alert.severity === "warning")
+      );
+    }
+    return false;
+  }, [liveView, activeCandidateStatus, snapshot.data?.alerts]);
+
   const setMonitorTab = (value: string) => {
     updateMonitoringParams({ monitorTab: value });
   };
@@ -1116,7 +1137,10 @@ export function LiveMonitoring({ examId: examIdProp, embedded = false }: LiveMon
                       <div><p className="font-medium text-slate-900">{liveView.candidateName}</p><p className="text-xs text-slate-500">{liveView.participantName || "Waiting for session metadata"}</p></div>
                       <StatusBadge status={liveView.status} />
                     </div>
-                    <div ref={liveStageRef} className="flex aspect-video items-center justify-center rounded-2xl border border-slate-200 bg-slate-950 p-4 text-center text-sm text-slate-200">
+                    <div ref={liveStageRef} className={cn(
+                      "flex aspect-video items-center justify-center rounded-2xl border bg-slate-950 p-4 text-center text-sm text-slate-200 transition-all duration-300",
+                      hasViolationOrAlert ? "proctor-alert-glow" : "border-slate-200"
+                    )}>
                       {liveView.status === "connecting" ? <p>Connecting to webcam feed...</p> : liveView.error ? <p>{liveView.error}</p> : <p>Waiting for webcam track...</p>}
                     </div>
                     <Button size="sm" variant="outline" onClick={() => void closeLiveView()}>Close Webcam</Button>
@@ -1195,7 +1219,10 @@ export function LiveMonitoring({ examId: examIdProp, embedded = false }: LiveMon
                     {liveView ? (
                       <>
                         <div className="flex items-start justify-between gap-3"><div><p className="font-medium text-slate-900">{liveView.candidateName}</p><p className="text-xs text-slate-500">{liveView.participantName || "Waiting for session metadata"}</p></div><StatusBadge status={liveView.status} /></div>
-                        <div ref={liveStageRef} className="flex aspect-video items-center justify-center rounded-2xl border border-slate-200 bg-slate-950 p-4 text-center text-sm text-slate-200">{liveView.status === "connecting" ? <p>Connecting to webcam feed...</p> : liveView.error ? <p>{liveView.error}</p> : <p>Waiting for webcam track...</p>}</div>
+                        <div ref={liveStageRef} className={cn(
+                          "flex aspect-video items-center justify-center rounded-2xl border bg-slate-950 p-4 text-center text-sm text-slate-200 transition-all duration-300",
+                          hasViolationOrAlert ? "proctor-alert-glow" : "border-slate-200"
+                        )}>{liveView.status === "connecting" ? <p>Connecting to webcam feed...</p> : liveView.error ? <p>{liveView.error}</p> : <p>Waiting for webcam track...</p>}</div>
                         <Button size="sm" variant="outline" onClick={() => void closeLiveView()}>Close Webcam</Button>
                       </>
                     ) : (

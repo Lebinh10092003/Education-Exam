@@ -472,7 +472,7 @@ export function ManualGrading() {
                 ) : null}
 
                 <div className="flex justify-end">
-                  <Button onClick={() => void submitGrade()} disabled={mutation.isSubmitting}>
+                  <Button className="btn-micro-animate" onClick={() => void submitGrade()} disabled={mutation.isSubmitting}>
                     <Send className="mr-2 h-4 w-4" />
                     {mutation.isSubmitting ? "Saving..." : "Submit Grade"}
                   </Button>

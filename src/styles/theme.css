@@ -419,3 +419,49 @@
   color: #34d399;
 }
 
+/* Micro-animations and custom proctoring colors */
+@keyframes pulse-glow {
+  0%, 100% {
+    box-shadow: 0 0 15px rgba(239, 68, 68, 0.4);
+    border-color: rgba(239, 68, 68, 0.8);
+  }
+  50% {
+    box-shadow: 0 0 25px rgba(239, 68, 68, 0.8);
+    border-color: rgba(239, 68, 68, 1);
+  }
+}
+
+.proctor-alert-glow {
+  animation: pulse-glow 2s infinite ease-in-out;
+}
+
+/* Micro-animations for buttons */
+.btn-micro-animate {
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.btn-micro-animate:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+}
+
+.btn-micro-animate:active {
+  transform: translateY(1px);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+}
+
+/* Glassmorphism theme utility classes */
+.glass-panel {
+  background: rgba(255, 255, 255, 0.75) !important;
+  backdrop-filter: blur(8px) !important;
+  -webkit-backdrop-filter: blur(8px) !important;
+  border: 1px solid rgba(255, 255, 255, 0.25) !important;
+}
+
+.dark .glass-panel {
+  background: rgba(27, 33, 43, 0.6) !important;
+  backdrop-filter: blur(12px) !important;
+  -webkit-backdrop-filter: blur(12px) !important;
+  border: 1px solid rgba(255, 255, 255, 0.05) !important;
+}
+

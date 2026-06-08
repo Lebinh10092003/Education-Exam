@@ -1,3 +1,4 @@
+import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router";
 import {
   Award,
@@ -104,6 +105,75 @@ const formatDateTime = (value: string | null) => {
 
 const formatNumber = (value: string | number) => Number(value || 0).toFixed(2).replace(/\.00$/, "");
 
+function ExamCountdownWidget({ opensAt, examName }: { opensAt: string; examName: string }) {
+  const [timeLeft, setTimeLeft] = useState<{
+    days: number;
+    hours: number;
+    minutes: number;
+    seconds: number;
+  } | null>(null);
+
+  useEffect(() => {
+    const target = new Date(opensAt).getTime();
+    
+    const calculateTime = () => {
+      const now = new Date().getTime();
+      const diff = target - now;
+      if (diff <= 0) {
+        setTimeLeft(null);
+        return;
+      }
+      
+      const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+      const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+      const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+      const seconds = Math.floor((diff % (1000 * 60)) / 1000);
+      
+      setTimeLeft({ days, hours, minutes, seconds });
+    };
+
+    calculateTime();
+    const interval = setInterval(calculateTime, 1000);
+    return () => clearInterval(interval);
+  }, [opensAt]);
+
+  if (!timeLeft) return null;
+
+  return (
+    <div className="mb-6 rounded-2xl border border-blue-200/50 bg-gradient-to-r from-blue-500/10 to-indigo-500/10 p-5 backdrop-blur-md shadow-lg glass-panel">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <span className="inline-flex items-center rounded-full bg-blue-100 dark:bg-blue-900/40 px-2.5 py-0.5 text-xs font-semibold text-blue-800 dark:text-blue-300">
+            Next Exam Countdown
+          </span>
+          <h3 className="mt-1 text-lg font-bold text-gray-900 dark:text-white">{examName}</h3>
+          <p className="text-sm text-gray-600 dark:text-gray-300">
+            Exam starts on {new Intl.DateTimeFormat("en-GB", { dateStyle: "medium", timeStyle: "short" }).format(new Date(opensAt))}
+          </p>
+        </div>
+        
+        <div className="flex items-center gap-3">
+          {[
+            { label: "Days", value: timeLeft.days },
+            { label: "Hrs", value: timeLeft.hours },
+            { label: "Mins", value: timeLeft.minutes },
+            { label: "Secs", value: timeLeft.seconds },
+          ].map((item) => (
+            <div key={item.label} className="flex flex-col items-center min-w-[3.5rem] rounded-xl bg-white/70 dark:bg-slate-800/70 p-2 shadow-sm border border-slate-200/50 backdrop-blur-sm">
+              <span className="font-mono text-xl font-bold text-blue-600 dark:text-blue-400">
+                {String(item.value).padStart(2, "0")}
+              </span>
+              <span className="text-[10px] uppercase font-medium text-gray-500 dark:text-gray-400">
+                {item.label}
+              </span>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function CandidateDashboard() {
   const dashboard = useAsyncList(
     () => apiRequest<CandidateDashboardOverview>("/api/v1/my-dashboard/overview/"),
@@ -111,6 +181,15 @@ export function CandidateDashboard() {
   );
 
   const overview = dashboard.data;
+
+  const nextUpcomingExam = useMemo(() => {
+    if (!overview?.upcoming_exams) return null;
+    const now = new Date();
+    const upcoming = overview.upcoming_exams
+      .filter((e) => e.schedule.opens_at && new Date(e.schedule.opens_at) > now)
+      .sort((a, b) => new Date(a.schedule.opens_at!).getTime() - new Date(b.schedule.opens_at!).getTime());
+    return upcoming[0] ?? null;
+  }, [overview?.upcoming_exams]);
 
   return (
     <div>
@@ -135,8 +214,15 @@ export function CandidateDashboard() {
         </div>
       ) : null}
 
+      {nextUpcomingExam && nextUpcomingExam.schedule.opens_at && (
+        <ExamCountdownWidget
+          opensAt={nextUpcomingExam.schedule.opens_at}
+          examName={nextUpcomingExam.name}
+        />
+      )}
+
       <div className="mb-6 grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-4">
-        <Card>
+        <Card className="glass-panel transition-all duration-300 hover:shadow-md hover:-translate-y-0.5">
           <CardHeader className="pb-3">
             <CardTitle className="flex items-center gap-2 text-base">
               <FileCheck className="h-4 w-4 text-blue-600" />
@@ -144,11 +230,11 @@ export function CandidateDashboard() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-3xl font-bold text-gray-900">{overview?.stats.assigned_exam_count ?? 0}</p>
-            <p className="mt-1 text-sm text-gray-600">Visible from your current assignments</p>
+            <p className="text-3xl font-bold text-gray-900 dark:text-white">{overview?.stats.assigned_exam_count ?? 0}</p>
+            <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">Visible from your current assignments</p>
           </CardContent>
         </Card>
-        <Card>
+        <Card className="glass-panel transition-all duration-300 hover:shadow-md hover:-translate-y-0.5">
           <CardHeader className="pb-3">
             <CardTitle className="flex items-center gap-2 text-base">
               <CalendarDays className="h-4 w-4 text-green-600" />
@@ -156,11 +242,11 @@ export function CandidateDashboard() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-3xl font-bold text-gray-900">{overview?.stats.upcoming_exam_count ?? 0}</p>
-            <p className="mt-1 text-sm text-gray-600">Exam windows still available</p>
+            <p className="text-3xl font-bold text-gray-900 dark:text-white">{overview?.stats.upcoming_exam_count ?? 0}</p>
+            <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">Exam windows still available</p>
           </CardContent>
         </Card>
-        <Card>
+        <Card className="glass-panel transition-all duration-300 hover:shadow-md hover:-translate-y-0.5">
           <CardHeader className="pb-3">
             <CardTitle className="flex items-center gap-2 text-base">
               <Award className="h-4 w-4 text-purple-600" />
@@ -168,13 +254,13 @@ export function CandidateDashboard() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-3xl font-bold text-gray-900">{overview?.stats.published_result_count ?? 0}</p>
-            <p className="mt-1 text-sm text-gray-600">
+            <p className="text-3xl font-bold text-gray-900 dark:text-white">{overview?.stats.published_result_count ?? 0}</p>
+            <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
               Average {formatNumber(overview?.stats.average_percentage ?? 0)}%
             </p>
           </CardContent>
         </Card>
-        <Card>
+        <Card className="glass-panel transition-all duration-300 hover:shadow-md hover:-translate-y-0.5">
           <CardHeader className="pb-3">
             <CardTitle className="flex items-center gap-2 text-base">
               <BookOpen className="h-4 w-4 text-orange-600" />
@@ -182,14 +268,14 @@ export function CandidateDashboard() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-3xl font-bold text-gray-900">{overview?.stats.active_material_count ?? 0}</p>
-            <p className="mt-1 text-sm text-gray-600">Latest references ready to open</p>
+            <p className="text-3xl font-bold text-gray-900 dark:text-white">{overview?.stats.active_material_count ?? 0}</p>
+            <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">Latest references ready to open</p>
           </CardContent>
         </Card>
       </div>
 
       <div className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1.5fr),minmax(0,1fr)]">
-        <Card>
+        <Card className="glass-panel">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <CalendarDays className="h-5 w-5 text-blue-600" />
@@ -259,7 +345,7 @@ export function CandidateDashboard() {
         </Card>
 
         <div className="space-y-6">
-          <Card>
+          <Card className="glass-panel">
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Award className="h-5 w-5 text-purple-600" />
@@ -305,7 +391,7 @@ export function CandidateDashboard() {
             </CardContent>
           </Card>
 
-          <Card>
+          <Card className="glass-panel">
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <BookOpen className="h-5 w-5 text-orange-600" />
