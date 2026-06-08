@@ -331,3 +331,91 @@
     line-height: 1.5;
   }
 }
+
+/* Custom styles for the competition schedule table */
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 1.5rem;
+}
+
+.table th, .table td {
+  padding: 1rem 1.25rem;
+  vertical-align: middle;
+  border-bottom: 1px solid var(--border);
+}
+
+.table th {
+  font-weight: 700;
+  text-transform: uppercase;
+  font-size: 0.75rem;
+  letter-spacing: 0.05em;
+  background-color: var(--muted);
+  color: var(--muted-foreground);
+}
+
+.table-bordered th, .table-bordered td {
+  border: 1px solid var(--border);
+}
+
+.table-hover tbody tr:hover {
+  background-color: var(--accent);
+}
+
+.exam-name {
+  font-weight: 600;
+  color: var(--foreground);
+  display: block;
+}
+
+.exam-code {
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--muted-foreground);
+  display: block;
+  margin-top: 0.25rem;
+}
+
+.cycle-badge {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 9999px;
+  background-color: rgba(59, 130, 246, 0.1);
+  color: #3b82f6;
+  padding: 0.125rem 0.625rem;
+  font-size: 0.75rem;
+  font-weight: 500;
+}
+
+.dark .cycle-badge {
+  background-color: rgba(59, 130, 246, 0.2);
+  color: #60a5fa;
+}
+
+.date-badge {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 9999px;
+  background-color: var(--muted);
+  color: var(--muted-foreground);
+  padding: 0.125rem 0.625rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.status-badge {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 9999px;
+  background-color: rgba(16, 185, 129, 0.1);
+  color: #10b981;
+  padding: 0.125rem 0.625rem;
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+.dark .status-badge {
+  background-color: rgba(16, 185, 129, 0.2);
+  color: #34d399;
+}
+

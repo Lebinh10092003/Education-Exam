@@ -5,7 +5,6 @@ import {
   ArrowLeft,
   CheckCircle,
   ExternalLink,
-  Globe2,
   Loader2,
   LockKeyhole,
   Mail,
@@ -33,16 +32,19 @@ const partners = [
     name: "School Connect Online",
     initials: "SCO",
     className: "bg-blue-700",
+    logo: "/scologo.svg",
   },
   {
     name: "AYSBC",
     initials: "AY",
     className: "bg-emerald-600",
+    logo: "/aysbc-logo.png",
   },
   {
     name: "FermatTech",
     initials: "FT",
     className: "bg-slate-900",
+    logo: "/fermat-logo.png",
   },
 ];
 
@@ -82,9 +84,7 @@ export function Login() {
       <header className="border-b border-slate-200 bg-white/95 backdrop-blur dark:border-slate-800 dark:bg-slate-950/90">
         <div className="mx-auto flex h-16 max-w-7xl items-center justify-between gap-4 px-4 sm:px-6 lg:px-8">
           <Link to="/" className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-blue-700 text-sm font-black text-white">
-              FT
-            </div>
+            <img src="/fermat-logo.png" alt="FermatTech" className="h-10 w-10 object-contain rounded-lg" />
             <div>
               <p className="font-bold leading-none text-slate-950 dark:text-white">FermatTech</p>
               <p className="mt-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
@@ -121,10 +121,10 @@ export function Login() {
             {partners.map((partner) => (
               <div
                 key={partner.name}
-                className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900"
+                className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900 flex flex-col items-start"
               >
-                <div className={`flex h-10 w-10 items-center justify-center rounded-lg ${partner.className} text-[10px] font-black text-white`}>
-                  {partner.initials}
+                <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-white p-1 border border-slate-200">
+                  <img src={partner.logo} alt={partner.initials} className="h-full w-full object-contain" />
                 </div>
                 <p className="mt-3 text-sm font-bold leading-5 text-slate-900 dark:text-white">{partner.name}</p>
               </div>
@@ -133,7 +133,7 @@ export function Login() {
 
           <div className="mt-8 rounded-lg border border-blue-200 bg-blue-50 p-6 dark:border-blue-900 dark:bg-blue-950/30">
             <div className="flex items-center gap-3">
-              <Globe2 className="h-6 w-6 text-blue-700 dark:text-blue-300" />
+              <img src="/fermat-logo.png" className="h-6 w-6 object-contain" alt="FermatTech" />
               <h2 className="text-lg font-black uppercase tracking-wide text-slate-950 dark:text-white">
                 LIÊN HỆ HỖ TRỢ
               </h2>

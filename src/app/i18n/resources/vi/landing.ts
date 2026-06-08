@@ -78,6 +78,38 @@ const landing = {
     benefits: "Điểm nổi bật",
     learnMore: "Xem thông tin",
     register: "Đăng ký",
+    table: {
+      headers: {
+        olympiad: "Olympiad",
+        cycle: "Chu kỳ",
+        date: "Ngày thi",
+        status: "Trạng thái",
+      },
+      exams: {
+        imo: {
+          name: "Olympic Quốc tế về Toán học",
+        },
+        ico: {
+          name: "Olympic Quốc tế về Lập trình",
+        },
+        ieio: {
+          name: "Olympic Quốc tế về Khởi nghiệp & Đổi mới sáng tạo",
+        },
+        ifko: {
+          name: "Olympic Quốc tế về Kiến thức Tài chính",
+        },
+        ieo: {
+          name: "Olympic Quốc tế về Tiếng Anh",
+        },
+        iso: {
+          name: "Olympic Quốc tế về Khoa học",
+        },
+      },
+      cycle: "Chu kỳ {{num}}",
+      status: {
+        upcoming: "Sắp diễn ra",
+      },
+    },
     cards: {
       ftSco: {
         title: "FT-SCO Global Olympiad",

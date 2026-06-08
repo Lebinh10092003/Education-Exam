@@ -7,7 +7,6 @@ import {
   ArrowRight,
   Award,
   Bot,
-  Brain,
   Calculator,
   CalendarDays,
   CheckCircle,
@@ -15,11 +14,9 @@ import {
   Code2,
   ExternalLink,
   FlaskConical,
-  Globe2,
   Languages,
   Lightbulb,
   Mail,
-  Medal,
   Moon,
   Phone,
   Sparkles,
@@ -58,13 +55,7 @@ type Partner = {
   initials: string;
   href: string;
   tone: string;
-};
-
-type Competition = {
-  key: "ftSco" | "imo" | "ico" | "iaio" | "iso" | "aysbc";
-  icon: LucideIcon;
-  href: string;
-  tone: Tone;
+  logo: string;
 };
 
 const categoryItems: Category[] = [
@@ -136,87 +127,21 @@ const partnerItems: Partner[] = [
     initials: "SCO",
     href: SCO_URL,
     tone: "bg-blue-600",
+    logo: "/scologo.svg",
   },
   {
     key: "aysbc",
     initials: "AY",
     href: AYSBC_URL,
     tone: "bg-emerald-600",
+    logo: "/aysbc-logo.png",
   },
   {
     key: "fermatTech",
     initials: "FT",
     href: "https://fermat.edu.vn/",
     tone: "bg-slate-900",
-  },
-];
-
-const competitionItems: Competition[] = [
-  {
-    key: "ftSco",
-    icon: Globe2,
-    href: SCO_URL,
-    tone: {
-      badge: "bg-blue-50 text-blue-700",
-      border: "border-blue-200",
-      icon: "bg-blue-600 text-white",
-      text: "text-blue-700",
-    },
-  },
-  {
-    key: "imo",
-    icon: Calculator,
-    href: SCO_URL,
-    tone: {
-      badge: "bg-sky-50 text-sky-700",
-      border: "border-sky-200",
-      icon: "bg-sky-600 text-white",
-      text: "text-sky-700",
-    },
-  },
-  {
-    key: "ico",
-    icon: Code2,
-    href: SCO_URL,
-    tone: {
-      badge: "bg-cyan-50 text-cyan-700",
-      border: "border-cyan-200",
-      icon: "bg-cyan-600 text-white",
-      text: "text-cyan-700",
-    },
-  },
-  {
-    key: "iaio",
-    icon: Brain,
-    href: SCO_URL,
-    tone: {
-      badge: "bg-violet-50 text-violet-700",
-      border: "border-violet-200",
-      icon: "bg-violet-600 text-white",
-      text: "text-violet-700",
-    },
-  },
-  {
-    key: "iso",
-    icon: FlaskConical,
-    href: SCO_URL,
-    tone: {
-      badge: "bg-emerald-50 text-emerald-700",
-      border: "border-emerald-200",
-      icon: "bg-emerald-600 text-white",
-      text: "text-emerald-700",
-    },
-  },
-  {
-    key: "aysbc",
-    icon: Medal,
-    href: AYSBC_URL,
-    tone: {
-      badge: "bg-amber-50 text-amber-700",
-      border: "border-amber-200",
-      icon: "bg-amber-500 text-white",
-      text: "text-amber-700",
-    },
+    logo: "/fermat-logo.png",
   },
 ];
 
@@ -250,9 +175,7 @@ function SectionHeading({
 function BrandMark() {
   return (
     <div className="flex items-center gap-3">
-      <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-blue-700 text-sm font-black text-white shadow-sm">
-        FT
-      </div>
+      <img src="/fermat-logo.png" alt="FermatTech" className="h-10 w-10 object-contain rounded-lg" />
       <div className="leading-tight">
         <p className="text-base font-bold text-slate-950 dark:text-white">FermatTech</p>
         <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500 dark:text-slate-400">
@@ -422,11 +345,9 @@ export function LandingPage() {
 
                 <div className="mt-5 grid grid-cols-3 gap-3 text-center">
                   {partnerItems.map((partner) => (
-                    <div key={partner.key} className="rounded-lg border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-950">
-                      <div className={`mx-auto flex h-8 w-8 items-center justify-center rounded-md ${partner.tone} text-[10px] font-black text-white`}>
-                        {partner.initials}
-                      </div>
-                      <p className="mt-2 text-[11px] font-bold text-slate-600 dark:text-slate-300">
+                    <div key={partner.key} className="rounded-lg border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-950 flex flex-col items-center justify-center">
+                      <img src={partner.logo} alt={partner.initials} className="mx-auto h-8 w-8 object-contain" />
+                      <p className="mt-2 text-[11px] font-bold text-slate-600 dark:text-slate-300 text-center">
                         {t(`partners.${partner.key}.name`)}
                       </p>
                     </div>
@@ -450,8 +371,8 @@ export function LandingPage() {
                   className="rounded-lg border border-slate-200 bg-white p-5 transition hover:-translate-y-0.5 hover:border-blue-300 hover:shadow-md dark:border-slate-800 dark:bg-slate-900"
                 >
                   <div className="flex items-start gap-4">
-                    <div className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-lg ${partner.tone} text-xs font-black text-white`}>
-                      {partner.initials}
+                    <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-white p-1 border border-slate-200 shadow-sm">
+                      <img src={partner.logo} alt={partner.initials} className="h-full w-full object-contain" />
                     </div>
                     <div>
                       <h3 className="font-bold text-slate-950 dark:text-white">{t(`partners.${partner.key}.name`)}</h3>
@@ -496,60 +417,54 @@ export function LandingPage() {
         <section id="competitions" className="py-16">
           <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
             <SectionHeading title={t("competitions.title")} subtitle={t("competitions.subtitle")} />
-            <div className="mt-10 grid gap-5 lg:grid-cols-2">
-              {competitionItems.map((competition) => {
-                const Icon = competition.icon;
-
-                return (
-                  <Card
-                    key={competition.key}
-                    className={`rounded-lg border ${competition.tone.border} bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900`}
-                  >
-                    <CardContent className="grid gap-5 p-5 sm:grid-cols-[auto_1fr]">
-                      <div className={`flex h-12 w-12 items-center justify-center rounded-lg ${competition.tone.icon}`}>
-                        <Icon className="h-6 w-6" />
-                      </div>
-                      <div>
-                        <div className="flex flex-wrap items-center gap-2">
-                          <span className={`rounded-full px-2.5 py-1 text-xs font-bold ${competition.tone.badge}`}>
-                            {t(`competitions.cards.${competition.key}.category`)}
-                          </span>
-                        </div>
-                        <h3 className="mt-3 text-xl font-bold text-slate-950 dark:text-white">
-                          {t(`competitions.cards.${competition.key}.title`)}
-                        </h3>
-                        <div className="mt-4 grid gap-3 text-sm text-slate-600 sm:grid-cols-3 dark:text-slate-300">
-                          <div>
-                            <p className="font-bold text-slate-900 dark:text-white">{t("competitions.audience")}</p>
-                            <p className="mt-1 leading-6">{t(`competitions.cards.${competition.key}.audience`)}</p>
-                          </div>
-                          <div>
-                            <p className="font-bold text-slate-900 dark:text-white">{t("competitions.format")}</p>
-                            <p className="mt-1 leading-6">{t(`competitions.cards.${competition.key}.format`)}</p>
-                          </div>
-                          <div>
-                            <p className="font-bold text-slate-900 dark:text-white">{t("competitions.benefits")}</p>
-                            <p className="mt-1 leading-6">{t(`competitions.cards.${competition.key}.benefits`)}</p>
-                          </div>
-                        </div>
-                        <div className="mt-5 flex flex-wrap gap-3">
-                          <Button asChild variant="outline" className="rounded-lg border-slate-300">
-                            <a href={competition.href} target="_blank" rel="noreferrer">
-                              {t("competitions.learnMore")}
-                              <ExternalLink className="ml-2 h-4 w-4" />
-                            </a>
-                          </Button>
-                          <Button asChild className="rounded-lg bg-blue-700 text-white hover:bg-blue-800">
-                            <a href={REGISTRATION_URL} target="_blank" rel="noreferrer">
-                              {t("competitions.register")}
-                            </a>
-                          </Button>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                );
-              })}
+            
+            <div className="mt-10 overflow-x-auto rounded-lg border border-slate-200 dark:border-slate-800 shadow-sm bg-white dark:bg-slate-900">
+              <table className="table table-bordered table-hover w-full border-collapse text-left text-sm">
+                <thead className="bg-slate-50 text-xs font-bold uppercase tracking-wider text-slate-700 dark:bg-slate-800/50 dark:text-slate-200 border-b border-slate-200 dark:border-slate-800">
+                  <tr>
+                    <th className="px-6 py-4 font-bold" width="46%">{t("competitions.table.headers.olympiad")}</th>
+                    <th className="px-6 py-4 font-bold text-center" width="18%">{t("competitions.table.headers.cycle")}</th>
+                    <th className="px-6 py-4 font-bold text-center" width="22%">{t("competitions.table.headers.date")}</th>
+                    <th className="px-6 py-4 font-bold text-center" width="14%">{t("competitions.table.headers.status")}</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-200 dark:divide-slate-800">
+                  {[
+                    { key: "imo", code: "IMO", cycle: "3", date: "31/05/2026", status: "upcoming" },
+                    { key: "ico", code: "ICO", cycle: "3", date: "30/05/2026", status: "upcoming" },
+                    { key: "ieio", code: "SCO IEIO", cycle: "3", date: "30/05/2026", status: "upcoming" },
+                    { key: "ifko", code: "SCO IFKO", cycle: "3", date: "30/05/2026", status: "upcoming" },
+                    { key: "ieo", code: "SCO IEO", cycle: "3", date: "07/06/2026", status: "upcoming" },
+                    { key: "iso", code: "ISO", cycle: "3", date: "07/06/2026", status: "upcoming" },
+                  ].map((exam) => (
+                    <tr key={exam.key} className="hover:bg-slate-50 dark:hover:bg-slate-800/30">
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <span className="exam-name font-semibold text-slate-900 dark:text-white block">
+                          {t(`competitions.table.exams.${exam.key}.name`)}
+                        </span>
+                        <span className="exam-code text-xs text-slate-500 dark:text-slate-400 block mt-1">
+                          {exam.code}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-center">
+                        <span className="cycle-badge inline-flex items-center rounded-full bg-blue-50 px-2.5 py-0.5 text-xs font-medium text-blue-700 dark:bg-blue-900/30 dark:text-blue-300">
+                          {t("competitions.table.cycle", { num: exam.cycle })}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-center">
+                        <span className="date-badge inline-flex items-center rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-semibold text-slate-800 dark:bg-slate-800 dark:text-slate-200">
+                          {exam.date}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-center">
+                        <span className="status-badge inline-flex items-center rounded-full bg-emerald-50 px-2.5 py-0.5 text-xs font-bold text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-300">
+                          {t(`competitions.table.status.${exam.status}`)}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           </div>
         </section>
@@ -602,9 +517,9 @@ export function LandingPage() {
                   href={ZALO_URL}
                   target="_blank"
                   rel="noreferrer"
-                  className="rounded-lg border border-blue-200 bg-white p-4 text-sm font-bold text-slate-950 hover:border-blue-400 dark:border-blue-800 dark:bg-slate-950 dark:text-white"
+                  className="rounded-lg border border-blue-200 bg-white p-4 text-sm font-bold text-slate-950 hover:border-blue-400 dark:border-blue-800 dark:bg-slate-950 dark:text-white flex flex-col items-start"
                 >
-                  <Globe2 className="mb-3 h-5 w-5 text-blue-700 dark:text-blue-300" />
+                  <img src="/fermat-logo.png" className="mb-3 h-5 w-5 object-contain" alt="FermatTech" />
                   {t("support.zalo")}
                 </a>
                 <a

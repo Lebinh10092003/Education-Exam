@@ -78,6 +78,38 @@ const landing = {
     benefits: "Highlights",
     learnMore: "View details",
     register: "Register",
+    table: {
+      headers: {
+        olympiad: "Olympiad",
+        cycle: "Cycle",
+        date: "Exam Date",
+        status: "Status",
+      },
+      exams: {
+        imo: {
+          name: "International Math Olympiad",
+        },
+        ico: {
+          name: "International Coding Olympiad",
+        },
+        ieio: {
+          name: "International Entrepreneurship & Innovation Olympiad",
+        },
+        ifko: {
+          name: "International Finance Knowledge Olympiad",
+        },
+        ieo: {
+          name: "International English Olympiad",
+        },
+        iso: {
+          name: "International Science Olympiad",
+        },
+      },
+      cycle: "Cycle {{num}}",
+      status: {
+        upcoming: "Upcoming",
+      },
+    },
     cards: {
       ftSco: {
         title: "FT-SCO Global Olympiad",
