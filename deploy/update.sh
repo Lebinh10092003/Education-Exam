@@ -2,7 +2,7 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-COMPOSE=(docker compose --env-file "$ROOT_DIR/deploy/.env.production" -f "$ROOT_DIR/deploy/docker-compose.prod.yml")
+COMPOSE=(docker compose -p khaothi --env-file "$ROOT_DIR/deploy/.env.production" -f "$ROOT_DIR/deploy/docker-compose.prod.yml")
 
 cd "$ROOT_DIR"
 
