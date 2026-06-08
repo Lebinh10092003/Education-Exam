@@ -2,6 +2,7 @@ services:
   postgres:
     image: postgres:16-alpine
     restart: unless-stopped
+    command: ["postgres", "-c", "max_connections=500"]
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-eduexam}
       POSTGRES_USER: ${POSTGRES_USER:-eduexam}
