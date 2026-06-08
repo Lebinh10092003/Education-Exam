@@ -15,6 +15,8 @@ output/
 .env.development.local
 .env.test.local
 .env.production.local
+deploy/.env.production
+deploy/livekit.yaml
 !.env.example
 backend/.env
 backend/.env.local

@@ -1,0 +1,169 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-eduexam}
+      POSTGRES_USER: ${POSTGRES_USER:-eduexam}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in deploy/.env.production}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-eduexam} -d ${POSTGRES_DB:-eduexam}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  backend:
+    build:
+      context: ..
+      dockerfile: backend/Dockerfile
+    container_name: khaothi-backend
+    restart: unless-stopped
+    environment: &backend_environment
+      DJANGO_SETTINGS_MODULE: config.settings.base
+      DEBUG: ${EDUEXAM_DEBUG:-False}
+      SECRET_KEY: ${SECRET_KEY:?Set SECRET_KEY in deploy/.env.production}
+      ALLOWED_HOSTS: ${ALLOWED_HOSTS:-khaothi.fermat.vn,103.142.27.69,khaothi-backend}
+      DATABASE_URL: postgresql://${POSTGRES_USER:-eduexam}:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in deploy/.env.production}@postgres:5432/${POSTGRES_DB:-eduexam}
+      DATABASE_CONN_MAX_AGE: ${DATABASE_CONN_MAX_AGE:-60}
+      DATABASE_CONN_HEALTH_CHECKS: ${DATABASE_CONN_HEALTH_CHECKS:-True}
+      REDIS_URL: redis://redis:6379/0
+      REDIS_CHANNEL_URL: redis://redis:6379/0
+      REDIS_CACHE_URL: redis://redis:6379/2
+      REDIS_RUNTIME_URL: redis://redis:6379/3
+      REDIS_RUNTIME_MAX_CONNECTIONS: ${REDIS_RUNTIME_MAX_CONNECTIONS:-50}
+      CELERY_BROKER_URL: redis://redis:6379/0
+      CELERY_RESULT_BACKEND: redis://redis:6379/1
+      EMAIL_BACKEND: ${EMAIL_BACKEND:-django.core.mail.backends.console.EmailBackend}
+      DEFAULT_FROM_EMAIL: ${DEFAULT_FROM_EMAIL:-no-reply@khaothi.fermat.vn}
+      FRONTEND_BASE_URL: ${FRONTEND_BASE_URL:-https://khaothi.fermat.vn}
+      PROCTORING_MEDIA_PROVIDER: livekit
+      PROCTORING_MEDIA_URL: ${PROCTORING_MEDIA_URL:-wss://khaothi.fermat.vn}
+      PROCTORING_MEDIA_API_KEY: ${PROCTORING_MEDIA_API_KEY:?Set PROCTORING_MEDIA_API_KEY in deploy/.env.production}
+      PROCTORING_MEDIA_API_SECRET: ${PROCTORING_MEDIA_API_SECRET:?Set PROCTORING_MEDIA_API_SECRET in deploy/.env.production}
+      PROCTORING_MEDIA_ROOM_PREFIX: ${PROCTORING_MEDIA_ROOM_PREFIX:-eduexam-}
+      PROCTORING_MEDIA_TOKEN_TTL_SECONDS: ${PROCTORING_MEDIA_TOKEN_TTL_SECONDS:-900}
+      PROCTORING_HEARTBEAT_INTERVAL_SECONDS: ${PROCTORING_HEARTBEAT_INTERVAL_SECONDS:-60}
+      PROCTORING_PRESENCE_TTL_SECONDS: ${PROCTORING_PRESENCE_TTL_SECONDS:-150}
+      PROCTORING_MAX_CONCURRENT_LIVE_VIEWS: ${PROCTORING_MAX_CONCURRENT_LIVE_VIEWS:-5}
+      PROCTORING_MAX_LIVE_VIEWS_PER_EXAM: ${PROCTORING_MAX_LIVE_VIEWS_PER_EXAM:-3}
+      PROCTORING_HEARTBEAT_UNSTABLE_AFTER_SECONDS: ${PROCTORING_HEARTBEAT_UNSTABLE_AFTER_SECONDS:-90}
+      PROCTORING_HEARTBEAT_OFFLINE_AFTER_SECONDS: ${PROCTORING_HEARTBEAT_OFFLINE_AFTER_SECONDS:-150}
+      PROCTORING_MONITORING_SNAPSHOT_TTL_SECONDS: ${PROCTORING_MONITORING_SNAPSHOT_TTL_SECONDS:-10}
+      PROCTORING_EVIDENCE_RETENTION_DAYS: ${PROCTORING_EVIDENCE_RETENTION_DAYS:-15}
+      PROCTORING_EVIDENCE_CLEANUP_INTERVAL_SECONDS: ${PROCTORING_EVIDENCE_CLEANUP_INTERVAL_SECONDS:-3600}
+      NOTIFICATION_PERMISSION_RECIPIENT_CACHE_TTL_SECONDS: ${NOTIFICATION_PERMISSION_RECIPIENT_CACHE_TTL_SECONDS:-60}
+      EXAM_SESSION_ACTIVITY_WRITE_INTERVAL_SECONDS: ${EXAM_SESSION_ACTIVITY_WRITE_INTERVAL_SECONDS:-30}
+      PRACTICE_DETAILS_RETENTION_DAYS: ${PRACTICE_DETAILS_RETENTION_DAYS:-15}
+      PRACTICE_DETAILS_CLEANUP_INTERVAL_SECONDS: ${PRACTICE_DETAILS_CLEANUP_INTERVAL_SECONDS:-3600}
+      USE_S3_STORAGE: ${USE_S3_STORAGE:-False}
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-}
+      AWS_STORAGE_BUCKET_NAME: ${AWS_STORAGE_BUCKET_NAME:-}
+      AWS_S3_ENDPOINT_URL: ${AWS_S3_ENDPOINT_URL:-}
+      AWS_S3_REGION_NAME: ${AWS_S3_REGION_NAME:-us-east-1}
+    command: sh -c "python manage.py collectstatic --noinput && daphne -b 0.0.0.0 -p 8000 config.asgi:application"
+    volumes:
+      - backend_static:/app/backend/staticfiles
+      - backend_media:/app/backend/media
+    expose:
+      - "8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - default
+      - caddy
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/v1/health/live/', timeout=5).read()\""]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  worker:
+    build:
+      context: ..
+      dockerfile: backend/Dockerfile
+    container_name: khaothi-worker
+    restart: unless-stopped
+    environment: *backend_environment
+    command: celery -A config worker --loglevel=info
+    volumes:
+      - backend_media:/app/backend/media
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  beat:
+    build:
+      context: ..
+      dockerfile: backend/Dockerfile
+    container_name: khaothi-beat
+    restart: unless-stopped
+    environment: *backend_environment
+    command: celery -A config beat --loglevel=info
+    volumes:
+      - backend_media:/app/backend/media
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  frontend:
+    build:
+      context: ..
+      dockerfile: deploy/frontend.Dockerfile
+    container_name: khaothi-frontend
+    restart: unless-stopped
+    volumes:
+      - backend_static:/srv/django-static:ro
+      - backend_media:/srv/django-media:ro
+    expose:
+      - "80"
+    networks:
+      - caddy
+    depends_on:
+      backend:
+        condition: service_healthy
+
+  livekit:
+    image: livekit/livekit-server:latest
+    container_name: khaothi-livekit
+    restart: unless-stopped
+    command: --config /etc/livekit.yaml
+    volumes:
+      - ./livekit.yaml:/etc/livekit.yaml:ro
+    ports:
+      - "7881:7881/tcp"
+      - "7882:7882/udp"
+    networks:
+      - caddy
+
+volumes:
+  postgres_data:
+  redis_data:
+  backend_static:
+  backend_media:
+
+networks:
+  caddy:
+    external: true
+    name: movedrive_default
