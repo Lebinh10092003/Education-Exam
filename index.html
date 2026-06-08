@@ -6,6 +6,21 @@
       <meta name="viewport" content="width=device-width, initial-scale=1.0" />
       <link rel="icon" type="image/png" href="/favicon.png" />
       <title>FermatTech Competitions</title>
+      <script>
+        // Auto-reload the page if a dynamically imported module fails to load (due to a new deployment)
+        window.addEventListener('error', function (e) {
+          if (e.message && (e.message.indexOf('dynamically imported module') !== -1 || e.message.indexOf('Failed to fetch') !== -1)) {
+            console.warn('Dynamic import failed, reloading page to fetch the latest version...');
+            window.location.reload();
+          }
+        }, true);
+        window.addEventListener('unhandledrejection', function (e) {
+          if (e.reason && (e.reason.name === 'TypeError' || e.reason.message && e.reason.message.indexOf('dynamically imported module') !== -1)) {
+            console.warn('Unhandled dynamic import rejection, reloading page...');
+            window.location.reload();
+          }
+        });
+      </script>
     </head>
 
     <body>
