@@ -243,6 +243,32 @@ def _exam_roster_workbook(exam):
     return workbook
 
 
+def _exam_unsubmitted_workbook(exam):
+    candidates = list(_assigned_exam_candidates(exam))
+    submitted_user_ids = set(
+        Result.objects.filter(session__exam=exam).values_list("session__candidate_id", flat=True)
+    )
+    unsubmitted_candidates = [
+        c for c in candidates if c.id not in submitted_user_ids
+    ]
+    workbook = Workbook()
+    sheet = workbook.active
+    sheet.title = "Chưa thi"
+    headers = ["STT", "Họ tên", "Email", "Tài khoản", "Trạng thái"]
+    rows = [
+        [
+            index,
+            c.full_name,
+            c.email,
+            c.username,
+            "Chưa thi"
+        ]
+        for index, c in enumerate(unsubmitted_candidates, start=1)
+    ]
+    _write_sheet(sheet, headers, rows)
+    return workbook
+
+
 def _review_workbook(result):
     review = ResultReviewSerializer(result).data
     workbook = Workbook()
@@ -536,6 +562,14 @@ class ResultViewSet(
             return Response({"detail": "exam is required."}, status=status.HTTP_400_BAD_REQUEST)
         exam = get_object_or_404(Exam.objects.select_related("subject"), pk=exam_id)
         return _xlsx_response(_exam_roster_workbook(exam), f"eduexam-exam-roster-{exam.id}.xlsx")
+
+    @action(detail=False, methods=["get"], url_path="exam-unsubmitted-export")
+    def exam_unsubmitted_export(self, request):
+        exam_id = request.query_params.get("exam")
+        if not exam_id:
+            return Response({"detail": "exam is required."}, status=status.HTTP_400_BAD_REQUEST)
+        exam = get_object_or_404(Exam, pk=exam_id)
+        return _xlsx_response(_exam_unsubmitted_workbook(exam), f"eduexam-unsubmitted-{exam.id}.xlsx")
 
     @action(detail=False, methods=["get"], url_path="candidates")
     def candidates(self, request):

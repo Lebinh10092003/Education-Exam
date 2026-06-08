@@ -217,3 +217,39 @@ def test_admin_can_get_exam_candidates_list_with_status(
     assert user.email in candidate_map
     assert candidate_map[user.email]["has_submitted"] is False
 
+
+@pytest.mark.django_db
+def test_admin_can_export_exam_unsubmitted_candidates_xlsx(
+    api_client,
+    admin_token,
+    subject,
+    admin_user,
+    candidate_user,
+    user,
+):
+    from apps.institutions.models import GroupMembership
+
+    result = _build_finalized_result(subject=subject, admin_user=admin_user, candidate_user=candidate_user)
+    group = result.session.exam.assignments.filter(group__isnull=False).first().group
+    GroupMembership.objects.create(group=group, user=user)
+    api_client.credentials(HTTP_AUTHORIZATION=f"Bearer {admin_token}")
+
+    response = api_client.get(f"/api/v1/results/exam-unsubmitted-export/?exam={result.session.exam_id}")
+
+    assert response.status_code == 200
+    workbook = load_workbook(BytesIO(response.content))
+    assert workbook.sheetnames == ["Chưa thi"]
+    # STT, Họ tên, Email, Tài khoản, Trạng thái
+    assert workbook["Chưa thi"]["A1"].value == "STT"
+    assert workbook["Chưa thi"]["B1"].value == "Họ tên"
+    assert workbook["Chưa thi"]["C1"].value == "Email"
+    assert workbook["Chưa thi"]["D1"].value == "Tài khoản"
+    assert workbook["Chưa thi"]["E1"].value == "Trạng thái"
+
+    assert workbook["Chưa thi"]["A2"].value == 1
+    assert workbook["Chưa thi"]["B2"].value == user.full_name
+    assert workbook["Chưa thi"]["C2"].value == user.email
+    assert workbook["Chưa thi"]["D2"].value == user.username
+    assert workbook["Chưa thi"]["E2"].value == "Chưa thi"
+
+

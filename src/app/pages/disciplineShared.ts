@@ -216,5 +216,5 @@ export const downloadDisciplineWorkbook = async (path: string, fileName: string)
   link.remove();
   window.setTimeout(() => {
     window.URL.revokeObjectURL(downloadUrl);
-  }, 0);
+  }, 100);
 };

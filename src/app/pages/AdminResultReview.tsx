@@ -103,7 +103,9 @@ const downloadReviewExport = async (resultId: string) => {
     document.body.append(anchor);
     anchor.click();
     anchor.remove();
-    URL.revokeObjectURL(url);
+    setTimeout(() => {
+      URL.revokeObjectURL(url);
+    }, 100);
     notify.success("Đã xuất file rà bài.");
   } catch (error) {
     notify.error(error instanceof Error ? error.message : "Không thể xuất file rà bài.");

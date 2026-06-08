@@ -190,7 +190,9 @@ const downloadApiFile = async (path: string, fallbackFileName: string, successMe
     document.body.append(anchor);
     anchor.click();
     anchor.remove();
-    URL.revokeObjectURL(url);
+    setTimeout(() => {
+      URL.revokeObjectURL(url);
+    }, 100);
     notify.success(successMessage);
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unable to export file.";
@@ -208,24 +210,12 @@ const exportResultsFile = async (format: "csv" | "xlsx", examId: string) => {
   );
 };
 
-const exportUnsubmittedCandidates = (candidates: CandidateRecord[], examName: string) => {
-  const unsubmitted = candidates.filter((c) => !c.has_submitted);
-  if (unsubmitted.length === 0) {
-    notify.info("Không có thí sinh chưa thi.");
-    return;
-  }
-  const headers = ["Họ tên", "Email", "Tài khoản", "Trạng thái"];
-  const rows = unsubmitted.map((c) => [c.full_name, c.email, c.username, "Chưa thi"]);
-  const csvContent = "\uFEFF" + [headers, ...rows].map((e) => e.map((val) => `"${val}"`).join(",")).join("\n");
-  const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement("a");
-  link.setAttribute("href", url);
-  link.setAttribute("download", `thi_sinh_chua_thi_${examName}.csv`);
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
-  notify.success("Đã xuất danh sách thí sinh chưa thi.");
+const exportUnsubmittedFile = async (examId: string, examName: string) => {
+  await downloadApiFile(
+    `/api/v1/results/exam-unsubmitted-export/?exam=${examId}`,
+    `thi_sinh_chua_thi_${examName}.xlsx`,
+    "Đã xuất danh sách thí sinh chưa thi (XLSX).",
+  );
 };
 
 type ExamTab = "details" | "assignments" | "questions" | "rules" | "monitoring" | "results";
@@ -762,11 +752,11 @@ export function ExamDetail() {
                       </Button>
                       <Button
                         variant="outline"
-                        onClick={() => exportUnsubmittedCandidates(candidatesList.data ?? [], exam.name)}
+                        onClick={() => void exportUnsubmittedFile(exam.id.toString(), exam.name)}
                         disabled={candidatesList.isLoading}
                       >
-                        <Download className="mr-2 h-4 w-4" />
-                        Xuất DS chưa thi (CSV)
+                        <FileSpreadsheet className="mr-2 h-4 w-4" />
+                        Xuất DS chưa thi (XLSX)
                       </Button>
                     </div>
                   </div>

@@ -28,7 +28,9 @@ const downloadTemplateFile = (format: ImportTemplateFormatDefinition) => {
   document.body.appendChild(anchor);
   anchor.click();
   document.body.removeChild(anchor);
-  window.URL.revokeObjectURL(url);
+  setTimeout(() => {
+    window.URL.revokeObjectURL(url);
+  }, 100);
 };
 
 export function ImportTemplateActions({

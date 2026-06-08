@@ -138,7 +138,9 @@ const downloadApiFile = async (path: string, fallbackFileName: string, successMe
     document.body.append(anchor);
     anchor.click();
     anchor.remove();
-    URL.revokeObjectURL(url);
+    setTimeout(() => {
+      URL.revokeObjectURL(url);
+    }, 100);
     notify.success(successMessage);
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unable to export file.";
@@ -241,7 +243,9 @@ export function ResultsReports() {
     document.body.append(anchor);
     anchor.click();
     anchor.remove();
-    URL.revokeObjectURL(url);
+    setTimeout(() => {
+      URL.revokeObjectURL(url);
+    }, 100);
   };
 
   const results = resultsList.data?.results ?? [];

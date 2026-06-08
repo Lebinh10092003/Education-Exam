@@ -58,6 +58,6 @@ export const exportViolationHistoryExcel = async ({
   link.remove();
   window.setTimeout(() => {
     window.URL.revokeObjectURL(downloadUrl);
-  }, 0);
+  }, 100);
 };
 

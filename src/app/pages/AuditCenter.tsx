@@ -107,7 +107,9 @@ const downloadJson = (events: AuditEventRecord[]) => {
   anchor.href = url;
   anchor.download = `audit-events-${new Date().toISOString().slice(0, 10)}.json`;
   anchor.click();
-  URL.revokeObjectURL(url);
+  setTimeout(() => {
+    URL.revokeObjectURL(url);
+  }, 100);
 };
 
 export function AuditCenter() {
