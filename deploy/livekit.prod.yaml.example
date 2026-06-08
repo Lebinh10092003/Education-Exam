@@ -4,8 +4,7 @@ rtc:
   tcp_port: 7881
   udp_port: 7882
   use_external_ip: false
-  node_ip:
-    ipv4: 103.142.27.69
+  node_ip: 103.142.27.69
 
 keys:
   replace-with-livekit-api-key: replace-with-livekit-api-secret
