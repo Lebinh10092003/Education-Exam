@@ -1,6 +1,7 @@
 from django.contrib.auth.base_user import BaseUserManager
 from django.contrib.auth.models import AbstractBaseUser, PermissionsMixin
 from django.db import models
+from django.db.models.functions import Upper
 
 from apps.platform_core.models import TimeStampedModel
 from .utils import build_email_username, ensure_unique_username
@@ -64,6 +65,10 @@ class User(AbstractBaseUser, PermissionsMixin, TimeStampedModel):
 
     class Meta:
         ordering = ("email",)
+        indexes = [
+            models.Index(Upper("username"), name="ident_user_un_upper_idx"),
+            models.Index(Upper("email"), name="ident_user_em_upper_idx"),
+        ]
 
     def __str__(self):
         return self.username or self.email

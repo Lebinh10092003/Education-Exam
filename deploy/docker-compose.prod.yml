@@ -2,7 +2,7 @@ services:
   postgres:
     image: postgres:16-alpine
     restart: unless-stopped
-    command: ["postgres", "-c", "max_connections=500"]
+    command: ["postgres", "-c", "max_connections=200", "-c", "idle_session_timeout=5min"]
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-eduexam}
       POSTGRES_USER: ${POSTGRES_USER:-eduexam}
@@ -11,6 +11,29 @@ services:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-eduexam} -d ${POSTGRES_DB:-eduexam}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  pgbouncer:
+    image: edoburu/pgbouncer:v1.25.1-p0
+    container_name: khaothi-pgbouncer
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgres://${POSTGRES_USER:-eduexam}:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in deploy/.env.production}@postgres:5432/${POSTGRES_DB:-eduexam}
+      AUTH_TYPE: scram-sha-256
+      POOL_MODE: transaction
+      MAX_CLIENT_CONN: ${PGBOUNCER_MAX_CLIENT_CONN:-500}
+      DEFAULT_POOL_SIZE: ${PGBOUNCER_DEFAULT_POOL_SIZE:-20}
+      MIN_POOL_SIZE: ${PGBOUNCER_MIN_POOL_SIZE:-5}
+      RESERVE_POOL_SIZE: ${PGBOUNCER_RESERVE_POOL_SIZE:-5}
+      SERVER_IDLE_TIMEOUT: ${PGBOUNCER_SERVER_IDLE_TIMEOUT:-60}
+      SERVER_LIFETIME: ${PGBOUNCER_SERVER_LIFETIME:-3600}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -p 5432 -U ${POSTGRES_USER:-eduexam} -d ${POSTGRES_DB:-eduexam}"]
       interval: 10s
       timeout: 5s
       retries: 10
@@ -38,9 +61,10 @@ services:
       DEBUG: ${EDUEXAM_DEBUG:-False}
       SECRET_KEY: ${SECRET_KEY:?Set SECRET_KEY in deploy/.env.production}
       ALLOWED_HOSTS: ${ALLOWED_HOSTS:-khaothi.fermat.vn,103.142.27.69,khaothi-backend}
-      DATABASE_URL: postgresql://${POSTGRES_USER:-eduexam}:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in deploy/.env.production}@postgres:5432/${POSTGRES_DB:-eduexam}
-      DATABASE_CONN_MAX_AGE: ${DATABASE_CONN_MAX_AGE:-60}
+      DATABASE_URL: postgresql://${POSTGRES_USER:-eduexam}:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in deploy/.env.production}@pgbouncer:5432/${POSTGRES_DB:-eduexam}
+      DATABASE_CONN_MAX_AGE: ${DATABASE_CONN_MAX_AGE:-0}
       DATABASE_CONN_HEALTH_CHECKS: ${DATABASE_CONN_HEALTH_CHECKS:-True}
+      DATABASE_DISABLE_SERVER_SIDE_CURSORS: ${DATABASE_DISABLE_SERVER_SIDE_CURSORS:-True}
       REDIS_URL: redis://redis:6379/0
       REDIS_CHANNEL_URL: redis://redis:6379/0
       REDIS_CACHE_URL: redis://redis:6379/2
@@ -48,6 +72,8 @@ services:
       REDIS_RUNTIME_MAX_CONNECTIONS: ${REDIS_RUNTIME_MAX_CONNECTIONS:-50}
       CELERY_BROKER_URL: redis://redis:6379/0
       CELERY_RESULT_BACKEND: redis://redis:6379/1
+      CELERY_WORKER_CONCURRENCY: ${CELERY_WORKER_CONCURRENCY:-2}
+      SIMPLE_JWT_UPDATE_LAST_LOGIN: ${SIMPLE_JWT_UPDATE_LAST_LOGIN:-True}
       EMAIL_BACKEND: ${EMAIL_BACKEND:-django.core.mail.backends.console.EmailBackend}
       DEFAULT_FROM_EMAIL: ${DEFAULT_FROM_EMAIL:-no-reply@khaothi.fermat.vn}
       FRONTEND_BASE_URL: ${FRONTEND_BASE_URL:-https://khaothi.fermat.vn}
@@ -83,7 +109,7 @@ services:
     expose:
       - "8000"
     depends_on:
-      postgres:
+      pgbouncer:
         condition: service_healthy
       redis:
         condition: service_healthy
@@ -103,11 +129,11 @@ services:
     container_name: khaothi-worker
     restart: unless-stopped
     environment: *backend_environment
-    command: celery -A config worker --loglevel=info
+    command: celery -A config worker --loglevel=info --concurrency=${CELERY_WORKER_CONCURRENCY:-2}
     volumes:
       - backend_media:/app/backend/media
     depends_on:
-      postgres:
+      pgbouncer:
         condition: service_healthy
       redis:
         condition: service_healthy
@@ -123,7 +149,7 @@ services:
     volumes:
       - backend_media:/app/backend/media
     depends_on:
-      postgres:
+      pgbouncer:
         condition: service_healthy
       redis:
         condition: service_healthy

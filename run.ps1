@@ -71,10 +71,14 @@ if (!(Test-Path .env)) {
 }
 
 $envContent = Get-Content .env
-$envContent = $envContent -replace '^DATABASE_URL=.*', 'DATABASE_URL=postgresql://postgres:abc@127.0.0.1:5432/eduexam'
+$envContent = $envContent -replace '^DATABASE_URL=.*', 'DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:6432/eduexam'
+$envContent = $envContent -replace '^DATABASE_CONN_MAX_AGE=.*', 'DATABASE_CONN_MAX_AGE=0'
+$envContent = $envContent -replace '^DATABASE_DISABLE_SERVER_SIDE_CURSORS=.*', 'DATABASE_DISABLE_SERVER_SIDE_CURSORS=True'
 $envContent = $envContent -replace '^REDIS_URL=.*', 'REDIS_URL=redis://127.0.0.1:6379/0'
 $envContent = $envContent -replace '^CELERY_BROKER_URL=.*', 'CELERY_BROKER_URL=redis://127.0.0.1:6379/0'
 $envContent = $envContent -replace '^CELERY_RESULT_BACKEND=.*', 'CELERY_RESULT_BACKEND=redis://127.0.0.1:6379/1'
+$envContent = $envContent -replace '^CELERY_WORKER_CONCURRENCY=.*', 'CELERY_WORKER_CONCURRENCY=2'
+$envContent = $envContent -replace '^SIMPLE_JWT_UPDATE_LAST_LOGIN=.*', 'SIMPLE_JWT_UPDATE_LAST_LOGIN=True'
 $envContent = $envContent -replace '^FRONTEND_BASE_URL=.*', 'FRONTEND_BASE_URL=http://127.0.0.1:5173'
 $envContent = $envContent -replace '^PROCTORING_MEDIA_PROVIDER=.*', 'PROCTORING_MEDIA_PROVIDER=livekit'
 $envContent = $envContent -replace '^PROCTORING_MEDIA_URL=.*', 'PROCTORING_MEDIA_URL=ws://127.0.0.1:7880'
@@ -88,10 +92,14 @@ $envContent | Set-Content .env
 
 # Bo sung cac cau hinh neu chua ton tai
 $keys = @(
-    @{ Pattern = '^DATABASE_URL='; Value = 'DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:5432/eduexam' },
+    @{ Pattern = '^DATABASE_URL='; Value = 'DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:6432/eduexam' },
+    @{ Pattern = '^DATABASE_CONN_MAX_AGE='; Value = 'DATABASE_CONN_MAX_AGE=0' },
+    @{ Pattern = '^DATABASE_DISABLE_SERVER_SIDE_CURSORS='; Value = 'DATABASE_DISABLE_SERVER_SIDE_CURSORS=True' },
     @{ Pattern = '^REDIS_URL='; Value = "REDIS_URL=redis://127.0.0.1:6379/0" },
     @{ Pattern = '^CELERY_BROKER_URL='; Value = "CELERY_BROKER_URL=redis://127.0.0.1:6379/0" },
     @{ Pattern = '^CELERY_RESULT_BACKEND='; Value = "CELERY_RESULT_BACKEND=redis://127.0.0.1:6379/1" },
+    @{ Pattern = '^CELERY_WORKER_CONCURRENCY='; Value = "CELERY_WORKER_CONCURRENCY=2" },
+    @{ Pattern = '^SIMPLE_JWT_UPDATE_LAST_LOGIN='; Value = "SIMPLE_JWT_UPDATE_LAST_LOGIN=True" },
     @{ Pattern = '^FRONTEND_BASE_URL='; Value = "FRONTEND_BASE_URL=http://127.0.0.1:5173" },
     @{ Pattern = '^PROCTORING_MEDIA_PROVIDER='; Value = "PROCTORING_MEDIA_PROVIDER=livekit" },
     @{ Pattern = '^PROCTORING_MEDIA_URL='; Value = "PROCTORING_MEDIA_URL=ws://127.0.0.1:7880" },
@@ -111,7 +119,7 @@ foreach ($key in $keys) {
 # 4. Khoi dong Docker cho cac dich vu local (Redis, LiveKit)
 Write-Host ""
 Write-Host ">>> [4/6] Dang khoi dong PostgreSQL, Redis va LiveKit qua Docker..." -ForegroundColor Cyan
-docker compose up -d postgres redis livekit
+docker compose up -d postgres pgbouncer redis livekit
 
 # Cho PostgreSQL san sang truoc khi migrate
 Write-Host ">>> Dang cho PostgreSQL khoi dong (10s)..." -ForegroundColor Yellow

@@ -1,6 +1,8 @@
 from django.db.models import Q
+from django.contrib.auth.models import update_last_login
 from rest_framework import serializers
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
+from rest_framework_simplejwt.settings import api_settings
 from drf_spectacular.utils import extend_schema_field
 from django.contrib.auth.password_validation import validate_password
 
@@ -49,7 +51,13 @@ class EduExamTokenObtainPairSerializer(TokenObtainPairSerializer):
             user.save(update_fields=["status"])
 
         self.user = user
-        data = super().validate({"email": user.email, "password": password})
+        refresh = self.get_token(user)
+        data = {
+            "refresh": str(refresh),
+            "access": str(refresh.access_token),
+        }
+        if api_settings.UPDATE_LAST_LOGIN:
+            update_last_login(None, user)
         data["username"] = user.username
         return data
 

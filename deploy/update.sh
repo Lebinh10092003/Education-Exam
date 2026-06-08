@@ -8,7 +8,7 @@ cd "$ROOT_DIR"
 
 git pull --ff-only
 
-"${COMPOSE[@]}" up -d postgres redis livekit
+"${COMPOSE[@]}" up -d postgres pgbouncer redis livekit
 "${COMPOSE[@]}" build backend worker beat frontend
 "${COMPOSE[@]}" run --rm backend python manage.py migrate
 "${COMPOSE[@]}" up -d
