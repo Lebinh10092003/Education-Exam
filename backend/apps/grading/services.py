@@ -129,24 +129,25 @@ def initialize_grading_for_submission(*, session):
             },
         )
 
-    if created_task_count:
-        create_notifications_for_permission(
-            permission_code="grading.manage",
-            title="Manual grading required",
-            message=(
-                f'{session.candidate.full_name or session.candidate.email} submitted "{session.exam.name}" '
-                f"and {created_task_count} response(s) require manual grading."
-            ),
-            category=Notification.Category.GRADING,
-            priority=Notification.Priority.MEDIUM,
-            action_url="/manual-grading",
-            metadata={
-                "session_id": session.id,
-                "exam_id": session.exam_id,
-                "candidate_id": session.candidate_id,
-                "manual_task_count": created_task_count,
-            },
-        )
+    # In accordance with optimization requests, admin notifications for each student submission are disabled.
+    # if created_task_count:
+    #     create_notifications_for_permission(
+    #         permission_code="grading.manage",
+    #         title="Manual grading required",
+    #         message=(
+    #             f'{session.candidate.full_name or session.candidate.email} submitted "{session.exam.name}" '
+    #             f"and {created_task_count} response(s) require manual grading."
+    #         ),
+    #         category=Notification.Category.GRADING,
+    #         priority=Notification.Priority.MEDIUM,
+    #         action_url="/manual-grading",
+    #         metadata={
+    #             "session_id": session.id,
+    #             "exam_id": session.exam_id,
+    #             "candidate_id": session.candidate_id,
+    #             "manual_task_count": created_task_count,
+    #         },
+    #     )
 
     return _sync_result_state(session=session)
 
