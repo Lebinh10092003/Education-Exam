@@ -154,6 +154,18 @@ export function GroupManagement() {
     [membersDialogGroup?.id, membershipRefreshKey],
   );
 
+  const rolesList = useAsyncList(
+    async () =>
+      apiRequest<PaginatedResponse<{ id: number; name: string; slug: string }>>("/api/v1/roles/", {
+        query: { page_size: 100 },
+      }),
+    [],
+  );
+
+  const candidateRole = rolesList.data?.results.find((r) => r.slug === "candidate");
+  const candidateRoleId = candidateRole?.id;
+
+
   const candidateSearchResults = useAsyncList(
     async () => {
       if (!membersDialogGroup) {
@@ -304,6 +316,17 @@ export function GroupManagement() {
     });
   };
 
+  const openCreateCandidateDialog = () => {
+    setEditingCandidateId(null);
+    setCandidateFormState({
+      full_name: "",
+      email: "",
+      phone_number: "",
+      password: "",
+    });
+    setIsCandidateEditingOpen(true);
+  };
+
   const openEditCandidateDialog = async (userId: number) => {
     setEditingCandidateId(userId);
     setCandidateFormState({
@@ -326,15 +349,14 @@ export function GroupManagement() {
         password: "",
       });
     } catch (err) {
-      notify.error("Failed to load candidate details.");
+      notify.error("Không thể tải thông tin thí sinh.");
       setIsCandidateEditingOpen(false);
     }
   };
 
   const saveCandidate = async () => {
-    if (!editingCandidateId) return;
     if (!candidateFormState.full_name.trim()) {
-      notify.error("Full name is required.");
+      notify.error("Họ và tên là bắt buộc.");
       return;
     }
 
@@ -348,16 +370,79 @@ export function GroupManagement() {
         payload.password = candidateFormState.password;
       }
 
-      await apiRequest(`/api/v1/users/${editingCandidateId}/`, {
-        method: "PATCH",
-        body: payload,
-      });
+      if (editingCandidateId) {
+        await apiRequest(`/api/v1/users/${editingCandidateId}/`, {
+          method: "PATCH",
+          body: payload,
+        });
+        notify.success("Cập nhật thông tin thí sinh thành công.");
+      } else {
+        if (!candidateFormState.password.trim()) {
+          notify.error("Mật khẩu là bắt buộc khi tạo thí sinh mới.");
+          return;
+        }
+
+        let roleId = candidateRoleId;
+        if (!roleId) {
+          try {
+            const rolesResp = await apiRequest<PaginatedResponse<{ id: number; slug: string }>>("/api/v1/roles/", {
+              query: { page_size: 100 },
+            });
+            const candRole = rolesResp.results.find((r) => r.slug === "candidate");
+            roleId = candRole?.id;
+          } catch (e) {
+            console.error("Failed to load roles during candidate creation", e);
+          }
+        }
+
+        payload.role_ids = roleId ? [roleId] : [];
+        payload.status = "active";
+        payload.is_active = true;
+
+        const newUser = await apiRequest<{ id: number }>("/api/v1/users/", {
+          method: "POST",
+          body: payload,
+        });
+
+        if (membersDialogGroup) {
+          await apiRequest(`/api/v1/groups/${membersDialogGroup.id}/memberships/`, {
+            method: "POST",
+            body: {
+              user_id: newUser.id,
+              is_active: true,
+            },
+          });
+        }
+        notify.success("Đã tạo thí sinh mới và thêm vào nhóm.");
+      }
 
       setIsCandidateEditingOpen(false);
       setMembershipRefreshKey((previous) => previous + 1);
-      notify.success("Candidate details updated.");
+      await groupsList.reload();
     });
   };
+
+  const deleteCandidateAccount = async () => {
+    if (!editingCandidateId) return;
+    const confirmed = await notify.confirm({
+      title: "Xóa tài khoản thí sinh?",
+      text: "Tài khoản thí sinh này sẽ bị xóa vĩnh viễn khỏi hệ thống.",
+      confirmText: "Xóa tài khoản",
+      confirmButtonColor: "#dc2626",
+    });
+    if (!confirmed) return;
+
+    await mutation.run(async () => {
+      await apiRequest(`/api/v1/users/${editingCandidateId}/`, {
+        method: "DELETE",
+      });
+      setIsCandidateEditingOpen(false);
+      setMembershipRefreshKey((previous) => previous + 1);
+      await groupsList.reload();
+      notify.success("Đã xóa tài khoản thí sinh khỏi hệ thống.");
+    });
+  };
+
 
   const removeMember = async (userId: number, userName: string) => {
     if (!membersDialogGroup) return;
@@ -714,17 +799,23 @@ export function GroupManagement() {
                 </div>
               ) : null}
 
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                <Input
-                  placeholder="Search candidates..."
-                  className="pl-10"
-                  value={candidateSearchQuery}
-                  onChange={(event) => setCandidateSearchQuery(event.target.value)}
-                />
+              <div className="flex gap-2 shrink-0">
+                <div className="relative flex-1">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                  <Input
+                    placeholder="Tìm kiếm thí sinh..."
+                    className="pl-10"
+                    value={candidateSearchQuery}
+                    onChange={(event) => setCandidateSearchQuery(event.target.value)}
+                  />
+                </div>
+                <Button onClick={openCreateCandidateDialog} variant="outline" size="sm" className="h-10 shrink-0">
+                  <Plus className="w-4 h-4 mr-2" />
+                  Tạo thí sinh
+                </Button>
               </div>
 
-              <div className="min-h-[14rem] flex-1 overflow-y-auto rounded-lg border">
+              <div className="h-[24rem] lg:h-full lg:flex-1 overflow-y-auto rounded-lg border">
                 <div className="divide-y">
                   {candidateSearchResults.isLoading ? (
                     <div className="p-4 text-sm text-gray-500">Loading candidate list...</div>
@@ -735,8 +826,8 @@ export function GroupManagement() {
                   ) : (
                     availableCandidates.map((candidate) => (
                       <label
-                        key={candidate.id}
-                        className="flex cursor-pointer items-start gap-3 p-3 hover:bg-gray-50"
+                         key={candidate.id}
+                         className="flex cursor-pointer items-start gap-3 p-3 hover:bg-gray-50"
                       >
                         <Checkbox
                           checked={selectedCandidateIds.includes(candidate.id)}
@@ -767,7 +858,7 @@ export function GroupManagement() {
                 <h3 className="text-sm font-semibold text-gray-900">Current Members</h3>
                 <Badge variant="outline">{memberships.length}</Badge>
               </div>
-              <div className="mt-4 min-h-[14rem] flex-1 overflow-y-auto pr-1">
+              <div className="mt-4 h-[24rem] lg:h-full lg:flex-1 overflow-y-auto pr-1">
                 <div className="space-y-3">
                 {membershipsList.isLoading ? (
                   <p className="text-sm text-gray-500">Loading members...</p>
@@ -831,14 +922,18 @@ export function GroupManagement() {
       <Dialog open={isCandidateEditingOpen} onOpenChange={setIsCandidateEditingOpen}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>Chỉnh sửa thông tin thí sinh</DialogTitle>
+            <DialogTitle>
+              {editingCandidateId ? "Chỉnh sửa thông tin thí sinh" : "Tạo tài khoản thí sinh mới"}
+            </DialogTitle>
             <DialogDescription>
-              Xem, cập nhật thông tin chi tiết và đặt lại mật khẩu cho tài khoản thí sinh.
+              {editingCandidateId
+                ? "Xem, cập nhật thông tin chi tiết và đặt lại mật khẩu cho tài khoản thí sinh."
+                : "Nhập thông tin chi tiết để tạo tài khoản thí sinh mới trong hệ thống."}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div>
-              <Label htmlFor="candidate-name">Họ và tên</Label>
+              <Label htmlFor="candidate-name">Họ và tên *</Label>
               <Input
                 id="candidate-name"
                 className="mt-2"
@@ -875,7 +970,9 @@ export function GroupManagement() {
               />
             </div>
             <div>
-              <Label htmlFor="candidate-password">Mật khẩu mới (Tự điền)</Label>
+              <Label htmlFor="candidate-password">
+                {editingCandidateId ? "Mật khẩu mới (Để trống nếu không đổi)" : "Mật khẩu *"}
+              </Label>
               <Input
                 id="candidate-password"
                 type="password"
@@ -884,17 +981,30 @@ export function GroupManagement() {
                 onChange={(event) =>
                   setCandidateFormState((previous) => ({ ...previous, password: event.target.value }))
                 }
-                placeholder="Nhập mật khẩu mới nếu muốn đặt lại"
+                placeholder={editingCandidateId ? "Nhập mật khẩu mới nếu muốn đặt lại" : "Nhập mật khẩu tạo tài khoản"}
               />
             </div>
           </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setIsCandidateEditingOpen(false)}>
-              Hủy
-            </Button>
-            <Button onClick={() => void saveCandidate()} disabled={mutation.isSubmitting}>
-              {mutation.isSubmitting ? "Đang lưu..." : "Lưu thay đổi"}
-            </Button>
+          <DialogFooter className="flex justify-between items-center w-full gap-2">
+            {editingCandidateId ? (
+              <Button
+                variant="destructive"
+                onClick={() => void deleteCandidateAccount()}
+                disabled={mutation.isSubmitting}
+                className="mr-auto"
+              >
+                <Trash2 className="w-4 h-4 mr-2" />
+                Xóa tài khoản
+              </Button>
+            ) : <div />}
+            <div className="flex gap-2">
+              <Button variant="outline" onClick={() => setIsCandidateEditingOpen(false)}>
+                Hủy
+              </Button>
+              <Button onClick={() => void saveCandidate()} disabled={mutation.isSubmitting}>
+                {mutation.isSubmitting ? "Đang lưu..." : "Lưu thay đổi"}
+              </Button>
+            </div>
           </DialogFooter>
         </DialogContent>
       </Dialog>
