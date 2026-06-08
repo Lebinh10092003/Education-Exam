@@ -235,7 +235,7 @@ def import_questions_from_upload(*, uploaded_by, source_format, uploaded_file):
     created_question_ids = []
     subjects_cache = {}
 
-    content = uploaded_file.read().decode("utf-8")
+    content = uploaded_file.read().decode("utf-8-sig")
     if source_format == QuestionImportBatch.SourceFormat.JSON:
         rows = json.loads(content)
     else:
