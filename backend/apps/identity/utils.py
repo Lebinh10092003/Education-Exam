@@ -40,14 +40,17 @@ def build_student_username(*, full_name: str, date_of_birth, student_class: str)
 def ensure_unique_username(base: str, *, exclude_user_id: int | None = None) -> str:
     user_model = get_user_model()
     candidate = base or "user"
-    suffix = 0
 
+    # Fetch all usernames starting with candidate prefix in one query
+    queryset = user_model.objects.filter(username__istartswith=candidate)
+    if exclude_user_id is not None:
+        queryset = queryset.exclude(id=exclude_user_id)
+    existing_usernames = {u.lower() for u in queryset.values_list("username", flat=True)}
+
+    suffix = 0
     while True:
         lookup_value = candidate if suffix == 0 else f"{candidate}.{suffix}"
-        queryset = user_model.objects.filter(username__iexact=lookup_value)
-        if exclude_user_id is not None:
-            queryset = queryset.exclude(id=exclude_user_id)
-        if not queryset.exists():
+        if lookup_value.lower() not in existing_usernames:
             return lookup_value
         suffix += 1
 

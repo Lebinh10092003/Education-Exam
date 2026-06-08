@@ -81,13 +81,17 @@ def _get_candidate_role():
     return role
 
 
-def _resolve_school_by_code(school_code):
+def _resolve_school_by_code(school_code, cache=None):
     normalized_code = (school_code or "").strip()
     if not normalized_code:
         return None
+    if cache is not None and normalized_code.lower() in cache:
+        return cache[normalized_code.lower()]
     school = School.objects.filter(code__iexact=normalized_code).first()
     if school is None:
         raise ValueError(f"Unknown school_code: {normalized_code}")
+    if cache is not None:
+        cache[normalized_code.lower()] = school
     return school
 
 
@@ -146,7 +150,7 @@ def _sync_profile(*, profile, cccd, date_of_birth, student_class, phone_number, 
 
 
 @transaction.atomic
-def _import_student_row(*, exam, assigned_by, row, row_number, candidate_role):
+def _import_student_row(*, exam, assigned_by, row, row_number, candidate_role, schools_cache=None):
     user_model = get_user_model()
     full_name = (row.get("full_name") or "").strip()
     if not full_name:
@@ -162,7 +166,7 @@ def _import_student_row(*, exam, assigned_by, row, row_number, candidate_role):
         raise ValueError("student_class is required.")
 
     phone_number = (row.get("phone_number") or "").strip()
-    school = _resolve_school_by_code(row.get("school_code"))
+    school = _resolve_school_by_code(row.get("school_code"), cache=schools_cache)
     existing_profile = Profile.objects.select_related("user").filter(cccd=cccd).first()
 
     if existing_profile is not None:
@@ -245,6 +249,7 @@ def _import_student_row(*, exam, assigned_by, row, row_number, candidate_role):
 def import_students_to_exam(*, exam, assigned_by, uploaded_file):
     rows = _decode_csv_upload(uploaded_file)
     candidate_role = _get_candidate_role()
+    schools_cache = {}
     summary = {
         "total_rows": len(rows),
         "created_users": 0,
@@ -263,6 +268,7 @@ def import_students_to_exam(*, exam, assigned_by, uploaded_file):
                 row=row,
                 row_number=index,
                 candidate_role=candidate_role,
+                schools_cache=schools_cache,
             )
         except ValueError as exc:
             summary["failed_rows"] += 1

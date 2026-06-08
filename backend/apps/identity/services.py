@@ -118,6 +118,9 @@ def import_users_from_csv(*, uploaded_file, requested_by):
             return default
         return str(val).strip().lower() in ("true", "1", "yes")
 
+    schools_cache = {}
+    roles_cache = {}
+
     for index, row in enumerate(rows, start=2):
         email = (row.get("email") or "").strip().lower()
         full_name = (row.get("full_name") or "").strip()
@@ -144,19 +147,26 @@ def import_users_from_csv(*, uploaded_file, requested_by):
 
             school = None
             if school_code:
-                school = School.objects.filter(code__iexact=school_code).first()
-                if not school:
-                    raise ValueError(f"Unknown school_code: '{school_code}'")
+                school_code_lower = school_code.lower()
+                if school_code_lower not in schools_cache:
+                    s = School.objects.filter(code__iexact=school_code).first()
+                    if not s:
+                        raise ValueError(f"Unknown school_code: '{school_code}'")
+                    schools_cache[school_code_lower] = s
+                school = schools_cache[school_code_lower]
 
             roles = []
             if role_slugs:
                 for slug in role_slugs.split("|"):
                     slug = slug.strip()
                     if slug:
-                        r = Role.objects.filter(slug=slug).first()
-                        if not r:
-                            raise ValueError(f"Unknown role slug: '{slug}'")
-                        roles.append(r)
+                        slug_lower = slug.lower()
+                        if slug_lower not in roles_cache:
+                            r = Role.objects.filter(slug=slug).first()
+                            if not r:
+                                raise ValueError(f"Unknown role slug: '{slug}'")
+                            roles_cache[slug_lower] = r
+                        roles.append(roles_cache[slug_lower])
 
             with transaction.atomic():
                 user = User.objects.filter(email=email).first()

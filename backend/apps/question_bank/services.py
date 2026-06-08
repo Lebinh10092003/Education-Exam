@@ -175,13 +175,18 @@ def revise_question(
     return question
 
 
-def _build_question_payload_from_import(row):
+def _build_question_payload_from_import(row, subjects_cache=None):
     subject_code = str(row.get("subject_code", "")).strip()
     if not subject_code:
         raise ValueError("subject_code is required.")
 
     try:
-        subject = Subject.objects.get(code=subject_code)
+        if subjects_cache is not None and subject_code in subjects_cache:
+            subject = subjects_cache[subject_code]
+        else:
+            subject = Subject.objects.get(code=subject_code)
+            if subjects_cache is not None:
+                subjects_cache[subject_code] = subject
     except Subject.DoesNotExist as exc:
         raise ValueError(f"Unknown subject code: {subject_code}") from exc
 
@@ -228,6 +233,7 @@ def import_questions_from_upload(*, uploaded_by, source_format, uploaded_file):
         status=QuestionImportBatch.Status.PENDING,
     )
     created_question_ids = []
+    subjects_cache = {}
 
     content = uploaded_file.read().decode("utf-8")
     if source_format == QuestionImportBatch.SourceFormat.JSON:
@@ -240,7 +246,7 @@ def import_questions_from_upload(*, uploaded_by, source_format, uploaded_file):
 
     for index, row in enumerate(rows, start=1):
         try:
-            payload = _build_question_payload_from_import(row)
+            payload = _build_question_payload_from_import(row, subjects_cache=subjects_cache)
             question = create_question(
                 subject=payload["subject"],
                 created_by=uploaded_by,

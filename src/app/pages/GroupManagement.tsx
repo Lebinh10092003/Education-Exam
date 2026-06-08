@@ -639,9 +639,9 @@ export function GroupManagement() {
               Search candidate or student accounts, or import them from CSV, then add them to this group.
             </DialogDescription>
           </DialogHeader>
-          <div className="min-h-0 flex-1 overflow-hidden px-4 py-4 sm:px-6 sm:py-5">
-            <div className="grid h-full min-h-0 gap-6 lg:grid-cols-[minmax(0,1.2fr),minmax(18rem,0.8fr)]">
-            <div className="flex min-h-0 flex-col gap-4">
+          <div className="min-h-0 flex-1 overflow-y-auto lg:overflow-hidden px-4 py-4 sm:px-6 sm:py-5">
+            <div className="grid h-auto lg:h-full min-h-0 gap-6 lg:grid-cols-[minmax(0,1.2fr),minmax(18rem,0.8fr)]">
+            <div className="flex h-auto lg:h-full min-h-0 flex-col gap-4">
               <div className="rounded-lg border border-dashed border-blue-200 bg-blue-50/60 p-4">
                 <div className="flex flex-col gap-3">
                   <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
@@ -762,7 +762,7 @@ export function GroupManagement() {
               </div>
             </div>
 
-            <div className="flex min-h-0 flex-col rounded-lg border border-gray-200 p-4">
+            <div className="flex h-auto lg:h-full min-h-0 flex-col rounded-lg border border-gray-200 p-4">
               <div className="flex items-center justify-between gap-3">
                 <h3 className="text-sm font-semibold text-gray-900">Current Members</h3>
                 <Badge variant="outline">{memberships.length}</Badge>
