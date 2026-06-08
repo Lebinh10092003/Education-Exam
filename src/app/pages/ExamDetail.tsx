@@ -3,9 +3,13 @@ import { Link, useNavigate, useParams, useSearchParams } from "react-router";
 import {
   Clock,
   Copy,
+  Download,
   Eye,
+  FileSearch,
+  FileSpreadsheet,
   FileText,
   Play,
+  Search,
   Settings2,
   Trash2,
   Users,
@@ -15,12 +19,16 @@ import { PageHeader } from "../components/PageHeader";
 import { StatusBadge } from "../components/StatusBadge";
 import { Badge } from "../components/ui/badge";
 import { Button } from "../components/ui/button";
+import { Input } from "../components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "../components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../components/ui/tabs";
 import { cn } from "../components/ui/utils";
 import { LiveMonitoring } from "./LiveMonitoring";
-import { apiRequest } from "../lib/http";
+import { apiRequest, type PaginatedResponse } from "../lib/http";
+import { getStoredTokens } from "../lib/storage";
+import { buildApiUrl } from "../lib/env";
+import { formatCertificateLevel } from "./disciplineShared";
 import { notify } from "../lib/notify";
 import { useAsyncList } from "../hooks/useAsyncList";
 import { useMutationState } from "../hooks/useMutationState";
@@ -112,7 +120,115 @@ const examModeBadgeClassNames = {
   class: "border-emerald-200 bg-emerald-50 text-emerald-700",
 } as const;
 
-type ExamTab = "details" | "assignments" | "questions" | "rules" | "monitoring";
+interface ResultRecord {
+  id: number;
+  candidate: {
+    id: number;
+    email: string;
+    full_name: string;
+  };
+  exam: {
+    id: number;
+    name: string;
+    subject_name: string;
+  };
+  workflow_status: string;
+  publish_state: string;
+  score: string;
+  original_score: string;
+  total_marks: string;
+  percentage: string;
+  original_percentage: string;
+  penalty_percent_applied: string;
+  certificate_level: string;
+  result_status: string;
+  passed: boolean;
+  completed_date: string | null;
+  time_taken_minutes: number;
+  published_at: string | null;
+}
+
+interface CandidateRecord {
+  id: number;
+  full_name: string;
+  email: string;
+  username: string;
+  has_submitted: boolean;
+}
+
+const formatDuration = (minutes: number) => {
+  if (!minutes) {
+    return "0m";
+  }
+  const hours = Math.floor(minutes / 60);
+  const remainingMinutes = minutes % 60;
+  if (!hours) {
+    return `${remainingMinutes}m`;
+  }
+  return `${hours}h ${remainingMinutes}m`;
+};
+
+const downloadApiFile = async (path: string, fallbackFileName: string, successMessage: string) => {
+  try {
+    const tokens = getStoredTokens();
+    const headers: HeadersInit = {};
+    if (tokens?.access) {
+      headers["Authorization"] = `Bearer ${tokens.access}`;
+    }
+
+    const response = await fetch(buildApiUrl(path), { headers });
+
+    if (!response.ok) {
+      throw new Error(`Unable to export file: ${response.statusText}`);
+    }
+
+    const blob = await response.blob();
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = fallbackFileName;
+    document.body.append(anchor);
+    anchor.click();
+    anchor.remove();
+    URL.revokeObjectURL(url);
+    notify.success(successMessage);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Unable to export file.";
+    notify.error(message);
+  }
+};
+
+const exportResultsFile = async (format: "csv" | "xlsx", examId: string) => {
+  const endpoint = format === "csv" ? "export-csv" : "export-xlsx";
+  const extension = format === "csv" ? "csv" : "xlsx";
+  await downloadApiFile(
+    `/api/v1/results/${endpoint}/?exam=${examId}`,
+    `eduexam-results.${extension}`,
+    format === "csv" ? "Đã xuất kết quả CSV." : "Đã xuất kết quả XLSX.",
+  );
+};
+
+const exportUnsubmittedCandidates = (candidates: CandidateRecord[], examName: string) => {
+  const unsubmitted = candidates.filter((c) => !c.has_submitted);
+  if (unsubmitted.length === 0) {
+    notify.info("Không có thí sinh chưa thi.");
+    return;
+  }
+  const headers = ["Họ tên", "Email", "Tài khoản", "Trạng thái"];
+  const rows = unsubmitted.map((c) => [c.full_name, c.email, c.username, "Chưa thi"]);
+  const csvContent = "\uFEFF" + [headers, ...rows].map((e) => e.map((val) => `"${val}"`).join(",")).join("\n");
+  const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.setAttribute("href", url);
+  link.setAttribute("download", `thi_sinh_chua_thi_${examName}.csv`);
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  notify.success("Đã xuất danh sách thí sinh chưa thi.");
+};
+
+type ExamTab = "details" | "assignments" | "questions" | "rules" | "monitoring" | "results";
 
 export function ExamDetail() {
   const { id } = useParams();
@@ -136,6 +252,61 @@ export function ExamDetail() {
 
   const exam = examDetail.data;
   const isClass = exam?.mode === "class";
+
+  const [resultsSearch, setResultsSearch] = useState("");
+  const [activeResultsSubTab, setActiveResultsSubTab] = useState<"submitted" | "unsubmitted">("submitted");
+
+  const resultsList = useAsyncList(
+    async () => {
+      if (!id || isClass || currentTab !== "results") {
+        return { count: 0, results: [] as ResultRecord[] };
+      }
+      return apiRequest<PaginatedResponse<ResultRecord>>("/api/v1/results/", {
+        query: { exam: id, page_size: 1000 },
+      });
+    },
+    [id, isClass, currentTab],
+  );
+
+  const candidatesList = useAsyncList(
+    async () => {
+      if (!id || isClass || currentTab !== "results") {
+        return [] as CandidateRecord[];
+      }
+      return apiRequest<CandidateRecord[]>("/api/v1/results/candidates/", {
+        query: { exam: id },
+      });
+    },
+    [id, isClass, currentTab],
+  );
+  const filteredResults = useMemo(() => {
+    const allResults = resultsList.data?.results ?? [];
+    if (!resultsSearch.trim()) {
+      return allResults;
+    }
+    const query = resultsSearch.toLowerCase();
+    return allResults.filter(
+      (r) =>
+        r.candidate.full_name.toLowerCase().includes(query) ||
+        r.candidate.email.toLowerCase().includes(query)
+    );
+  }, [resultsList.data, resultsSearch]);
+
+  const filteredUnsubmitted = useMemo(() => {
+    const allCandidates = candidatesList.data ?? [];
+    const unsubmitted = allCandidates.filter((c) => !c.has_submitted);
+    if (!resultsSearch.trim()) {
+      return unsubmitted;
+    }
+    const query = resultsSearch.toLowerCase();
+    return unsubmitted.filter(
+      (c) =>
+        c.full_name.toLowerCase().includes(query) ||
+        c.email.toLowerCase().includes(query) ||
+        c.username.toLowerCase().includes(query)
+    );
+  }, [candidatesList.data, resultsSearch]);
+
   const activeTab: ExamTab =
     exam && exam.mode === "exam" && exam.enable_proctoring && requestedMonitoringTab
       ? "monitoring"
@@ -366,6 +537,7 @@ export function ExamDetail() {
                 {!isClass ? <TabsTrigger value="questions">Questions</TabsTrigger> : null}
                 {!isClass ? <TabsTrigger value="rules">Random Rules</TabsTrigger> : null}
                 {!isClass && exam.enable_proctoring ? <TabsTrigger value="monitoring">Monitoring</TabsTrigger> : null}
+                {!isClass ? <TabsTrigger value="results">Results</TabsTrigger> : null}
               </TabsList>
 
               <TabsContent value="details" className="space-y-6">
@@ -551,6 +723,193 @@ export function ExamDetail() {
               {!isClass && exam.enable_proctoring ? (
                 <TabsContent value="monitoring" className="space-y-3">
                   <LiveMonitoring embedded examId={exam.id} />
+                </TabsContent>
+              ) : null}
+
+              {!isClass ? (
+                <TabsContent value="results" className="space-y-6">
+                  <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                    <div className="flex gap-2">
+                      <Button
+                        variant={activeResultsSubTab === "submitted" ? "default" : "outline"}
+                        onClick={() => setActiveResultsSubTab("submitted")}
+                      >
+                        Đã nộp bài ({filteredResults.length})
+                      </Button>
+                      <Button
+                        variant={activeResultsSubTab === "unsubmitted" ? "default" : "outline"}
+                        onClick={() => setActiveResultsSubTab("unsubmitted")}
+                      >
+                        Chưa thi ({filteredUnsubmitted.length})
+                      </Button>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      <Button
+                        variant="outline"
+                        onClick={() => void exportResultsFile("csv", exam.id.toString())}
+                        disabled={resultsList.isLoading}
+                      >
+                        <Download className="mr-2 h-4 w-4" />
+                        Xuất kết quả CSV
+                      </Button>
+                      <Button
+                        variant="outline"
+                        onClick={() => void exportResultsFile("xlsx", exam.id.toString())}
+                        disabled={resultsList.isLoading}
+                      >
+                        <FileSpreadsheet className="mr-2 h-4 w-4" />
+                        Xuất kết quả XLSX
+                      </Button>
+                      <Button
+                        variant="outline"
+                        onClick={() => exportUnsubmittedCandidates(candidatesList.data ?? [], exam.name)}
+                        disabled={candidatesList.isLoading}
+                      >
+                        <Download className="mr-2 h-4 w-4" />
+                        Xuất DS chưa thi (CSV)
+                      </Button>
+                    </div>
+                  </div>
+
+                  <div className="relative max-w-md">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                    <Input
+                      placeholder="Tìm theo tên hoặc email..."
+                      className="pl-10"
+                      value={resultsSearch}
+                      onChange={(e) => setResultsSearch(e.target.value)}
+                    />
+                  </div>
+
+                  {activeResultsSubTab === "submitted" ? (
+                    <div className="rounded-lg border border-gray-200 bg-white">
+                      <div className="overflow-x-auto">
+                        <table className="w-full">
+                          <thead>
+                            <tr className="border-b border-gray-200">
+                              <th className="text-left py-3 px-4 text-sm font-semibold text-gray-700">Thí sinh</th>
+                              <th className="text-left py-3 px-4 text-sm font-semibold text-gray-700">Điểm số</th>
+                              <th className="text-left py-3 px-4 text-sm font-semibold text-gray-700">Tỷ lệ %</th>
+                              <th className="text-left py-3 px-4 text-sm font-semibold text-gray-700">Phạt</th>
+                              <th className="text-left py-3 px-4 text-sm font-semibold text-gray-700">Trạng thái</th>
+                              <th className="text-left py-3 px-4 text-sm font-semibold text-gray-700">Thời gian nộp</th>
+                              <th className="text-left py-3 px-4 text-sm font-semibold text-gray-700">Thời gian làm bài</th>
+                              <th className="text-left py-3 px-4 text-sm font-semibold text-gray-700">Hành động</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {resultsList.isLoading ? (
+                              <tr>
+                                <td colSpan={8} className="py-8 text-center text-sm text-gray-500">
+                                  Đang tải danh sách kết quả...
+                                </td>
+                              </tr>
+                            ) : filteredResults.length === 0 ? (
+                              <tr>
+                                <td colSpan={8} className="py-8 text-center text-sm text-gray-500">
+                                  Không có kết quả nào.
+                                </td>
+                              </tr>
+                            ) : (
+                              filteredResults.map((result) => {
+                                const percentage = Number(result.percentage);
+                                return (
+                                  <tr key={result.id} className="border-b border-gray-100 hover:bg-gray-50">
+                                    <td className="py-4 px-4">
+                                      <p className="font-medium text-gray-900">{result.candidate.full_name}</p>
+                                      <p className="text-xs text-gray-500">{result.candidate.email}</p>
+                                    </td>
+                                    <td className="py-4 px-4 text-sm text-gray-900">
+                                      {result.score}/{result.total_marks}
+                                    </td>
+                                    <td className="py-4 px-4">
+                                      <div className="flex items-center gap-2">
+                                        <div className="h-2 w-20 rounded-full bg-gray-200">
+                                          <div
+                                            className={`h-2 rounded-full ${
+                                              percentage >= (exam.passing_score ?? 60) ? "bg-green-600" : "bg-red-600"
+                                            }`}
+                                            style={{ width: `${Math.min(100, Math.max(0, percentage))}%` }}
+                                          />
+                                        </div>
+                                        <span className="text-sm text-gray-900">{percentage.toFixed(2)}%</span>
+                                      </div>
+                                    </td>
+                                    <td className="py-4 px-4 text-sm text-gray-600">
+                                      {result.penalty_percent_applied}%
+                                    </td>
+                                    <td className="py-4 px-4">
+                                      <StatusBadge status={result.result_status} />
+                                    </td>
+                                    <td className="py-4 px-4 text-sm text-gray-600">
+                                      {formatDateTime(result.completed_date)}
+                                    </td>
+                                    <td className="py-4 px-4 text-sm text-gray-600">
+                                      {formatDuration(result.time_taken_minutes)}
+                                    </td>
+                                    <td className="py-4 px-4 text-sm">
+                                      <Button size="sm" variant="ghost" title="Rà bài" asChild>
+                                        <Link to={`/results/${result.id}/review`}>
+                                          <FileSearch className="h-4 w-4 mr-1" />
+                                          Rà bài
+                                        </Link>
+                                      </Button>
+                                    </td>
+                                  </tr>
+                                );
+                              })
+                            )}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="rounded-lg border border-gray-200 bg-white">
+                      <div className="overflow-x-auto">
+                        <table className="w-full">
+                          <thead>
+                            <tr className="border-b border-gray-200">
+                              <th className="text-left py-3 px-4 text-sm font-semibold text-gray-700">Thí sinh</th>
+                              <th className="text-left py-3 px-4 text-sm font-semibold text-gray-700">Tài khoản</th>
+                              <th className="text-left py-3 px-4 text-sm font-semibold text-gray-700">Trạng thái</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {candidatesList.isLoading ? (
+                              <tr>
+                                <td colSpan={3} className="py-8 text-center text-sm text-gray-500">
+                                  Đang tải danh sách thí sinh...
+                                </td>
+                              </tr>
+                            ) : filteredUnsubmitted.length === 0 ? (
+                              <tr>
+                                <td colSpan={3} className="py-8 text-center text-sm text-gray-500">
+                                  Tất cả thí sinh đã thi hoặc không có thí sinh nào được gán.
+                                </td>
+                              </tr>
+                            ) : (
+                              filteredUnsubmitted.map((candidate) => (
+                                <tr key={candidate.id} className="border-b border-gray-100 hover:bg-gray-50">
+                                  <td className="py-4 px-4">
+                                    <p className="font-medium text-gray-900">{candidate.full_name}</p>
+                                    <p className="text-xs text-gray-500">{candidate.email}</p>
+                                  </td>
+                                  <td className="py-4 px-4 text-sm font-mono text-gray-600">
+                                    {candidate.username}
+                                  </td>
+                                  <td className="py-4 px-4">
+                                    <Badge variant="secondary" className="border-amber-200 bg-amber-50 text-amber-700">
+                                      Chưa thi
+                                    </Badge>
+                                  </td>
+                                </tr>
+                              ))
+                            )}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  )}
                 </TabsContent>
               ) : null}
             </Tabs>

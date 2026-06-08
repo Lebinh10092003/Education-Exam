@@ -186,3 +186,34 @@ def test_admin_can_export_exam_roster_with_submitted_and_not_submitted_sheets(
     assert workbook.sheetnames == ["Kết quả", "Đã thi", "Chưa thi"]
     assert workbook["Đã thi"]["I2"].value == candidate_user.email
     assert workbook["Chưa thi"]["I2"].value == user.email
+
+
+@pytest.mark.django_db
+def test_admin_can_get_exam_candidates_list_with_status(
+    api_client,
+    admin_token,
+    subject,
+    admin_user,
+    candidate_user,
+    user,
+):
+    from apps.institutions.models import GroupMembership
+
+    result = _build_finalized_result(subject=subject, admin_user=admin_user, candidate_user=candidate_user)
+    group = result.session.exam.assignments.filter(group__isnull=False).first().group
+    GroupMembership.objects.create(group=group, user=user)
+    api_client.credentials(HTTP_AUTHORIZATION=f"Bearer {admin_token}")
+
+    response = api_client.get(f"/api/v1/results/candidates/?exam={result.session.exam_id}")
+
+    assert response.status_code == 200
+    candidates = response.json()
+    assert len(candidates) == 2
+    
+    candidate_map = {c["email"]: c for c in candidates}
+    assert candidate_user.email in candidate_map
+    assert candidate_map[candidate_user.email]["has_submitted"] is True
+
+    assert user.email in candidate_map
+    assert candidate_map[user.email]["has_submitted"] is False
+

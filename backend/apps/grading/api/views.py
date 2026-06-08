@@ -537,6 +537,28 @@ class ResultViewSet(
         exam = get_object_or_404(Exam.objects.select_related("subject"), pk=exam_id)
         return _xlsx_response(_exam_roster_workbook(exam), f"eduexam-exam-roster-{exam.id}.xlsx")
 
+    @action(detail=False, methods=["get"], url_path="candidates")
+    def candidates(self, request):
+        exam_id = request.query_params.get("exam")
+        if not exam_id:
+            return Response({"detail": "exam is required."}, status=status.HTTP_400_BAD_REQUEST)
+        exam = get_object_or_404(Exam, pk=exam_id)
+        candidates = _assigned_exam_candidates(exam)
+        submitted_user_ids = set(
+            Result.objects.filter(session__exam=exam).values_list("session__candidate_id", flat=True)
+        )
+        results = []
+        for c in candidates:
+            results.append({
+                "id": c.id,
+                "full_name": c.full_name,
+                "email": c.email,
+                "username": c.username,
+                "has_submitted": c.id in submitted_user_ids,
+            })
+        return Response(results)
+
+
 
 class CandidateResultListView(generics.ListAPIView):
     serializer_class = ResultSerializer

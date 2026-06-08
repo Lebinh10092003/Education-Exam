@@ -103,13 +103,34 @@ describe("ExamDetail", () => {
   });
 
   beforeEach(() => {
-    mockUseAsyncList.mockImplementation(() => ({
-      data: examRecord,
-      error: null,
-      isLoading: false,
-      reload: vi.fn(),
-      setData: vi.fn(),
-    }));
+    mockUseAsyncList.mockImplementation((fetcher: Function) => {
+      const fetcherStr = fetcher.toString();
+      if (fetcherStr.includes("/api/v1/exams/")) {
+        return {
+          data: examRecord,
+          error: null,
+          isLoading: false,
+          reload: vi.fn(),
+          setData: vi.fn(),
+        };
+      } else if (fetcherStr.includes("/api/v1/results/candidates/")) {
+        return {
+          data: [],
+          error: null,
+          isLoading: false,
+          reload: vi.fn(),
+          setData: vi.fn(),
+        };
+      } else {
+        return {
+          data: { count: 0, results: [] },
+          error: null,
+          isLoading: false,
+          reload: vi.fn(),
+          setData: vi.fn(),
+        };
+      }
+    });
     mockUseMutationState.mockImplementation(() => ({
       isSubmitting: false,
       error: null,
@@ -144,16 +165,37 @@ describe("ExamDetail", () => {
   });
 
   it("hides the monitoring tab when proctoring is disabled", () => {
-    mockUseAsyncList.mockImplementation(() => ({
-      data: {
-        ...examRecord,
-        enable_proctoring: false,
-      },
-      error: null,
-      isLoading: false,
-      reload: vi.fn(),
-      setData: vi.fn(),
-    }));
+    mockUseAsyncList.mockImplementation((fetcher: Function) => {
+      const fetcherStr = fetcher.toString();
+      if (fetcherStr.includes("/api/v1/exams/")) {
+        return {
+          data: {
+            ...examRecord,
+            enable_proctoring: false,
+          },
+          error: null,
+          isLoading: false,
+          reload: vi.fn(),
+          setData: vi.fn(),
+        };
+      } else if (fetcherStr.includes("/api/v1/results/candidates/")) {
+        return {
+          data: [],
+          error: null,
+          isLoading: false,
+          reload: vi.fn(),
+          setData: vi.fn(),
+        };
+      } else {
+        return {
+          data: { count: 0, results: [] },
+          error: null,
+          isLoading: false,
+          reload: vi.fn(),
+          setData: vi.fn(),
+        };
+      }
+    });
 
     render(
       <MemoryRouter initialEntries={["/exams/7"]}>
