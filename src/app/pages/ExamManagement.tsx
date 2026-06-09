@@ -1,6 +1,6 @@
 import { Link } from "react-router";
 import { useEffect, useState } from "react";
-import { Activity, Copy, Edit, Eye, Plus, Search, Trash2, Users } from "lucide-react";
+import { Activity, BarChart3, Copy, Edit, Eye, Plus, Search, Trash2, Users } from "lucide-react";
 import { notify } from "../lib/notify";
 
 import { PageHeader } from "../components/PageHeader";
@@ -338,6 +338,14 @@ export function ExamManagement() {
                           View
                         </Button>
                       </Link>
+                      {exam.mode === "exam" ? (
+                        <Link to={`/exams/${exam.id}?tab=results`}>
+                          <Button size="sm" variant="outline">
+                            <BarChart3 className="mr-2 h-4 w-4" />
+                            Results
+                          </Button>
+                        </Link>
+                      ) : null}
                       {exam.mode === "exam" &&
                         (exam.status === "open" || exam.delivery_summary.in_progress_sessions > 0) && (
                         <Link to={`/exams/${exam.id}?tab=monitoring`}>
@@ -523,6 +531,13 @@ export function ExamManagement() {
                                 <Eye className="w-4 h-4" />
                               </Button>
                             </Link>
+                            {exam.mode === "exam" ? (
+                              <Link to={`/exams/${exam.id}?tab=results`}>
+                                <Button size="sm" variant="ghost" title="Results">
+                                  <BarChart3 className="w-4 h-4" />
+                                </Button>
+                              </Link>
+                            ) : null}
                             {exam.mode === "exam" &&
                               (exam.status === "open" || exam.delivery_summary.in_progress_sessions > 0) && (
                               <Link to={`/exams/${exam.id}?tab=monitoring`}>

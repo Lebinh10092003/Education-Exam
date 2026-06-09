@@ -219,15 +219,23 @@ const exportUnsubmittedFile = async (examId: string, examName: string) => {
 };
 
 type ExamTab = "details" | "assignments" | "questions" | "rules" | "monitoring" | "results";
+type NonMonitoringExamTab = Exclude<ExamTab, "monitoring">;
+
+const queryTabValues = new Set<ExamTab>(["details", "assignments", "questions", "rules", "monitoring", "results"]);
+
+const getQueryTab = (value: string | null): ExamTab | null =>
+  value && queryTabValues.has(value as ExamTab) ? (value as ExamTab) : null;
 
 export function ExamDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
-  const [currentTab, setCurrentTab] = useState<Exclude<ExamTab, "monitoring">>("details");
+  const queryTab = getQueryTab(searchParams.get("tab"));
+  const [currentTab, setCurrentTab] = useState<NonMonitoringExamTab>(
+    queryTab && queryTab !== "monitoring" ? queryTab : "details",
+  );
   const [previewOpen, setPreviewOpen] = useState(false);
   const mutation = useMutationState();
-  const requestedMonitoringTab = searchParams.get("tab") === "monitoring";
 
   const examDetail = useAsyncList(
     async () => {
@@ -245,29 +253,35 @@ export function ExamDetail() {
 
   const [resultsSearch, setResultsSearch] = useState("");
   const [activeResultsSubTab, setActiveResultsSubTab] = useState<"submitted" | "unsubmitted">("submitted");
+  const activeTab: ExamTab =
+    exam && exam.mode === "exam" && queryTab === "monitoring" && exam.enable_proctoring
+      ? "monitoring"
+      : exam && exam.mode === "exam" && queryTab && queryTab !== "monitoring"
+        ? queryTab
+        : currentTab;
 
   const resultsList = useAsyncList(
     async () => {
-      if (!id || isClass || currentTab !== "results") {
+      if (!id || isClass || activeTab !== "results") {
         return { count: 0, results: [] as ResultRecord[] };
       }
       return apiRequest<PaginatedResponse<ResultRecord>>("/api/v1/results/", {
         query: { exam: id, page_size: 1000 },
       });
     },
-    [id, isClass, currentTab],
+    [id, isClass, activeTab],
   );
 
   const candidatesList = useAsyncList(
     async () => {
-      if (!id || isClass || currentTab !== "results") {
+      if (!id || isClass || activeTab !== "results") {
         return [] as CandidateRecord[];
       }
       return apiRequest<CandidateRecord[]>("/api/v1/results/candidates/", {
         query: { exam: id },
       });
     },
-    [id, isClass, currentTab],
+    [id, isClass, activeTab],
   );
   const filteredResults = useMemo(() => {
     const allResults = resultsList.data?.results ?? [];
@@ -297,10 +311,6 @@ export function ExamDetail() {
     );
   }, [candidatesList.data, resultsSearch]);
 
-  const activeTab: ExamTab =
-    exam && exam.mode === "exam" && exam.enable_proctoring && requestedMonitoringTab
-      ? "monitoring"
-      : currentTab;
   const stats = useMemo(() => {
     if (!exam) {
       return {
@@ -327,6 +337,9 @@ export function ExamDetail() {
     const nextSearchParams = new URLSearchParams(searchParams);
     if (nextTab === "monitoring") {
       nextSearchParams.set("tab", "monitoring");
+    } else if (nextTab === "results") {
+      nextSearchParams.set("tab", "results");
+      setCurrentTab(nextTab);
     } else {
       nextSearchParams.delete("tab");
       setCurrentTab(nextTab);

@@ -164,6 +164,19 @@ describe("ExamDetail", () => {
     expect(await screen.findByText("What is 2 + 2?")).toBeInTheDocument();
   });
 
+  it("opens the results tab from the canonical query route", async () => {
+    render(
+      <MemoryRouter initialEntries={["/exams/7?tab=results"]}>
+        <Routes>
+          <Route path="/exams/:id" element={<ExamDetail />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    expect(await screen.findByRole("button", { name: "Đã nộp bài (0)" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Chưa thi (0)" })).toBeInTheDocument();
+  });
+
   it("hides the monitoring tab when proctoring is disabled", () => {
     mockUseAsyncList.mockImplementation((fetcher: Function) => {
       const fetcherStr = fetcher.toString();
