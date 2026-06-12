@@ -58,21 +58,21 @@ const questionJsonTemplate = JSON.stringify(
 );
 
 const userCsvTemplate = [
-  "full_name,email,password,phone_number,status,is_active,is_staff,school_code,role_slugs",
-  'Candidate Demo,candidate@example.com,candidate123,+84900000001,active,true,false,SMOKE-SCHOOL,candidate',
-  'Exam Proctor,proctor@example.com,proctor123,+84900000002,pending,true,true,SMOKE-SCHOOL,proctor|examiner',
+  "full_name,email,password,phone_number,status,is_active,is_staff,school_code,school,role_slugs",
+  'Candidate Demo,candidate@example.com,candidate123,+84900000001,active,true,false,,Tiểu học Nguyễn Tri Phương,candidate',
+  'Exam Proctor,proctor@example.com,proctor123,+84900000002,pending,true,true,,TH Nguyễn Tri Phương,proctor|examiner',
 ].join("\n");
 
 const examStudentCsvTemplate = [
-  "full_name,date_of_birth,student_class,cccd,email,phone_number,school_code",
-  "Le Van Binh,24/08/2003,12,012345678901,,0901234567,SMOKE-SCHOOL",
-  "Tran Thi Hoa,15/01/2004,12A1,012345678902,hoa@student.local,0901234568,SMOKE-SCHOOL",
+  "full_name,date_of_birth,student_class,cccd,email,phone_number,school_code,school",
+  "Le Van Binh,24/08/2003,12,012345678901,,0901234567,,Tiểu học Nguyễn Tri Phương",
+  "Tran Thi Hoa,15/01/2004,12A1,012345678902,hoa@student.local,0901234568,,TH Nguyễn Tri Phương",
 ].join("\n");
 
 const groupMembershipCsvTemplate = [
-  "full_name,username,password,date_of_birth,school_code,ward,national_exam_subject,exam_block,candidate_number,email,phone_number,cccd",
-  "Le Van Binh,imo001,imo-pass-001,24/08/2003,SMOKE-SCHOOL,Phuong 1,Toan,A00,IMO001,binh@example.com,0901234567,012345678901",
-  "Tran Thi Hoa,imo002,imo-pass-002,15/01/2004,SMOKE-SCHOOL,Phuong 2,Toan,A01,IMO002,hoa@example.com,0901234568,012345678902",
+  "full_name,username,password,date_of_birth,school_code,school,ward,national_exam_subject,exam_block,candidate_number,email,phone_number,cccd",
+  "Le Van Binh,imo001,imo-pass-001,24/08/2003,,Tiểu học Nguyễn Tri Phương,Phuong 1,Toan,A00,IMO001,binh@example.com,0901234567,012345678901",
+  "Tran Thi Hoa,imo002,imo-pass-002,15/01/2004,,TH Nguyễn Tri Phương,Phuong 2,Toan,A01,IMO002,hoa@example.com,0901234568,012345678902",
 ].join("\n");
 
 export const questionImportTemplate: ImportTemplateDefinition = {
@@ -113,8 +113,8 @@ export const questionImportTemplate: ImportTemplateDefinition = {
 
 export const userImportTemplate: ImportTemplateDefinition = {
   title: "User Import Template",
-  description: "Prepare CSV files now using the fields planned for the future backend user import pipeline.",
-  footerNote: "This template is ready for the backend import phase that will resolve school_code and role_slugs into the current API payload.",
+  description: "Prepare CSV files for the backend user import pipeline.",
+  footerNote: "The backend resolves school_code when it exists, or creates/reuses a school from the school name when the code is blank.",
   formats: [
     {
       key: "csv",
@@ -123,7 +123,7 @@ export const userImportTemplate: ImportTemplateDefinition = {
       mimeType: "text/csv;charset=utf-8",
       requiredFields: ["full_name", "email", "password", "status", "is_active", "is_staff"],
       mappingNotes: [
-        "school_code should match an existing school code; leave it blank when the user has no school.",
+        "school_code may reference an existing code; school may contain a school name and the backend will create or reuse it automatically.",
         "role_slugs accepts one or more role slugs separated by `|`, for example candidate|student.",
         "status should use active, pending, or locked, while boolean columns should use true or false.",
       ],
@@ -149,6 +149,7 @@ export const examStudentImportTemplate: ImportTemplateDefinition = {
         "date_of_birth must use DD/MM/YYYY, for example 24/08/2003.",
         "Generated usernames follow the pattern name.ddmmyyyy.class and remove Vietnamese accents automatically.",
         "If CCCD already belongs to an existing student, the backend updates that profile and reuses the same account.",
+        "school_code may reference an existing code; school may contain a school name and the backend will create or reuse it automatically.",
       ],
       sample: examStudentCsvTemplate,
       downloadContent: examStudentCsvTemplate,
@@ -160,7 +161,7 @@ export const groupMembershipImportTemplate: ImportTemplateDefinition = {
   title: "Group Members Import Template",
   description: "Import candidates or students into a specific group with roster details and admin-visible login credentials.",
   footerNote:
-    "Use DD/MM/YYYY for date_of_birth. school_code must match an existing school. password is stored for admin roster display for newly created or reset candidate accounts.",
+    "Use DD/MM/YYYY for date_of_birth. school_code may match an existing school, or school may name a school to create/reuse. password is stored for admin roster display for newly created or reset candidate accounts.",
   formats: [
     {
       key: "csv",
@@ -172,6 +173,7 @@ export const groupMembershipImportTemplate: ImportTemplateDefinition = {
         "username becomes the candidate login account. If username is blank, the backend generates one.",
         "password becomes both the login password and the admin-visible roster password. If blank for a new account, the backend uses the generated username.",
         "date_of_birth must use DD/MM/YYYY, for example 24/08/2003.",
+        "school_code may reference an existing code; school may contain a school name and the backend will create or reuse it automatically.",
         "national_exam_subject stores one or more registered subjects; separate multiple subjects with semicolons. candidate_number maps to SBD. exam_block maps to Khối thi.",
       ],
       sample: groupMembershipCsvTemplate,

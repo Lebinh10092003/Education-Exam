@@ -14,7 +14,7 @@ from rest_framework.exceptions import ValidationError
 from apps.identity.models import Profile, Role, UserRole
 from apps.identity.utils import build_student_username, ensure_unique_username
 from apps.institutions.models import CandidateGroup
-from apps.institutions.models import School
+from apps.institutions.services import resolve_school_from_import
 from apps.platform_core.audit import record_audit_event
 from apps.platform_core.i18n import t
 from apps.question_bank.models import Question
@@ -79,20 +79,6 @@ def _get_candidate_role():
         defaults={"name": "Candidate", "is_system": True},
     )
     return role
-
-
-def _resolve_school_by_code(school_code, cache=None):
-    normalized_code = (school_code or "").strip()
-    if not normalized_code:
-        return None
-    if cache is not None and normalized_code.lower() in cache:
-        return cache[normalized_code.lower()]
-    school = School.objects.filter(code__iexact=normalized_code).first()
-    if school is None:
-        raise ValueError(f"Unknown school_code: {normalized_code}")
-    if cache is not None:
-        cache[normalized_code.lower()] = school
-    return school
 
 
 def _resolve_import_email(*, row_email, username, existing_user=None):
@@ -166,7 +152,11 @@ def _import_student_row(*, exam, assigned_by, row, row_number, candidate_role, s
         raise ValueError("student_class is required.")
 
     phone_number = (row.get("phone_number") or "").strip()
-    school = _resolve_school_by_code(row.get("school_code"), cache=schools_cache)
+    school = resolve_school_from_import(
+        school_code=row.get("school_code"),
+        school_name=row.get("school") or row.get("school_name"),
+        cache=schools_cache,
+    )
     existing_profile = Profile.objects.select_related("user").filter(cccd=cccd).first()
 
     if existing_profile is not None:

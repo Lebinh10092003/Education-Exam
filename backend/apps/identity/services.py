@@ -73,7 +73,7 @@ def import_users_from_csv(*, uploaded_file, requested_by):
     from io import StringIO
     from django.db import transaction
     from apps.identity.models import Profile, Role, User, UserRole
-    from apps.institutions.models import School
+    from apps.institutions.services import resolve_school_from_import
     from apps.identity.utils import ensure_unique_username, normalize_username_segment
 
     if not uploaded_file:
@@ -132,6 +132,7 @@ def import_users_from_csv(*, uploaded_file, requested_by):
         is_staff = parse_bool(row.get("is_staff"), default=False)
         phone_number = (row.get("phone_number") or "").strip()
         school_code = (row.get("school_code") or "").strip()
+        school_name = (row.get("school") or row.get("school_name") or "").strip()
         role_slugs = (row.get("role_slugs") or "").strip()
         if not role_slugs:
             role_slugs = "candidate"
@@ -144,16 +145,6 @@ def import_users_from_csv(*, uploaded_file, requested_by):
 
             if status_val not in (User.Status.ACTIVE, User.Status.PENDING, User.Status.LOCKED):
                 raise ValueError(f"Invalid status: '{status_val}'. Must be active, pending, or locked.")
-
-            school = None
-            if school_code:
-                school_code_lower = school_code.lower()
-                if school_code_lower not in schools_cache:
-                    s = School.objects.filter(code__iexact=school_code).first()
-                    if not s:
-                        raise ValueError(f"Unknown school_code: '{school_code}'")
-                    schools_cache[school_code_lower] = s
-                school = schools_cache[school_code_lower]
 
             roles = []
             if role_slugs:
@@ -169,6 +160,11 @@ def import_users_from_csv(*, uploaded_file, requested_by):
                         roles.append(roles_cache[slug_lower])
 
             with transaction.atomic():
+                school = resolve_school_from_import(
+                    school_code=school_code,
+                    school_name=school_name,
+                    cache=schools_cache,
+                )
                 user = User.objects.filter(email=email).first()
                 created = False
                 updated = False

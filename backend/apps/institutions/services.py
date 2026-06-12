@@ -1,10 +1,12 @@
 import csv
 import re
+import unicodedata
 from datetime import datetime
 from io import StringIO
 
 from django.contrib.auth import get_user_model
 from django.db import transaction
+from django.utils.text import slugify
 from rest_framework.exceptions import ValidationError
 
 from apps.identity.models import Profile, Role, UserRole
@@ -18,6 +20,9 @@ from apps.identity.utils import (
 from .models import GroupMembership, School
 
 CSV_REQUIRED_GROUP_IMPORT_FIELDS = ("full_name",)
+MISSING_SCHOOL = object()
+SCHOOL_CODE_CACHE_KEY = "codes"
+SCHOOL_NAME_CACHE_KEY = "names"
 
 
 def _normalize_cccd(value):
@@ -62,28 +67,138 @@ def _get_candidate_role():
     return role
 
 
-def _resolve_school(school_code):
+def _get_cache_bucket(cache, key):
+    if cache is None:
+        return None
+    return cache.setdefault(key, {})
+
+
+def _clean_school_name(value):
+    return re.sub(r"\s+", " ", (value or "").strip())
+
+
+def _strip_vietnamese_accents(value):
+    value = value.replace("đ", "d").replace("Đ", "D")
+    normalized = unicodedata.normalize("NFKD", value)
+    return "".join(char for char in normalized if not unicodedata.combining(char))
+
+
+def _normalize_school_name_key(value):
+    cleaned = _clean_school_name(value)
+    if not cleaned:
+        return ""
+
+    normalized = _strip_vietnamese_accents(cleaned).lower()
+    normalized = re.sub(r"[^\w\s]", " ", normalized)
+    normalized = re.sub(r"\s+", " ", normalized).strip()
+    if normalized.startswith("truong "):
+        normalized = normalized[len("truong "):].strip()
+
+    if normalized == "tieu hoc":
+        return "primary"
+    if normalized.startswith("tieu hoc "):
+        return f"primary {normalized[len('tieu hoc '):].strip()}"
+    if normalized == "th":
+        return "primary"
+    if normalized.startswith("th "):
+        return f"primary {normalized[len('th '):].strip()}"
+    return normalized
+
+
+def _normalize_school_code(value):
+    normalized = slugify((value or "").strip()).upper()
+    return normalized or ""
+
+
+def _generate_unique_school_code(school_name, preferred_code=""):
+    base_code = _normalize_school_code(preferred_code) or _normalize_school_code(school_name) or "SCHOOL"
+    candidate = base_code
+    suffix = 2
+    while School.objects.filter(code__iexact=candidate).exists():
+        candidate = f"{base_code}-{suffix}"
+        suffix += 1
+    return candidate
+
+
+def _cache_school(cache, school):
+    if cache is None or school is None:
+        return
+    code_bucket = _get_cache_bucket(cache, SCHOOL_CODE_CACHE_KEY)
+    name_bucket = _get_cache_bucket(cache, SCHOOL_NAME_CACHE_KEY)
+    code_bucket[school.code.lower()] = school
+    name_key = _normalize_school_name_key(school.name)
+    if name_key:
+        name_bucket[name_key] = school
+
+
+def _resolve_school_by_code(school_code, cache=None):
     normalized_code = (school_code or "").strip()
-    if normalized_code:
-        school = School.objects.filter(code__iexact=normalized_code).first()
-        if school is None:
-            raise ValueError(f"Unknown school_code: {normalized_code}")
-        return school
+    if not normalized_code:
+        return None
+
+    cache_key = normalized_code.lower()
+    code_bucket = _get_cache_bucket(cache, SCHOOL_CODE_CACHE_KEY)
+    if code_bucket is not None and cache_key in code_bucket:
+        school = code_bucket[cache_key]
+        return None if school is MISSING_SCHOOL else school
+
+    school = School.objects.filter(code__iexact=normalized_code).first()
+    if code_bucket is not None:
+        code_bucket[cache_key] = school or MISSING_SCHOOL
+    if school is not None:
+        _cache_school(cache, school)
+    return school
+
+
+def _resolve_school_by_name(school_name, cache=None):
+    display_name = _clean_school_name(school_name)
+    name_key = _normalize_school_name_key(display_name)
+    if not name_key:
+        return None
+
+    name_bucket = _get_cache_bucket(cache, SCHOOL_NAME_CACHE_KEY)
+    if name_bucket is not None and name_key in name_bucket:
+        return name_bucket[name_key]
+
+    for school in School.objects.all().only("id", "name", "code", "description", "is_active"):
+        if _normalize_school_name_key(school.name) == name_key:
+            _cache_school(cache, school)
+            return school
     return None
 
 
-def _resolve_school_from_import(*, school_code, school_name):
-    school = _resolve_school(school_code)
+def resolve_school_from_import(*, school_code=None, school_name=None, cache=None, create_missing=True):
+    display_name = _clean_school_name(school_name)
+    normalized_code = (school_code or "").strip()
+
+    school = _resolve_school_by_code(normalized_code, cache=cache)
     if school is not None:
         return school
 
-    normalized_name = (school_name or "").strip()
-    if normalized_name:
-        school = School.objects.filter(name__iexact=normalized_name).first()
-        if school is None:
-            raise ValueError(f"Unknown school: {normalized_name}")
-        return school
+    if display_name:
+        school = _resolve_school_by_name(display_name, cache=cache)
+        if school is not None:
+            return school
+        if create_missing:
+            school = School.objects.create(
+                name=display_name,
+                code=_generate_unique_school_code(display_name, preferred_code=normalized_code),
+                is_active=True,
+            )
+            _cache_school(cache, school)
+            return school
+
+    if normalized_code:
+        raise ValueError(f"Unknown school_code: {normalized_code}")
     return None
+
+
+def _resolve_school_from_import(*, school_code, school_name, cache=None):
+    return resolve_school_from_import(
+        school_code=school_code,
+        school_name=school_name,
+        cache=cache,
+    )
 
 
 def _resolve_existing_user(*, email, cccd, username):
@@ -194,7 +309,7 @@ def _sync_profile(
 
 
 @transaction.atomic
-def _import_group_member_row(*, group, row, candidate_role):
+def _import_group_member_row(*, group, row, candidate_role, schools_cache=None):
     user_model = get_user_model()
     full_name = (row.get("full_name") or "").strip()
     if not full_name:
@@ -220,7 +335,8 @@ def _import_group_member_row(*, group, row, candidate_role):
     date_of_birth = _parse_optional_date(row.get("date_of_birth"))
     explicit_school = _resolve_school_from_import(
         school_code=row.get("school_code"),
-        school_name=row.get("school"),
+        school_name=row.get("school") or row.get("school_name"),
+        cache=schools_cache,
     )
 
     user, profile = _resolve_existing_user(email=email, cccd=cccd, username=username)
@@ -332,6 +448,7 @@ def _import_group_member_row(*, group, row, candidate_role):
 def import_memberships_to_group(*, group, uploaded_file):
     rows = _decode_csv_upload(uploaded_file)
     candidate_role = _get_candidate_role()
+    schools_cache = {}
     summary = {
         "total_rows": len(rows),
         "created_users": 0,
@@ -348,6 +465,7 @@ def import_memberships_to_group(*, group, uploaded_file):
                 group=group,
                 row=row,
                 candidate_role=candidate_role,
+                schools_cache=schools_cache,
             )
         except ValueError as exc:
             summary["failed_rows"] += 1

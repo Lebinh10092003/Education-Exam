@@ -53,6 +53,60 @@ def test_student_import_creates_user_and_assignment(api_client, admin_token, sub
 
 
 @pytest.mark.django_db
+def test_student_import_creates_missing_school_from_name(api_client, admin_token, subject, admin_user):
+    from apps.exam_authoring.models import ExamAssignment
+    from apps.institutions.models import School
+
+    exam = _build_exam(subject=subject, admin_user=admin_user)
+    csv_content = (
+        "full_name,date_of_birth,student_class,cccd,email,phone_number,school_code,school\n"
+        "Lê Văn Bình,24/08/2003,12,012345678901,,0901234567,,Tiểu học Nguyễn Tri Phương\n"
+    ).encode("utf-8")
+    upload = SimpleUploadedFile("students.csv", csv_content, content_type="text/csv")
+
+    api_client.credentials(HTTP_AUTHORIZATION=f"Bearer {admin_token}")
+    response = api_client.post(f"/api/v1/exams/{exam.id}/student-import/", {"file": upload})
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["created_users"] == 1
+    assert payload["failed_rows"] == 0
+
+    school = School.objects.get()
+    assert school.name == "Tiểu học Nguyễn Tri Phương"
+    assert school.code == "TIEU-HOC-NGUYEN-TRI-PHUONG"
+    assignment = ExamAssignment.objects.select_related("user__profile").get(exam=exam)
+    assert assignment.user.profile.school == school
+
+
+@pytest.mark.django_db
+def test_student_import_reuses_school_by_normalized_name_within_batch(api_client, admin_token, subject, admin_user):
+    from apps.exam_authoring.models import ExamAssignment
+    from apps.institutions.models import School
+
+    exam = _build_exam(subject=subject, admin_user=admin_user)
+    school = School.objects.create(name="Tiểu học Nguyễn Tri Phương", code="NTP")
+    csv_content = (
+        "full_name,date_of_birth,student_class,cccd,email,phone_number,school_code,school\n"
+        "Tran Thi Hoa,15/01/2004,12A1,012345678902,hoa@student.local,0901234568,,TH NGUYỄN TRI PHƯƠNG\n"
+        "Pham Van An,20/02/2004,12A2,012345678903,an@student.local,0901234569,,Trường tiểu học Nguyen Tri Phuong\n"
+    ).encode("utf-8")
+    upload = SimpleUploadedFile("students.csv", csv_content, content_type="text/csv")
+
+    api_client.credentials(HTTP_AUTHORIZATION=f"Bearer {admin_token}")
+    response = api_client.post(f"/api/v1/exams/{exam.id}/student-import/", {"file": upload})
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["created_users"] == 2
+    assert payload["failed_rows"] == 0
+    assert School.objects.count() == 1
+    assert set(
+        ExamAssignment.objects.filter(exam=exam).values_list("user__profile__school_id", flat=True)
+    ) == {school.id}
+
+
+@pytest.mark.django_db
 def test_student_import_matches_existing_user_by_cccd_and_updates_fields(
     api_client,
     admin_token,
