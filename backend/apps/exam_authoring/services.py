@@ -365,7 +365,12 @@ def _resolve_random_item_specs(*, subject, random_rules, excluded_question_ids=N
 
         candidates = list(queryset.select_related("current_revision").distinct().order_by("id")[: rule["count"]])
         if len(candidates) != rule["count"]:
-            raise ValueError(f"Not enough questions available for random rule #{rule['sort_order']}.")
+            raise ValidationError(
+                t(
+                    vi=f"Không đủ câu hỏi trong ngân hàng cho luật chọn ngẫu nhiên #{rule['sort_order']}.",
+                    en=f"Not enough questions available for random rule #{rule['sort_order']}."
+                )
+            )
 
         for question in candidates:
             excluded_ids.add(question.id)
