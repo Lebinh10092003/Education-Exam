@@ -1,0 +1,38 @@
+# BEGIN managed khaothi.fermat.vn
+khaothi.fermat.vn {
+	encode zstd gzip
+
+	handle /api/* {
+		reverse_proxy khaothi-backend:8000
+	}
+
+	handle /admin/* {
+		reverse_proxy khaothi-backend:8000
+	}
+
+	handle /ws/* {
+		reverse_proxy khaothi-backend:8000
+	}
+
+	handle /rtc* {
+		reverse_proxy khaothi-livekit:7880
+	}
+
+	handle /twirp* {
+		reverse_proxy khaothi-livekit:7880
+	}
+
+	handle /static/* {
+		reverse_proxy khaothi-frontend:80
+	}
+
+	handle /media/* {
+		reverse_proxy khaothi-frontend:80
+	}
+
+	handle {
+		reverse_proxy khaothi-frontend:80
+	}
+}
+
+# END managed khaothi.fermat.vn

@@ -3,8 +3,8 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 COMPOSE=(docker compose -p khaothi --env-file "$ROOT_DIR/deploy/.env.production" -f "$ROOT_DIR/deploy/docker-compose.prod.yml")
 DOMAIN="${DOMAIN:-khaothi.fermat.vn}"
-CADDY_CONTAINER="${CADDY_CONTAINER:-movedrive-caddy-1}"
-CADDYFILE_PATH="${CADDYFILE_PATH:-/opt/movedrive/Caddyfile}"
+CADDY_CONTAINER="${CADDY_CONTAINER:-examedu-caddy}"
+CADDYFILE_PATH="${CADDYFILE_PATH:-/opt/khaothi.fermat.vn/deploy/caddy/Caddyfile}"
 CADDY_CONFIG_IN_CONTAINER="${CADDY_CONFIG_IN_CONTAINER:-/etc/caddy/Caddyfile}"
 
 sync_caddy_config() {

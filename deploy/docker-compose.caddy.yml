@@ -1,0 +1,29 @@
+services:
+  caddy:
+    image: caddy:2
+    container_name: examedu-caddy
+    restart: unless-stopped
+
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+
+    volumes:
+      - ./caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+
+    networks:
+      - examedu
+
+networks:
+  examedu:
+    external: true
+    name: examedu_default
+
+volumes:
+  caddy_data:
+    name: examedu_caddy_data
+  caddy_config:
+    name: examedu_caddy_config
