@@ -1,5 +1,5 @@
 import { createElement, lazy, type ComponentType } from "react";
-import { createBrowserRouter, Navigate, useParams } from "react-router";
+import { createBrowserRouter, Navigate, useParams, useRouteError } from "react-router";
 import { TakeExam } from "./pages/TakeExam";
 import { PracticeExam } from "./pages/PracticeExam";
 import { ForgotPassword } from "./pages/ForgotPassword";
@@ -78,30 +78,70 @@ export function ExamMonitorRedirectRoute() {
   return createElement(Navigate, { replace: true, to: `/exams/${id}?tab=monitoring` });
 }
 
+export function GlobalErrorBoundary() {
+  const error = useRouteError();
+  
+  if (error instanceof Error && error.message.includes("Failed to fetch dynamically imported module")) {
+    // If it's a chunk load error, automatically reload the page (only once)
+    const hasReloaded = sessionStorage.getItem("chunk_reload");
+    if (!hasReloaded) {
+      sessionStorage.setItem("chunk_reload", "true");
+      window.location.reload();
+      return <div>Loading new version...</div>;
+    }
+  }
+
+  // Clear the flag on successful load or other errors
+  sessionStorage.removeItem("chunk_reload");
+
+  return (
+    <div className="flex min-h-screen flex-col items-center justify-center p-4 text-center">
+      <div className="rounded-xl border border-red-200 bg-red-50 p-8 shadow-sm">
+        <h1 className="mb-4 text-2xl font-bold text-red-800">Đã xảy ra lỗi</h1>
+        <p className="mb-6 text-red-600">
+          {error instanceof Error ? error.message : "Đã có lỗi không xác định xảy ra."}
+        </p>
+        <button
+          onClick={() => window.location.reload()}
+          className="rounded-lg bg-red-600 px-6 py-2 text-white hover:bg-red-700 transition-colors"
+        >
+          Tải lại trang
+        </button>
+      </div>
+    </div>
+  );
+}
+
 export const routeConfig = [
   {
     path: "/login",
     Component: PublicLoginPage,
+    errorElement: createElement(GlobalErrorBoundary),
   },
   {
     path: "/forgot-password",
     Component: ForgotPassword,
+    errorElement: createElement(GlobalErrorBoundary),
   },
   {
     path: "/reset-password",
     Component: ResetPassword,
+    errorElement: createElement(GlobalErrorBoundary),
   },
   {
     path: "/",
     Component: LandingPageRoute,
+    errorElement: createElement(GlobalErrorBoundary),
   },
   {
     path: "/register",
     Component: RegistrationPageRoute,
+    errorElement: createElement(GlobalErrorBoundary),
   },
   {
     path: "/",
     Component: ProtectedAdminLayout,
+    errorElement: createElement(GlobalErrorBoundary),
     children: [
       { path: "dashboard", Component: DashboardRoute },
       { path: "users", Component: UserManagementRoute },
@@ -131,6 +171,7 @@ export const routeConfig = [
   {
     path: "/candidate",
     Component: ProtectedCandidateLayout,
+    errorElement: createElement(GlobalErrorBoundary),
     children: [
       { index: true, Component: CandidateDashboardRoute },
       { path: "dashboard", Component: CandidateDashboardRoute },
