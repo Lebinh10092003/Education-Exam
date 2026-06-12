@@ -1,6 +1,7 @@
 import logging
 import uuid
 import boto3
+from botocore.config import Config
 from django.urls import reverse
 
 from asgiref.sync import async_to_sync
@@ -408,10 +409,6 @@ def record_proctor_event(*, session, event_type, severity="info", metadata=None,
         }
 
     def publish_event_side_effects():
-        if admin_notification_kwargs is not None:
-            create_notifications_for_permission(**admin_notification_kwargs)
-        if candidate_notification_kwargs is not None:
-            create_notification(**candidate_notification_kwargs)
         _broadcast_exam_monitoring_update(
             exam_id=session.exam_id,
             message_type="proctor_event",
@@ -838,6 +835,7 @@ def generate_evidence_presigned_url(*, session, evidence_type, file_name, conten
             aws_secret_access_key=getattr(settings, 'AWS_SECRET_ACCESS_KEY', None),
             endpoint_url=getattr(settings, 'AWS_S3_ENDPOINT_URL', None),
             region_name=getattr(settings, 'AWS_S3_REGION_NAME', 'us-east-1'),
+            config=Config(signature_version='s3v4'),
         )
         bucket_name = getattr(settings, 'AWS_STORAGE_BUCKET_NAME', '')
         upload_url = s3_client.generate_presigned_url(

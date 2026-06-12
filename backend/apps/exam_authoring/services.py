@@ -822,7 +822,7 @@ def transition_exam_status(*, exam, next_status, actor, bonus_minutes=0, request
         Exam.Status.SCHEDULED: {Exam.Status.DRAFT, Exam.Status.OPEN, Exam.Status.CLOSED},
         Exam.Status.OPEN: {Exam.Status.SCHEDULED, Exam.Status.PAUSED, Exam.Status.CLOSED},
         Exam.Status.PAUSED: {Exam.Status.SCHEDULED, Exam.Status.OPEN, Exam.Status.CLOSED},
-        Exam.Status.CLOSED: {Exam.Status.SCHEDULED, Exam.Status.DRAFT},
+        Exam.Status.CLOSED: {Exam.Status.SCHEDULED, Exam.Status.DRAFT, Exam.Status.OPEN},
         Exam.Status.ARCHIVED: set(),
     }
     next_status = str(next_status)

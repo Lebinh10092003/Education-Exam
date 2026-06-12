@@ -248,6 +248,33 @@ export function ExamDetail() {
     [id],
   );
 
+  const bulkPublishResults = async () => {
+    if (!examDetail.data?.id) return;
+    try {
+      const { default: Swal } = await import("sweetalert2");
+      const confirm = await Swal.fire({
+        title: "Công bố tất cả?",
+        text: `Tất cả kết quả đã hoàn tất chấm điểm của kỳ thi này sẽ được công bố.`,
+        icon: "question",
+        showCancelButton: true,
+        confirmButtonText: "Đồng ý",
+        cancelButtonText: "Hủy",
+      });
+      if (confirm.isConfirmed) {
+        const res = await apiRequest<{ published_count: number }>("/api/v1/results/bulk-publish/", {
+          method: "POST",
+          body: { exam_id: examDetail.data.id },
+        });
+        notify.success(`Đã công bố thành công ${res.published_count} kết quả thi.`);
+        void resultsList.reload();
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Có lỗi xảy ra khi công bố điểm.";
+      notify.error(message);
+    }
+  };
+
+
   const exam = examDetail.data;
   const isClass = exam?.mode === "class";
 
@@ -747,6 +774,15 @@ export function ExamDetail() {
                       </Button>
                     </div>
                     <div className="flex flex-wrap gap-2">
+                      {exam.status === "closed" || exam.status === "archived" ? (
+                        <Button
+                          className="bg-blue-600 text-white hover:bg-blue-700 font-semibold"
+                          onClick={() => void bulkPublishResults()}
+                          disabled={resultsList.isLoading}
+                        >
+                          Công bố tất cả điểm thi
+                        </Button>
+                      ) : null}
                       <Button
                         variant="outline"
                         onClick={() => void exportResultsFile("csv", exam.id.toString())}

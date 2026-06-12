@@ -309,7 +309,6 @@ export function TakeExam() {
   const locale = i18n.resolvedLanguage ?? i18n.language;
 
   const [session, setSession] = useState<CandidateSession | null>(null);
-  const [focusMode, setFocusMode] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
@@ -319,6 +318,7 @@ export function TakeExam() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [proctoringBlockReason, setProctoringBlockReason] = useState<string | null>(null);
   const [proctoringReady, setProctoringReady] = useState(false);
+  const [isFullscreen, setIsFullscreen] = useState(true);
   const [isProctoringSetupPending, setIsProctoringSetupPending] = useState(false);
   const [localPreviewStream, setLocalPreviewStream] = useState<MediaStream | null>(null);
   const [latestViolationNotice, setLatestViolationNotice] = useState<ViolationNotice | null>(null);
@@ -1055,6 +1055,7 @@ export function TakeExam() {
     };
 
     const handleFullscreenChange = () => {
+      setIsFullscreen(!!document.fullscreenElement);
       if (session.enable_proctoring && document.fullscreenEnabled && !document.fullscreenElement) {
         void reportViolation("fullscreen_exit", "warning", t("examSession.fullscreenExitWarning"));
       }
@@ -1469,6 +1470,20 @@ export function TakeExam() {
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
+      {!isFullscreen && session?.enable_proctoring ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm">
+          <div className="text-center p-8 bg-white rounded-xl max-w-md mx-auto shadow-2xl relative">
+            <AlertTriangle className="w-16 h-16 text-amber-500 mx-auto mb-4" />
+            <h2 className="text-2xl font-bold text-slate-900 mb-2">Đã thoát toàn màn hình</h2>
+            <p className="text-slate-600 mb-6">
+              Hệ thống giám sát yêu cầu bạn phải làm bài ở chế độ toàn màn hình. Vui lòng quay lại toàn màn hình để tiếp tục làm bài thi.
+            </p>
+            <Button onClick={() => void ensureFullscreenMode()} size="lg" className="w-full text-base py-6">
+              Quay lại toàn màn hình
+            </Button>
+          </div>
+        </div>
+      ) : null}
       <header className="sticky top-0 z-10 border-b border-gray-200 bg-white px-4 py-4 sm:px-6">
         <div className="mx-auto flex max-w-7xl flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <div className="min-w-0">
@@ -1512,14 +1527,7 @@ export function TakeExam() {
               <span className="font-mono font-semibold text-blue-900">{formatTime(timeRemaining)}</span>
             </div>
 
-            <Button
-              variant="outline"
-              className="w-full sm:w-auto gap-2"
-              onClick={() => setFocusMode(!focusMode)}
-            >
-              {focusMode ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-              {focusMode ? "Exit Focus" : "Focus Mode"}
-            </Button>
+
 
             <Button className="w-full sm:w-auto" onClick={() => void confirmSubmit()} disabled={isSubmitting}>
               {t("examSession.submitExam")}
@@ -1529,11 +1537,8 @@ export function TakeExam() {
       </header>
 
       <div className="flex-1 p-4 sm:p-6">
-        <div className={cn(
-          "mx-auto grid gap-6",
-          focusMode ? "max-w-4xl grid-cols-1" : "max-w-7xl grid-cols-1 lg:grid-cols-4"
-        )}>
-          <div className={focusMode ? "lg:col-span-1" : "lg:col-span-3"}>
+        <div className="mx-auto grid gap-6 max-w-7xl grid-cols-1 lg:grid-cols-4">
+          <div className="lg:col-span-3">
             {latestViolationNotice ? (
               <div
                 className={`mb-4 rounded-xl border px-4 py-4 text-sm ${
@@ -1639,7 +1644,6 @@ export function TakeExam() {
             </Card>
           </div>
 
-          {!focusMode && (
             <div className="lg:col-span-1">
               <Card className="lg:sticky lg:top-24">
                 <CardContent className="p-4 sm:p-6">
@@ -1762,7 +1766,7 @@ export function TakeExam() {
               </CardContent>
             </Card>
           </div>
-          )}
+
         </div>
       </div>
 

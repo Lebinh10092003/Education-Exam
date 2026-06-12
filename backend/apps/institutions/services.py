@@ -94,14 +94,43 @@ def _normalize_school_name_key(value):
     if normalized.startswith("truong "):
         normalized = normalized[len("truong "):].strip()
 
-    if normalized == "tieu hoc":
+    if normalized == "tieu hoc" or normalized == "th":
         return "primary"
     if normalized.startswith("tieu hoc "):
         return f"primary {normalized[len('tieu hoc '):].strip()}"
-    if normalized == "th":
-        return "primary"
     if normalized.startswith("th "):
         return f"primary {normalized[len('th '):].strip()}"
+
+    if normalized in ("trung hoc co so", "thcs"):
+        return "secondary"
+    if normalized.startswith("trung hoc co so "):
+        return f"secondary {normalized[len('trung hoc co so '):].strip()}"
+    if normalized.startswith("thcs "):
+        return f"secondary {normalized[len('thcs '):].strip()}"
+
+    if normalized in ("trung hoc pho thong", "thpt", "ptth"):
+        return "highschool"
+    if normalized.startswith("trung hoc pho thong "):
+        return f"highschool {normalized[len('trung hoc pho thong '):].strip()}"
+    if normalized.startswith("thpt "):
+        return f"highschool {normalized[len('thpt '):].strip()}"
+    if normalized.startswith("ptth "):
+        return f"highschool {normalized[len('ptth '):].strip()}"
+
+    if normalized in ("dai hoc", "dh"):
+        return "university"
+    if normalized.startswith("dai hoc "):
+        return f"university {normalized[len('dai hoc '):].strip()}"
+    if normalized.startswith("dh "):
+        return f"university {normalized[len('dh '):].strip()}"
+
+    if normalized in ("cao dang", "cd"):
+        return "college"
+    if normalized.startswith("cao dang "):
+        return f"college {normalized[len('cao dang '):].strip()}"
+    if normalized.startswith("cd "):
+        return f"college {normalized[len('cd '):].strip()}"
+
     return normalized
 
 
