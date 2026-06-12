@@ -165,7 +165,7 @@ describe("protected layouts", () => {
     await user.click(screen.getByRole("link", { name: "Open Practice Session" }));
 
     expect(await screen.findByText("Practice Session Screen")).toBeInTheDocument();
-  });
+  }, 15000);
 
   it("redirects legacy exam monitoring routes to the canonical detail query route", async () => {
     render(

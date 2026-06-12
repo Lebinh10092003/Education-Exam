@@ -3,17 +3,19 @@ from datetime import timedelta
 from decimal import Decimal
 
 from django.conf import settings
+from django.core.cache import cache
 from django.db import transaction
 from django.db.models import Count, Q
 from django.utils import timezone
 from rest_framework.exceptions import PermissionDenied, ValidationError
 
-from apps.exam_authoring.models import Exam, ExamAssignment
+from apps.exam_authoring.models import Exam, ExamAssignment, ExamItem
 from apps.exam_authoring.lifecycle import (
     assert_exam_phase_allows_start,
     assert_session_allows_interaction,
     resolve_exam_phase,
 )
+from apps.question_bank.models import Question
 from apps.platform_core.i18n import t
 
 from .models import AutosaveSnapshot, ExamSession, SessionAnswer, SessionQuestion, Submission
@@ -37,6 +39,30 @@ def _progress_counts_for_session(session):
         answered_count=Count("id", filter=Q(answer__is_answered=True)),
         marked_count=Count("id", filter=Q(is_marked_for_review=True)),
     )
+
+
+def set_session_cache(session):
+    cache_key = f"exam_session_cache:{session.id}"
+    has_published_results = session.exam.sessions.filter(result__publish_state="published").exists()
+    progress_counts = _progress_counts_for_session(session)
+    
+    cached_data = {
+        "candidate_id": session.candidate_id,
+        "status": session.status,
+        "expires_at": session.expires_at.timestamp(),
+        "paused_at": session.paused_at.timestamp() if session.paused_at else None,
+        "remaining_seconds_at_pause": session.remaining_seconds_at_pause,
+        "exam_id": session.exam_id,
+        "exam_status": session.exam.status,
+        "exam_opens_at": session.exam.schedule_window.opens_at.timestamp() if (hasattr(session.exam, "schedule_window") and session.exam.schedule_window and session.exam.schedule_window.opens_at) else None,
+        "exam_closes_at": session.exam.schedule_window.closes_at.timestamp() if (hasattr(session.exam, "schedule_window") and session.exam.schedule_window and session.exam.schedule_window.closes_at) else None,
+        "has_published_results": has_published_results,
+        "answered_count": progress_counts["answered_count"],
+        "marked_count": progress_counts["marked_count"],
+        "last_activity_at": session.last_activity_at.timestamp() if session.last_activity_at else None,
+    }
+    cache.set(cache_key, cached_data, timeout=3600)
+    return cached_data
 
 
 def _should_write_session_activity(session, now):
@@ -73,6 +99,7 @@ def _expire_if_needed(session, *, now):
     if session.status == ExamSession.Status.IN_PROGRESS and session.expires_at <= now:
         session.status = ExamSession.Status.EXPIRED
         session.save(update_fields=["status", "updated_at"])
+        cache.delete(f"exam_session_cache:{session.id}")
         return True
     return False
 
@@ -85,21 +112,71 @@ def _sum_points(items):
 
 
 def _build_session_questions(*, session, exam_items):
-    items = list(exam_items)
-    if session.exam.shuffle_questions and len(items) > 1:
+    manual_items = [item for item in exam_items if item.source == ExamItem.Source.MANUAL]
+    static_random_items = [item for item in exam_items if item.source == ExamItem.Source.RANDOM]
+
+    random_rules = list(session.exam_version.random_rules.order_by("sort_order"))
+    total_rule_count = sum(rule.count for rule in random_rules)
+
+    paired_specs = []  # list of tuples (exam_item, question_revision)
+
+    if len(static_random_items) == total_rule_count and total_rule_count > 0:
         seeded_rng = random.Random(f"{session.exam_id}:{session.candidate_id}:{session.attempt_number}")
-        seeded_rng.shuffle(items)
+        excluded_ids = {item.question_revision.question_id for item in manual_items}
+
+        static_random_ptr = 0
+
+        for rule in random_rules:
+            queryset = Question.objects.filter(subject=session.exam.subject, current_revision__isnull=False)
+            if rule.difficulty:
+                queryset = queryset.filter(difficulty=rule.difficulty)
+            if rule.question_type:
+                queryset = queryset.filter(question_type=rule.question_type)
+            if rule.tag_ids:
+                queryset = queryset.filter(tags__id__in=rule.tag_ids)
+            if excluded_ids:
+                queryset = queryset.exclude(id__in=excluded_ids)
+
+            candidates = list(queryset.select_related("current_revision").distinct().order_by("id"))
+            if len(candidates) < rule.count:
+                raise ValidationError(t(
+                    vi=f"Không đủ câu hỏi trong ngân hàng để sinh đề ngẫu nhiên theo yêu cầu (Luật #{rule.sort_order}).",
+                    en=f"Not enough questions available in the question bank to satisfy random rule #{rule.sort_order}."
+                ))
+
+            # Shuffle candidates deterministically based on seed
+            seeded_rng.shuffle(candidates)
+            selected_questions = candidates[:rule.count]
+
+            for question in selected_questions:
+                excluded_ids.add(question.id)
+                item = static_random_items[static_random_ptr]
+                static_random_ptr += 1
+                paired_specs.append((item, question.current_revision))
+    else:
+        # Fallback to static items if no random rules or mismatch
+        for item in static_random_items:
+            paired_specs.append((item, item.question_revision))
+
+    # Add all manual items
+    for item in manual_items:
+        paired_specs.append((item, item.question_revision))
+
+    # Shuffle paired_specs if required by exam configurations
+    if session.exam.shuffle_questions and len(paired_specs) > 1:
+        seeded_rng = random.Random(f"{session.exam_id}:{session.candidate_id}:{session.attempt_number}")
+        seeded_rng.shuffle(paired_specs)
 
     SessionQuestion.objects.bulk_create(
         [
             SessionQuestion(
                 session=session,
                 exam_item=item,
-                question_revision=item.question_revision,
+                question_revision=revision,
                 sort_order=index,
                 points=item.points,
             )
-            for index, item in enumerate(items, start=1)
+            for index, (item, revision) in enumerate(paired_specs, start=1)
         ]
     )
 
@@ -115,6 +192,7 @@ def start_or_resume_session(*, exam, candidate):
     )
     if current_session:
         if not _expire_if_needed(current_session, now=now):
+            set_session_cache(current_session)
             return current_session
 
     latest_session = (
@@ -159,6 +237,7 @@ def start_or_resume_session(*, exam, candidate):
         max_score=max_score,
     )
     _build_session_questions(session=session, exam_items=exam_items)
+    set_session_cache(session)
     return session
 
 
@@ -187,6 +266,9 @@ def save_session_answer(
     now = _assert_session_is_active(session)
     answer, _ = SessionAnswer.objects.get_or_create(session_question=session_question)
 
+    was_answered = answer.is_answered
+    was_marked = session_question.is_marked_for_review
+
     if selected_option_keys is not None:
         answer.selected_option_keys = [str(option_key) for option_key in selected_option_keys]
     if answer_text is not None:
@@ -201,6 +283,30 @@ def save_session_answer(
     if _should_write_session_activity(session, now):
         session.last_activity_at = now
         session.save(update_fields=["last_activity_at", "updated_at"])
+
+    # Update counts in-place in Redis cache if cache exists
+    cache_key = f"exam_session_cache:{session.id}"
+    cached_data = cache.get(cache_key)
+    if cached_data:
+        answered_diff = 0
+        if not was_answered and answer.is_answered:
+            answered_diff = 1
+        elif was_answered and not answer.is_answered:
+            answered_diff = -1
+
+        marked_diff = 0
+        if not was_marked and session_question.is_marked_for_review:
+            marked_diff = 1
+        elif was_marked and not session_question.is_marked_for_review:
+            marked_diff = -1
+
+        if answered_diff != 0 or marked_diff != 0:
+            cached_data["answered_count"] += answered_diff
+            cached_data["marked_count"] += marked_diff
+        
+        cached_data["last_activity_at"] = now.timestamp()
+        cache.set(cache_key, cached_data, timeout=3600)
+
     return answer
 
 
@@ -304,6 +410,7 @@ def submit_session(*, session, submitted_by, source=Submission.Source.MANUAL, fo
             "updated_at",
         ]
     )
+    cache.delete(f"exam_session_cache:{session.id}")
     submission = Submission.objects.create(
         session=session,
         submitted_by=submitted_by,

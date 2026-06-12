@@ -13,6 +13,9 @@ from .views import (
     ExamMonitoringSnapshotView,
     ViolationCaseExportView,
     ViolationCaseViewSet,
+    CandidateSessionEvidencePresignedUrlView,
+    CandidateSessionEvidenceConfirmView,
+    CandidateSessionEvidenceMockUploadView,
 )
 
 
@@ -49,6 +52,21 @@ urlpatterns = [
         "proctoring/sessions/<int:session_id>/evidence/",
         CandidateSessionEvidenceView.as_view(),
         name="proctoring-session-evidence",
+    ),
+    path(
+        "proctoring/sessions/<int:session_id>/evidence/presigned-url/",
+        CandidateSessionEvidencePresignedUrlView.as_view(),
+        name="proctoring-session-evidence-presigned-url",
+    ),
+    path(
+        "proctoring/sessions/<int:session_id>/evidence/confirm/",
+        CandidateSessionEvidenceConfirmView.as_view(),
+        name="proctoring-session-evidence-confirm",
+    ),
+    path(
+        "proctoring/sessions/<int:session_id>/evidence/mock-upload/",
+        CandidateSessionEvidenceMockUploadView.as_view(),
+        name="proctoring-session-evidence-mock-upload",
     ),
     path(
         "proctoring/sessions/<int:session_id>/media/publish-token/",

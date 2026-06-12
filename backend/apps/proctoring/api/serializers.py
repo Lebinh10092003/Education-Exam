@@ -330,3 +330,22 @@ class ViolationCaseSerializer(serializers.ModelSerializer):
 class ViolationCaseResolveSerializer(serializers.Serializer):
     decision = serializers.ChoiceField(choices=ViolationReview.Decision.choices)
     notes = serializers.CharField(required=False, allow_blank=True, default="")
+
+
+class EvidencePresignedUrlRequestSerializer(serializers.Serializer):
+    evidence_type = serializers.ChoiceField(choices=ProctorEvidence.EvidenceType.choices)
+    file_name = serializers.CharField(max_length=255)
+    content_type = serializers.CharField(max_length=128)
+
+
+class EvidencePresignedUrlResponseSerializer(serializers.Serializer):
+    upload_url = serializers.CharField()
+    object_key = serializers.CharField()
+
+
+class EvidenceConfirmSerializer(serializers.Serializer):
+    event_id = serializers.IntegerField(required=False, allow_null=True, default=None)
+    evidence_type = serializers.ChoiceField(choices=ProctorEvidence.EvidenceType.choices)
+    object_key = serializers.CharField(max_length=512)
+    metadata = FlexibleJSONField(required=False, default=dict)
+

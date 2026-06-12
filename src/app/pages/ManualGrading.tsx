@@ -81,6 +81,7 @@ export function ManualGrading() {
   const [selectedTask, setSelectedTask] = useState<ManualGradingTaskRecord | null>(null);
   const [scoreAwarded, setScoreAwarded] = useState("");
   const [feedback, setFeedback] = useState("");
+  const [pendingAutoSelectFirst, setPendingAutoSelectFirst] = useState(false);
 
   const debouncedSearch = useDebouncedValue(searchQuery, 300);
   const mutation = useMutationState();
@@ -137,7 +138,37 @@ export function ManualGrading() {
     };
   }, [tasks]);
 
-  const submitGrade = async () => {
+  const currentTaskIndex = useMemo(() => {
+    if (!selectedTask) return -1;
+    return tasks.findIndex((t) => t.id === selectedTask.id);
+  }, [selectedTask, tasks]);
+
+  const hasPreviousTask = currentTaskIndex > 0;
+  const hasNextTask = currentTaskIndex !== -1 && (currentTaskIndex < tasks.length - 1 || Boolean(tasksList.data?.next));
+
+  const selectPreviousTask = () => {
+    if (hasPreviousTask) {
+      setSelectedTask(tasks[currentTaskIndex - 1]);
+    }
+  };
+
+  const selectNextTask = () => {
+    if (currentTaskIndex < tasks.length - 1) {
+      setSelectedTask(tasks[currentTaskIndex + 1]);
+    } else if (tasksList.data?.next) {
+      setPendingAutoSelectFirst(true);
+      setPage((current) => current + 1);
+    }
+  };
+
+  useEffect(() => {
+    if (pendingAutoSelectFirst && !tasksList.isLoading && tasks.length > 0) {
+      setSelectedTask(tasks[0]);
+      setPendingAutoSelectFirst(false);
+    }
+  }, [pendingAutoSelectFirst, tasksList.isLoading, tasks]);
+
+  const submitGrade = async (andNext: boolean = false) => {
     if (!selectedTask) {
       return;
     }
@@ -158,8 +189,21 @@ export function ManualGrading() {
         }),
       );
       notify.success("Manual grade saved.");
-      setSelectedTask(updatedTask);
       await tasksList.reload();
+
+      if (andNext) {
+        if (currentTaskIndex < tasks.length - 1) {
+          setSelectedTask(tasks[currentTaskIndex + 1]);
+        } else if (tasksList.data?.next) {
+          setPendingAutoSelectFirst(true);
+          setPage((current) => current + 1);
+        } else {
+          setSelectedTask(null);
+          notify.info("All tasks on this page have been graded.");
+        }
+      } else {
+        setSelectedTask(updatedTask);
+      }
     } catch (error) {
       const message = error instanceof Error ? error.message : "Unable to save the manual grade.";
       notify.error(message);
@@ -471,11 +515,45 @@ export function ManualGrading() {
                   </div>
                 ) : null}
 
-                <div className="flex justify-end">
-                  <Button className="btn-micro-animate" onClick={() => void submitGrade()} disabled={mutation.isSubmitting}>
-                    <Send className="mr-2 h-4 w-4" />
-                    {mutation.isSubmitting ? "Saving..." : "Submit Grade"}
-                  </Button>
+                <div className="flex justify-between items-center mt-6 pt-4 border-t border-gray-100 flex-wrap gap-4">
+                  <div className="flex gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      disabled={!hasPreviousTask}
+                      onClick={selectPreviousTask}
+                    >
+                      &larr; Prev
+                    </Button>
+                    <span className="text-xs text-gray-500 flex items-center px-1 font-medium">
+                      {currentTaskIndex + 1} / {tasks.length}
+                    </span>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      disabled={!hasNextTask}
+                      onClick={selectNextTask}
+                    >
+                      Next &rarr;
+                    </Button>
+                  </div>
+                  <div className="flex gap-2">
+                    <Button
+                      variant="outline"
+                      onClick={() => void submitGrade(false)}
+                      disabled={mutation.isSubmitting}
+                    >
+                      {mutation.isSubmitting ? "Saving..." : "Save"}
+                    </Button>
+                    <Button
+                      className="btn-micro-animate bg-blue-600 text-white hover:bg-blue-700"
+                      onClick={() => void submitGrade(true)}
+                      disabled={mutation.isSubmitting}
+                    >
+                      <Send className="mr-2 h-4 w-4" />
+                      {mutation.isSubmitting ? "Saving..." : "Save & Next"}
+                    </Button>
+                  </div>
                 </div>
               </div>
             </div>

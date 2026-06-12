@@ -1,6 +1,7 @@
 import { Room, Track } from "livekit-client";
 
 import { apiRequest } from "./http";
+import { getStoredTokens } from "./storage";
 
 export interface MediaTokenPayload {
   provider: string;
@@ -118,20 +119,59 @@ export async function uploadProctorEvidence(
   metadata: Record<string, unknown>,
 ) {
   const extension = file.type === "image/webp" ? "webp" : file.type === "image/jpeg" ? "jpg" : "png";
-  const formData = new FormData();
-  if (eventId !== null) {
-    formData.set("event_id", String(eventId));
-  }
-  formData.set("evidence_type", evidenceType);
-  formData.set("metadata", JSON.stringify(metadata));
-  formData.set(
-    "file",
-    new File([file], `${evidenceType}.${extension}`, { type: file.type || "application/octet-stream" }),
+  const fileName = `${evidenceType}.${extension}`;
+  const contentType = file.type || "application/octet-stream";
+
+  // 1. Xin Presigned URL tu backend
+  const presignedRes = await apiRequest<{ upload_url: string; object_key: string }>(
+    `/api/v1/proctoring/sessions/${sessionId}/evidence/presigned-url/`,
+    {
+      method: "POST",
+      body: {
+        evidence_type: evidenceType,
+        file_name: fileName,
+        content_type: contentType,
+      },
+    }
   );
-  return apiRequest<ProctorEvidenceResponse>(`/api/v1/proctoring/sessions/${sessionId}/evidence/`, {
-    method: "POST",
-    body: formData,
+
+  const { upload_url, object_key } = presignedRes;
+
+  // 2. Put file trực tiếp lên R2/S3 (hoặc mock upload endpoint)
+  const isMock = upload_url.includes("mock-upload");
+  const headers: Record<string, string> = {
+    "Content-Type": contentType,
+  };
+  if (isMock) {
+    const tokens = getStoredTokens();
+    if (tokens?.access) {
+      headers["Authorization"] = `Bearer ${tokens.access}`;
+    }
+  }
+
+  const uploadRes = await fetch(upload_url, {
+    method: "PUT",
+    headers,
+    body: file,
   });
+
+  if (!uploadRes.ok) {
+    throw new Error(`Evidence upload failed with status ${uploadRes.status}`);
+  }
+
+  // 3. Confirm tải lên thành công để backend tạo bản ghi DB
+  return apiRequest<ProctorEvidenceResponse>(
+    `/api/v1/proctoring/sessions/${sessionId}/evidence/confirm/`,
+    {
+      method: "POST",
+      body: {
+        event_id: eventId,
+        evidence_type: evidenceType,
+        object_key: object_key,
+        metadata: metadata,
+      },
+    }
+  );
 }
 
 export async function connectCandidatePublisher(

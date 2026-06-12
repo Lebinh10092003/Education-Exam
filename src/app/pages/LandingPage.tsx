@@ -29,6 +29,8 @@ import { getDefaultRouteForProfile } from "../auth/AuthContext";
 import { LanguageSwitcher } from "../components/LanguageSwitcher";
 import { Button } from "../components/ui/button";
 import { Card, CardContent } from "../components/ui/card";
+import { Input } from "../components/ui/input";
+import { Label } from "../components/ui/label";
 
 const REGISTRATION_URL = "https://dangky.fermat.edu.vn/";
 const SCO_URL = "https://www.schoolconnectonline.com/olympiad/vietnam.aspx";
@@ -186,11 +188,59 @@ function BrandMark() {
   );
 }
 
+interface PublicResultRecord {
+  id: number;
+  candidate_name: string;
+  exam_name: string;
+  subject_name: string;
+  score: string;
+  max_score: string;
+  percentage: string;
+  passed: boolean | null;
+  completed_date: string;
+}
+
 export function LandingPage() {
   const { t } = useTranslation("landing");
   const { theme, setTheme } = useTheme();
   const { isAuthenticated, profile } = useAuth();
   const [faqOpen, setFaqOpen] = useState<Record<number, boolean>>({ 1: true });
+
+  const [lookupType, setLookupType] = useState<"username" | "personal">("username");
+  const [username, setUsername] = useState("");
+  const [fullName, setFullName] = useState("");
+  const [dob, setDob] = useState("");
+  const [phone, setPhone] = useState("");
+  const [results, setResults] = useState<PublicResultRecord[] | null>(null);
+  const [isSearching, setIsSearching] = useState(false);
+  const [hasSearched, setHasSearched] = useState(false);
+
+  const handleLookup = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsSearching(true);
+    setHasSearched(true);
+    setResults(null);
+
+    const queryParams: Record<string, string> = { type: lookupType };
+    if (lookupType === "username") {
+      queryParams.username = username;
+    } else {
+      queryParams.full_name = fullName;
+      queryParams.date_of_birth = dob;
+      queryParams.phone_number = phone;
+    }
+
+    try {
+      const data = await apiRequest<PaginatedResponse<PublicResultRecord>>("/api/v1/public-results/lookup/", {
+        query: queryParams,
+      });
+      setResults(data.results ?? []);
+    } catch (err) {
+      setResults([]);
+    } finally {
+      setIsSearching(false);
+    }
+  };
 
   const portalPath = profile ? getDefaultRouteForProfile(profile) : "/login";
 
@@ -221,6 +271,9 @@ export function LandingPage() {
             </button>
             <button className="hover:text-blue-700 dark:hover:text-blue-300" onClick={() => scrollToId("journey")}>
               {t("nav.journey")}
+            </button>
+            <button className="hover:text-blue-700 dark:hover:text-blue-300" onClick={() => scrollToId("result-lookup")}>
+              {t("lookup.title")}
             </button>
             <button className="hover:text-blue-700 dark:hover:text-blue-300" onClick={() => scrollToId("support")}>
               {t("nav.support")}
@@ -564,6 +617,175 @@ export function LandingPage() {
                 </a>
               </div>
             </div>
+          </div>
+        </section>
+
+        <section id="result-lookup" className="border-t border-slate-200 py-16 dark:border-slate-800 bg-white dark:bg-slate-950">
+          <div className="mx-auto max-w-4xl px-4 sm:px-6 lg:px-8">
+            <SectionHeading title={t("lookup.title")} subtitle={t("lookup.subtitle")} />
+
+            <Card className="mt-10 overflow-hidden border border-slate-200/80 bg-white/70 backdrop-blur-md shadow-lg dark:border-slate-800/80 dark:bg-slate-900/60 rounded-2xl">
+              <CardContent className="p-6 sm:p-8">
+                <div className="flex justify-center border-b border-slate-100 dark:border-slate-800 pb-4 mb-6">
+                  <div className="flex gap-2 p-1 bg-slate-100 dark:bg-slate-800 rounded-lg">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setLookupType("username");
+                        setResults(null);
+                        setHasSearched(false);
+                      }}
+                      className={`px-4 py-2 text-sm font-semibold rounded-md transition-all duration-200 ${
+                        lookupType === "username"
+                          ? "bg-blue-700 text-white shadow"
+                          : "text-slate-600 dark:text-slate-300 hover:bg-slate-200/50 dark:hover:bg-slate-700/50"
+                      }`}
+                    >
+                      {t("lookup.tabUsername")}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setLookupType("personal");
+                        setResults(null);
+                        setHasSearched(false);
+                      }}
+                      className={`px-4 py-2 text-sm font-semibold rounded-md transition-all duration-200 ${
+                        lookupType === "personal"
+                          ? "bg-blue-700 text-white shadow"
+                          : "text-slate-600 dark:text-slate-300 hover:bg-slate-200/50 dark:hover:bg-slate-700/50"
+                      }`}
+                    >
+                      {t("lookup.tabPersonal")}
+                    </button>
+                  </div>
+                </div>
+
+                <form onSubmit={handleLookup} className="space-y-4">
+                  {lookupType === "username" ? (
+                    <div>
+                      <Label htmlFor="lookup-username" className="text-slate-700 dark:text-slate-300 font-semibold">{t("lookup.usernameLabel")}</Label>
+                      <Input
+                        id="lookup-username"
+                        placeholder={t("lookup.usernamePlaceholder")}
+                        className="mt-2 h-10 border-slate-200 dark:border-slate-800"
+                        value={username}
+                        onChange={(e) => setUsername(e.target.value)}
+                        required
+                      />
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+                      <div>
+                        <Label htmlFor="lookup-fullname" className="text-slate-700 dark:text-slate-300 font-semibold">{t("lookup.fullNameLabel")}</Label>
+                        <Input
+                          id="lookup-fullname"
+                          placeholder={t("lookup.fullNamePlaceholder")}
+                          className="mt-2 h-10 border-slate-200 dark:border-slate-800"
+                          value={fullName}
+                          onChange={(e) => setFullName(e.target.value)}
+                          required
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="lookup-dob" className="text-slate-700 dark:text-slate-300 font-semibold">{t("lookup.dobLabel")}</Label>
+                        <Input
+                          id="lookup-dob"
+                          type="date"
+                          placeholder={t("lookup.dobPlaceholder")}
+                          className="mt-2 h-10 border-slate-200 dark:border-slate-800"
+                          value={dob}
+                          onChange={(e) => setDob(e.target.value)}
+                          required
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="lookup-phone" className="text-slate-700 dark:text-slate-300 font-semibold">{t("lookup.phoneLabel")}</Label>
+                        <Input
+                          id="lookup-phone"
+                          placeholder={t("lookup.phonePlaceholder")}
+                          className="mt-2 h-10 border-slate-200 dark:border-slate-800"
+                          value={phone}
+                          onChange={(e) => setPhone(e.target.value)}
+                          required
+                        />
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="flex justify-end pt-2">
+                    <Button
+                      type="submit"
+                      disabled={isSearching}
+                      className="w-full sm:w-auto bg-blue-700 hover:bg-blue-800 text-white rounded-lg transition-all duration-200 hover:shadow-lg hover:shadow-blue-700/20"
+                    >
+                      {isSearching ? t("lookup.searching") : t("lookup.btnSearch")}
+                    </Button>
+                  </div>
+                </form>
+
+                {hasSearched && !isSearching && results !== null && (
+                  <div className="mt-8 pt-6 border-t border-slate-100 dark:border-slate-800 animate-fadeIn">
+                    <h3 className="text-lg font-bold text-slate-950 dark:text-white mb-4">
+                      {t("lookup.tableTitle")}
+                    </h3>
+
+                    {results.length === 0 ? (
+                      <p className="text-sm text-slate-500 dark:text-slate-400 py-4 text-center">
+                        {t("lookup.noResult")}
+                      </p>
+                    ) : (
+                      <div className="overflow-x-auto rounded-lg border border-slate-100 dark:border-slate-800">
+                        <table className="w-full text-left text-sm">
+                          <thead className="bg-slate-50 text-xs font-bold uppercase tracking-wider text-slate-700 dark:bg-slate-800/50 dark:text-slate-200 border-b border-slate-100 dark:border-slate-800">
+                            <tr>
+                              <th className="px-4 py-3">{t("lookup.candidateName")}</th>
+                              <th className="px-4 py-3">{t("lookup.examName")}</th>
+                              <th className="px-4 py-3">{t("lookup.subjectName")}</th>
+                              <th className="px-4 py-3 text-center">{t("lookup.score")}</th>
+                              <th className="px-4 py-3 text-center">{t("lookup.status")}</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                            {results.map((result) => (
+                              <tr key={result.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/20 transition">
+                                <td className="px-4 py-4 font-medium text-slate-900 dark:text-white">
+                                  {result.candidate_name}
+                                </td>
+                                <td className="px-4 py-4 text-slate-600 dark:text-slate-300">
+                                  {result.exam_name}
+                                </td>
+                                <td className="px-4 py-4 text-slate-600 dark:text-slate-300">
+                                  {result.subject_name}
+                                </td>
+                                <td className="px-4 py-4 text-center font-bold text-slate-900 dark:text-white">
+                                  {result.score} / {result.max_score} ({result.percentage}%)
+                                </td>
+                                <td className="px-4 py-4 text-center">
+                                  {result.passed === null ? (
+                                    <span className="inline-flex items-center rounded-full bg-yellow-50 px-2 py-0.5 text-xs font-medium text-yellow-800 dark:bg-yellow-950/30 dark:text-yellow-300">
+                                      -
+                                    </span>
+                                  ) : result.passed ? (
+                                    <span className="inline-flex items-center rounded-full bg-green-50 px-2 py-0.5 text-xs font-bold text-green-700 dark:bg-green-950/30 dark:text-green-300">
+                                      {t("lookup.pass")}
+                                    </span>
+                                  ) : (
+                                    <span className="inline-flex items-center rounded-full bg-rose-50 px-2 py-0.5 text-xs font-bold text-rose-700 dark:bg-rose-950/30 dark:text-rose-300">
+                                      {t("lookup.fail")}
+                                    </span>
+                                  )}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
           </div>
         </section>
 

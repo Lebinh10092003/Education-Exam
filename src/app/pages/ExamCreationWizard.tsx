@@ -139,10 +139,11 @@ interface ExamRecord {
   };
 }
 
-interface RandomRuleState {
-  easy: string;
-  medium: string;
-  hard: string;
+interface RandomRuleInput {
+  difficulty: "easy" | "medium" | "hard" | "";
+  question_type: "multiple_choice" | "essay" | "true_false" | "";
+  tag_ids_str: string;
+  count: string;
 }
 
 interface ExamFormState {
@@ -155,7 +156,7 @@ interface ExamFormState {
   passing_score: string;
   max_attempts: string;
   manual_question_ids: number[];
-  random_rule_counts: RandomRuleState;
+  random_rules: RandomRuleInput[];
   selected_group_ids: number[];
   opening_at: string;
   closing_at: string;
@@ -174,11 +175,9 @@ const buildDefaultFormState = (): ExamFormState => ({
   passing_score: "60",
   max_attempts: "1",
   manual_question_ids: [],
-  random_rule_counts: {
-    easy: "",
-    medium: "",
-    hard: "",
-  },
+  random_rules: [
+    { difficulty: "", question_type: "", tag_ids_str: "", count: "" }
+  ],
   selected_group_ids: [],
   opening_at: "",
   closing_at: "",
@@ -207,13 +206,15 @@ const toFormState = (exam: ExamRecord): ExamFormState => {
       .filter((item) => item.source === "manual")
       .map((item) => item.question.question_id) ?? [];
 
-  const randomRuleCounts = { easy: "", medium: "", hard: "" };
-  exam.current_version?.random_rules.forEach((rule) => {
-    if (rule.difficulty && rule.difficulty in randomRuleCounts) {
-      const currentValue = Number(randomRuleCounts[rule.difficulty as keyof RandomRuleState] || "0");
-      randomRuleCounts[rule.difficulty as keyof RandomRuleState] = String(currentValue + rule.count);
-    }
-  });
+  const randomRules: RandomRuleInput[] =
+    exam.current_version?.random_rules.map((rule) => ({
+      difficulty: (rule.difficulty as any) || "",
+      question_type: (rule as any).question_type || "",
+      tag_ids_str: (rule as any).tag_ids ? (rule as any).tag_ids.join(", ") : "",
+      count: String(rule.count),
+    })) ?? [
+      { difficulty: "", question_type: "", tag_ids_str: "", count: "" }
+    ];
 
   return {
     name: exam.name,
@@ -225,7 +226,7 @@ const toFormState = (exam: ExamRecord): ExamFormState => {
     passing_score: String(exam.passing_score),
     max_attempts: String(exam.max_attempts),
     manual_question_ids: manualQuestionIds,
-    random_rule_counts: randomRuleCounts,
+    random_rules: randomRules,
     selected_group_ids: exam.assignment_summary.assigned_group_ids,
     opening_at: toLocalDateTimeValue(exam.schedule_window?.opens_at ?? null),
     closing_at: toLocalDateTimeValue(exam.schedule_window?.closes_at ?? null),
@@ -310,14 +311,33 @@ export function ExamCreationWizard() {
     }
   }, [examDetails.data]);
 
-  const updateRandomRuleCount = (difficulty: keyof RandomRuleState, value: string) => {
+  const addRandomRule = () => {
     setFormState((previous) => ({
       ...previous,
-      random_rule_counts: {
-        ...previous.random_rule_counts,
-        [difficulty]: value,
-      },
+      random_rules: [
+        ...previous.random_rules,
+        { difficulty: "", question_type: "", tag_ids_str: "", count: "" },
+      ],
     }));
+  };
+
+  const removeRandomRule = (index: number) => {
+    setFormState((previous) => ({
+      ...previous,
+      random_rules: previous.random_rules.filter((_, idx) => idx !== index),
+    }));
+  };
+
+  const updateRandomRule = (index: number, key: keyof RandomRuleInput, value: any) => {
+    let val = value;
+    if (val === "all_diff" || val === "all_type") {
+      val = "";
+    }
+    setFormState((previous) => {
+      const updated = [...previous.random_rules];
+      updated[index] = { ...updated[index], [key]: val };
+      return { ...previous, random_rules: updated };
+    });
   };
 
   const toggleManualQuestion = (questionId: number) => {
@@ -343,21 +363,31 @@ export function ExamCreationWizard() {
       ...previous,
       subject_id: subjectId,
       manual_question_ids: previous.subject_id === subjectId ? previous.manual_question_ids : [],
-      random_rule_counts:
+      random_rules:
         previous.subject_id === subjectId
-          ? previous.random_rule_counts
-          : { easy: "", medium: "", hard: "" },
+          ? previous.random_rules
+          : [{ difficulty: "", question_type: "", tag_ids_str: "", count: "" }],
     }));
     setImportResult(null);
   };
 
   const buildRandomRulesPayload = () =>
-    (Object.entries(formState.random_rule_counts) as Array<[keyof RandomRuleState, string]>)
-      .filter(([, value]) => Number(value) > 0)
-      .map(([difficulty, value]) => ({
-        difficulty,
-        count: Number(value),
-      }));
+    formState.random_rules
+      .filter((rule) => Number(rule.count) > 0)
+      .map((rule) => {
+        const tag_ids = rule.tag_ids_str
+          ? rule.tag_ids_str
+              .split(",")
+              .map((id) => Number(id.trim()))
+              .filter((id) => !Number.isNaN(id))
+          : [];
+        return {
+          difficulty: rule.difficulty || undefined,
+          question_type: rule.question_type || undefined,
+          tag_ids: tag_ids.length > 0 ? tag_ids : undefined,
+          count: Number(rule.count),
+        };
+      });
 
   const currentSteps = formState.mode === "class" ? classSteps : examSteps;
 
@@ -814,44 +844,95 @@ export function ExamCreationWizard() {
                 </div>
               ) : (
                 <div className="space-y-4">
-                <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
-                  <div className="mb-4">
-                    <h4 className="font-medium text-blue-900">Random Selection</h4>
-                    <p className="text-sm text-blue-700 mt-1">
-                      Backend random rules will pick questions from the selected subject.
-                    </p>
+                <div className="p-5 bg-blue-50/50 rounded-xl border border-blue-100">
+                  <div className="flex items-center justify-between gap-4 mb-4">
+                    <div>
+                      <h4 className="font-semibold text-blue-900">Cấu hình câu hỏi ngẫu nhiên (Random Selection)</h4>
+                      <p className="text-sm text-blue-700 mt-1">
+                        Thiết lập các luật rút câu hỏi ngẫu nhiên từ Ngân hàng câu hỏi của môn học này.
+                      </p>
+                    </div>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={addRandomRule}
+                      className="bg-white border-blue-200 text-blue-700 hover:bg-blue-50 font-semibold"
+                    >
+                      + Thêm luật
+                    </Button>
                   </div>
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <div>
-                      <Label className="text-sm">Easy Questions</Label>
-                      <Input
-                        type="number"
-                        placeholder="0"
-                        className="mt-1"
-                        value={formState.random_rule_counts.easy}
-                        onChange={(event) => updateRandomRuleCount("easy", event.target.value)}
-                      />
-                    </div>
-                    <div>
-                      <Label className="text-sm">Medium Questions</Label>
-                      <Input
-                        type="number"
-                        placeholder="0"
-                        className="mt-1"
-                        value={formState.random_rule_counts.medium}
-                        onChange={(event) => updateRandomRuleCount("medium", event.target.value)}
-                      />
-                    </div>
-                    <div>
-                      <Label className="text-sm">Hard Questions</Label>
-                      <Input
-                        type="number"
-                        placeholder="0"
-                        className="mt-1"
-                        value={formState.random_rule_counts.hard}
-                        onChange={(event) => updateRandomRuleCount("hard", event.target.value)}
-                      />
-                    </div>
+
+                  <div className="space-y-3">
+                    {formState.random_rules.map((rule, idx) => (
+                      <div key={idx} className="grid grid-cols-1 md:grid-cols-5 gap-3 p-3 bg-white rounded-lg border shadow-sm items-end relative dark:bg-slate-900 dark:border-slate-800">
+                        <div>
+                          <Label className="text-xs text-gray-500 font-semibold">Độ khó</Label>
+                          <Select
+                            value={rule.difficulty || "all_diff"}
+                            onValueChange={(val) => updateRandomRule(idx, "difficulty", val)}
+                          >
+                            <SelectTrigger className="mt-1 h-9 border-slate-200 dark:border-slate-800">
+                              <SelectValue placeholder="Tất cả" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="all_diff">Tất cả độ khó</SelectItem>
+                              <SelectItem value="easy">Dễ (Easy)</SelectItem>
+                              <SelectItem value="medium">Trung bình (Medium)</SelectItem>
+                              <SelectItem value="hard">Khó (Hard)</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div>
+                          <Label className="text-xs text-gray-500 font-semibold">Loại câu hỏi</Label>
+                          <Select
+                            value={rule.question_type || "all_type"}
+                            onValueChange={(val) => updateRandomRule(idx, "question_type", val)}
+                          >
+                            <SelectTrigger className="mt-1 h-9 border-slate-200 dark:border-slate-800">
+                              <SelectValue placeholder="Tất cả" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="all_type">Tất cả loại</SelectItem>
+                              <SelectItem value="multiple_choice">Trắc nghiệm</SelectItem>
+                              <SelectItem value="essay">Tự luận</SelectItem>
+                              <SelectItem value="true_false">Đúng / Sai</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div>
+                          <Label className="text-xs text-gray-500 font-semibold">Tag IDs (ví dụ: 1, 2)</Label>
+                          <Input
+                            placeholder="Không lọc"
+                            className="mt-1 h-9 border-slate-200 dark:border-slate-800"
+                            value={rule.tag_ids_str}
+                            onChange={(e) => updateRandomRule(idx, "tag_ids_str", e.target.value)}
+                          />
+                        </div>
+                        <div>
+                          <Label className="text-xs text-gray-500 font-semibold">Số câu hỏi</Label>
+                          <Input
+                            type="number"
+                            placeholder="0"
+                            className="mt-1 h-9 border-slate-200 dark:border-slate-800"
+                            value={rule.count}
+                            onChange={(e) => updateRandomRule(idx, "count", e.target.value)}
+                          />
+                        </div>
+                        <div className="flex gap-2">
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => removeRandomRule(idx)}
+                            disabled={formState.random_rules.length <= 1}
+                            className="text-red-500 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950/30 w-full h-9 font-semibold"
+                          >
+                            Xoá
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
                   </div>
                 </div>
 
@@ -953,6 +1034,22 @@ export function ExamCreationWizard() {
                         </label>
                       ))
                     )}
+                  </div>
+
+                  <div className="mt-6 p-4 bg-slate-50 dark:bg-slate-900 border rounded-lg flex justify-between items-center flex-wrap gap-4 text-sm font-semibold border-slate-200 dark:border-slate-800">
+                    <div className="text-slate-700 dark:text-slate-300">
+                      Chọn thủ công: <span className="text-blue-700 dark:text-blue-400 font-bold">{formState.manual_question_ids.length}</span> câu
+                    </div>
+                    <div className="text-slate-700 dark:text-slate-300">
+                      Chọn ngẫu nhiên: <span className="text-blue-700 dark:text-blue-400 font-bold">
+                        {formState.random_rules.reduce((acc, rule) => acc + (Number(rule.count) || 0), 0)}
+                      </span> câu
+                    </div>
+                    <div className="text-slate-900 dark:text-white font-bold border-l pl-4 border-slate-200 dark:border-slate-800">
+                      Tổng số câu hỏi: <span className="text-green-700 dark:text-green-400 font-extrabold text-base">
+                        {formState.manual_question_ids.length + formState.random_rules.reduce((acc, rule) => acc + (Number(rule.count) || 0), 0)}
+                      </span> câu
+                    </div>
                   </div>
                 </div>
               </div>

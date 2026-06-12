@@ -242,3 +242,26 @@ class ResultReviewSerializer(serializers.Serializer):
             "questions": questions,
         }
 
+
+class PublicResultSerializer(serializers.ModelSerializer):
+    candidate_name = serializers.CharField(source="session.candidate.full_name", read_only=True)
+    exam_name = serializers.CharField(source="session.exam.name", read_only=True)
+    subject_name = serializers.CharField(source="session.exam.subject.name", read_only=True)
+    score = serializers.DecimalField(source="total_score", max_digits=8, decimal_places=2, read_only=True)
+    max_score = serializers.DecimalField(max_digits=8, decimal_places=2, read_only=True)
+    completed_date = serializers.DateTimeField(source="session.submitted_at", read_only=True)
+
+    class Meta:
+        model = Result
+        fields = (
+            "id",
+            "candidate_name",
+            "exam_name",
+            "subject_name",
+            "score",
+            "max_score",
+            "percentage",
+            "passed",
+            "completed_date",
+        )
+

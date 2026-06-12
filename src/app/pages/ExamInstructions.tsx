@@ -9,6 +9,12 @@ import {
   Clock3,
   FileText,
   Shield,
+  Cpu,
+  Database,
+  Camera,
+  Monitor,
+  Wifi,
+  Loader2,
 } from "lucide-react";
 
 import { PageHeader } from "../components/PageHeader";
@@ -41,11 +47,172 @@ export function ExamInstructions() {
   const navigate = useNavigate();
   const locationExam = (location.state as { exam?: CandidateAssignedExam } | null)?.exam ?? null;
   const [checklist, setChecklist] = useState({
-    device: false,
-    internet: false,
     rules: false,
     workspace: false,
   });
+
+  const [autoCheckState, setAutoCheckState] = useState<{
+    status: "idle" | "running" | "pass" | "fail";
+    indexedDb: "pending" | "running" | "pass" | "fail";
+    camera: "pending" | "running" | "pass" | "fail";
+    screen: "pending" | "running" | "pass" | "fail";
+    worker: "pending" | "running" | "pass" | "fail";
+    network: "pending" | "running" | "pass" | "fail";
+  }>({
+    status: "idle",
+    indexedDb: "pending",
+    camera: "pending",
+    screen: "pending",
+    worker: "pending",
+    network: "pending",
+  });
+
+  const runSystemCheck = async () => {
+    if (!exam) return;
+
+    setAutoCheckState({
+      status: "running",
+      indexedDb: "running",
+      camera: "pending",
+      screen: "pending",
+      worker: "pending",
+      network: "pending",
+    });
+
+    // 1. Check IndexedDB storage (>250MB)
+    let dbPass = false;
+    try {
+      if (window.indexedDB) {
+        if (navigator.storage && navigator.storage.estimate) {
+          const estimate = await navigator.storage.estimate();
+          const quota = estimate.quota ?? 0;
+          const usage = estimate.usage ?? 0;
+          dbPass = (quota - usage) > 250 * 1024 * 1024;
+        } else {
+          dbPass = true; // fallback
+        }
+      }
+    } catch {}
+    
+    setAutoCheckState(prev => ({
+      ...prev,
+      indexedDb: dbPass ? "pass" : "fail",
+      camera: exam.enable_proctoring ? "running" : "pending",
+    }));
+
+    if (!dbPass) {
+      setAutoCheckState(prev => ({ ...prev, status: "fail" }));
+      return;
+    }
+
+    // 2. Check Camera access
+    let cameraPass = true;
+    if (exam.enable_proctoring) {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+        const video = document.createElement("video");
+        video.srcObject = stream;
+        video.muted = true;
+        video.playsInline = true;
+        await new Promise<void>((resolve, reject) => {
+          video.onloadedmetadata = () => resolve();
+          video.onerror = () => reject();
+          setTimeout(() => reject(), 3000);
+        });
+        const canvas = document.createElement("canvas");
+        canvas.width = 160;
+        canvas.height = 120;
+        const ctx = canvas.getContext("2d");
+        ctx?.drawImage(video, 0, 0, 160, 120);
+        const blob = await new Promise<Blob | null>((r) => canvas.toBlob(r, "image/jpeg", 0.5));
+        stream.getTracks().forEach((t) => t.stop());
+        cameraPass = blob !== null && blob.size > 0;
+      } catch {
+        cameraPass = false;
+      }
+    }
+
+    setAutoCheckState(prev => ({
+      ...prev,
+      camera: cameraPass ? "pass" : "fail",
+      screen: exam.enable_proctoring ? "running" : "pending",
+    }));
+
+    if (!cameraPass) {
+      setAutoCheckState(prev => ({ ...prev, status: "fail" }));
+      return;
+    }
+
+    // 3. Check Screen Share access
+    let screenPass = true;
+    if (exam.enable_proctoring) {
+      try {
+        const stream = await navigator.mediaDevices.getDisplayMedia({ video: true });
+        const track = stream.getVideoTracks()[0];
+        screenPass = !!track && track.readyState !== "ended";
+        stream.getTracks().forEach((t) => t.stop());
+      } catch {
+        screenPass = false;
+      }
+    }
+
+    setAutoCheckState(prev => ({
+      ...prev,
+      screen: screenPass ? "pass" : "fail",
+      worker: "running",
+    }));
+
+    if (!screenPass) {
+      setAutoCheckState(prev => ({ ...prev, status: "fail" }));
+      return;
+    }
+
+    // 4. Check Web Worker capability
+    let workerPass = false;
+    try {
+      if (window.Worker) {
+        const code = "self.onmessage = (e) => self.postMessage('pong');";
+        const blob = new Blob([code], { type: "application/javascript" });
+        const worker = new Worker(URL.createObjectURL(blob));
+        workerPass = await new Promise<boolean>((resolve) => {
+          worker.onmessage = () => resolve(true);
+          worker.onerror = () => resolve(false);
+          worker.postMessage("ping");
+          setTimeout(() => resolve(false), 2000);
+        });
+        worker.terminate();
+      }
+    } catch {}
+
+    setAutoCheckState(prev => ({
+      ...prev,
+      worker: workerPass ? "pass" : "fail",
+      network: "running",
+    }));
+
+    if (!workerPass) {
+      setAutoCheckState(prev => ({ ...prev, status: "fail" }));
+      return;
+    }
+
+    // 5. Check Network latency (<1.5s)
+    let networkPass = false;
+    try {
+      const start = Date.now();
+      await fetch("/api/v1/health/", { method: "HEAD", cache: "no-store" }).catch(() => {});
+      const latency = Date.now() - start;
+      networkPass = latency < 1500;
+    } catch {
+      networkPass = true;
+    }
+
+    const allPass = dbPass && cameraPass && screenPass && workerPass && networkPass;
+    setAutoCheckState(prev => ({
+      ...prev,
+      network: networkPass ? "pass" : "fail",
+      status: allPass ? "pass" : "fail",
+    }));
+  };
 
   const fallbackExams = useAsyncList(
     () =>
@@ -64,7 +231,7 @@ export function ExamInstructions() {
     return fallbackExams.data?.results.find((record) => String(record.id) === String(id)) ?? null;
   }, [fallbackExams.data?.results, id, locationExam]);
 
-  const allChecked = Object.values(checklist).every(Boolean);
+  const allChecked = checklist.rules && checklist.workspace && autoCheckState.status === "pass";
   const availability = exam ? getExamAvailabilityState(exam) : null;
 
   if (!locationExam && fallbackExams.isLoading) {
@@ -186,11 +353,103 @@ export function ExamInstructions() {
               </div>
             </div>
 
+            <div className="rounded-2xl border border-slate-200 bg-slate-50 p-5 space-y-4">
+              <div className="flex items-center justify-between">
+                <h3 className="font-semibold text-slate-900">{t("examInstructions.systemCheckTitle", { defaultValue: "Automated System Check" })}</h3>
+                {autoCheckState.status === "idle" && (
+                  <Button size="sm" onClick={runSystemCheck}>
+                    {t("examInstructions.runCheck", { defaultValue: "Run Check" })}
+                  </Button>
+                )}
+                {autoCheckState.status === "running" && (
+                  <span className="flex items-center gap-1.5 text-sm text-blue-600 font-medium">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    {t("examInstructions.checking", { defaultValue: "Checking..." })}
+                  </span>
+                )}
+                {autoCheckState.status === "pass" && (
+                  <span className="flex items-center gap-1.5 text-sm text-emerald-600 font-medium">
+                    <CheckCircle2 className="h-4 w-4" />
+                    {t("examInstructions.checkPass", { defaultValue: "System Ready" })}
+                  </span>
+                )}
+                {autoCheckState.status === "fail" && (
+                  <Button size="sm" variant="destructive" onClick={runSystemCheck}>
+                    {t("examInstructions.retryCheck", { defaultValue: "Retry Check" })}
+                  </Button>
+                )}
+              </div>
+
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div className={`flex items-center gap-3 rounded-xl border p-3 bg-white ${
+                  autoCheckState.indexedDb === "pass" ? "border-emerald-200" : autoCheckState.indexedDb === "fail" ? "border-red-200" : "border-slate-200"
+                }`}>
+                  <Database className={`h-5 w-5 ${
+                    autoCheckState.indexedDb === "pass" ? "text-emerald-500" : autoCheckState.indexedDb === "fail" ? "text-red-500" : "text-slate-400"
+                  }`} />
+                  <div className="min-w-0 flex-1">
+                    <p className="text-xs font-semibold text-slate-900">IndexedDB Storage</p>
+                    <p className="text-[10px] text-slate-500 truncate">{autoCheckState.indexedDb === "pass" ? "Ready (>250MB)" : autoCheckState.indexedDb === "fail" ? "Storage Full" : "Pending"}</p>
+                  </div>
+                </div>
+
+                <div className={`flex items-center gap-3 rounded-xl border p-3 bg-white ${
+                  autoCheckState.worker === "pass" ? "border-emerald-200" : autoCheckState.worker === "fail" ? "border-red-200" : "border-slate-200"
+                }`}>
+                  <Cpu className={`h-5 w-5 ${
+                    autoCheckState.worker === "pass" ? "text-emerald-500" : autoCheckState.worker === "fail" ? "text-red-500" : "text-slate-400"
+                  }`} />
+                  <div className="min-w-0 flex-1">
+                    <p className="text-xs font-semibold text-slate-900">Web Worker</p>
+                    <p className="text-[10px] text-slate-500 truncate">{autoCheckState.worker === "pass" ? "Supported" : autoCheckState.worker === "fail" ? "Unsupported" : "Pending"}</p>
+                  </div>
+                </div>
+
+                <div className={`flex items-center gap-3 rounded-xl border p-3 bg-white ${
+                  autoCheckState.network === "pass" ? "border-emerald-200" : autoCheckState.network === "fail" ? "border-red-200" : "border-slate-200"
+                }`}>
+                  <Wifi className={`h-5 w-5 ${
+                    autoCheckState.network === "pass" ? "text-emerald-500" : autoCheckState.network === "fail" ? "text-red-500" : "text-slate-400"
+                  }`} />
+                  <div className="min-w-0 flex-1">
+                    <p className="text-xs font-semibold text-slate-900">Network Connection</p>
+                    <p className="text-[10px] text-slate-500 truncate">{autoCheckState.network === "pass" ? "Stable" : autoCheckState.network === "fail" ? "High Latency" : "Pending"}</p>
+                  </div>
+                </div>
+
+                {exam.enable_proctoring && (
+                  <>
+                    <div className={`flex items-center gap-3 rounded-xl border p-3 bg-white ${
+                      autoCheckState.camera === "pass" ? "border-emerald-200" : autoCheckState.camera === "fail" ? "border-red-200" : "border-slate-200"
+                    }`}>
+                      <Camera className={`h-5 w-5 ${
+                        autoCheckState.camera === "pass" ? "text-emerald-500" : autoCheckState.camera === "fail" ? "text-red-500" : "text-slate-400"
+                      }`} />
+                      <div className="min-w-0 flex-1">
+                        <p className="text-xs font-semibold text-slate-900">Webcam Access</p>
+                        <p className="text-[10px] text-slate-500 truncate">{autoCheckState.camera === "pass" ? "Granted" : autoCheckState.camera === "fail" ? "Denied" : "Pending"}</p>
+                      </div>
+                    </div>
+
+                    <div className={`flex items-center gap-3 rounded-xl border p-3 bg-white ${
+                      autoCheckState.screen === "pass" ? "border-emerald-200" : autoCheckState.screen === "fail" ? "border-red-200" : "border-slate-200"
+                    }`}>
+                      <Monitor className={`h-5 w-5 ${
+                        autoCheckState.screen === "pass" ? "text-emerald-500" : autoCheckState.screen === "fail" ? "text-red-500" : "text-slate-400"
+                      }`} />
+                      <div className="min-w-0 flex-1">
+                        <p className="text-xs font-semibold text-slate-900">Screen Share</p>
+                        <p className="text-[10px] text-slate-500 truncate">{autoCheckState.screen === "pass" ? "Granted" : autoCheckState.screen === "fail" ? "Denied" : "Pending"}</p>
+                      </div>
+                    </div>
+                  </>
+                )}
+              </div>
+            </div>
+
             <div className="space-y-3">
               {(
                 [
-                  ["device", t("examInstructions.checklist.device")],
-                  ["internet", t("examInstructions.checklist.internet")],
                   ["rules", t("examInstructions.checklist.rules")],
                   ["workspace", t("examInstructions.checklist.workspace")],
                 ] as const

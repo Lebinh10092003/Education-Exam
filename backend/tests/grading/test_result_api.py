@@ -253,3 +253,55 @@ def test_admin_can_export_exam_unsubmitted_candidates_xlsx(
     assert workbook["Chưa thi"]["E2"].value == "Chưa thi"
 
 
+@pytest.mark.django_db
+def test_public_result_lookup_by_username(api_client, subject, admin_user, candidate_user):
+    result = _build_finalized_result(subject=subject, admin_user=admin_user, candidate_user=candidate_user, publish=True)
+    
+    response = api_client.get(f"/api/v1/public-results/lookup/?type=username&username={candidate_user.username}")
+    
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["count"] == 1
+    assert payload["results"][0]["candidate_name"] == candidate_user.full_name
+    assert payload["results"][0]["exam_name"] == "Mathematics Final Exam"
+
+
+@pytest.mark.django_db
+def test_public_result_lookup_by_personal_info(api_client, subject, admin_user, candidate_user):
+    result = _build_finalized_result(subject=subject, admin_user=admin_user, candidate_user=candidate_user, publish=True)
+    from apps.identity.models import Profile
+    profile, _ = Profile.objects.get_or_create(user=candidate_user)
+    profile.date_of_birth = "2000-01-01"
+    profile.phone_number = "0123456789"
+    profile.save()
+
+    response = api_client.get(
+        f"/api/v1/public-results/lookup/?type=personal&full_name={candidate_user.full_name}&date_of_birth=01/01/2000&phone_number=0123456789"
+    )
+    
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["count"] == 1
+    assert payload["results"][0]["candidate_name"] == candidate_user.full_name
+
+
+@pytest.mark.django_db
+def test_bulk_publish_results(api_client, admin_token, subject, admin_user, candidate_user):
+    result = _build_finalized_result(subject=subject, admin_user=admin_user, candidate_user=candidate_user, publish=False)
+    assert result.publish_state == "draft"
+
+    api_client.credentials(HTTP_AUTHORIZATION=f"Bearer {admin_token}")
+    response = api_client.post(
+        "/api/v1/results/bulk-publish/",
+        data={"exam_id": result.session.exam_id},
+        format="json"
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["published_count"] == 1
+    
+    result.refresh_from_db()
+    assert result.publish_state == "published"
+
+

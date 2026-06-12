@@ -12,8 +12,9 @@
  */
 
 const DB_NAME = "eduexam-snapshots";
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 const STORE_NAME = "snapshots";
+const DRAFTS_STORE_NAME = "exam_drafts";
 
 /** Diem uu tien cua tung muc severity (cao hon = quan trong hon) */
 const SEVERITY_SCORE: Record<string, number> = {
@@ -36,6 +37,14 @@ export interface SnapshotEntry {
   /** Thong tin kem theo */
   message: string;
   capturedAt: string;
+}
+
+export interface ExamDraftEntry {
+  sessionId: number;
+  answers: Record<string, { selected_option_keys: string[]; answer_text: string }>;
+  version: number;
+  timestamp: number;
+  checksum?: string;
 }
 
 // ────────────────────────────────────────────────────────────
@@ -65,6 +74,11 @@ function openSnapshotDb(): Promise<IDBDatabase> {
           unique: false,
         });
       }
+      if (!db.objectStoreNames.contains(DRAFTS_STORE_NAME)) {
+        db.createObjectStore(DRAFTS_STORE_NAME, {
+          keyPath: "sessionId",
+        });
+      }
     };
 
     request.onsuccess = () => resolve(request.result);
@@ -78,6 +92,44 @@ function openSnapshotDb(): Promise<IDBDatabase> {
 }
 
 // ────────────────────────────────────────────────────────────
+// Thao tac voi Exam Drafts
+// ────────────────────────────────────────────────────────────
+
+export async function saveExamDraft(entry: ExamDraftEntry): Promise<void> {
+  const db = await openSnapshotDb();
+  return new Promise<void>((resolve, reject) => {
+    const tx = db.transaction(DRAFTS_STORE_NAME, "readwrite");
+    const store = tx.objectStore(DRAFTS_STORE_NAME);
+    const req = store.put(entry);
+    req.onsuccess = () => resolve();
+    req.onerror = () => reject(req.error);
+  });
+}
+
+export async function getExamDraft(sessionId: number): Promise<ExamDraftEntry | null> {
+  const db = await openSnapshotDb();
+  return new Promise<ExamDraftEntry | null>((resolve, reject) => {
+    const tx = db.transaction(DRAFTS_STORE_NAME, "readonly");
+    const store = tx.objectStore(DRAFTS_STORE_NAME);
+    const req = store.get(sessionId);
+    req.onsuccess = () => resolve((req.result as ExamDraftEntry) || null);
+    req.onerror = () => reject(req.error);
+  });
+}
+
+export async function clearExamDraft(sessionId: number): Promise<void> {
+  const db = await openSnapshotDb();
+  return new Promise<void>((resolve, reject) => {
+    const tx = db.transaction(DRAFTS_STORE_NAME, "readwrite");
+    const store = tx.objectStore(DRAFTS_STORE_NAME);
+    const req = store.delete(sessionId);
+    req.onsuccess = () => resolve();
+    req.onerror = () => reject(req.error);
+  });
+}
+
+
+// ────────────────────────────────────────────────────────────
 // Luu snapshot vao IndexedDB
 // ────────────────────────────────────────────────────────────
 
@@ -87,13 +139,72 @@ function openSnapshotDb(): Promise<IDBDatabase> {
  */
 export async function saveSnapshotLocally(entry: Omit<SnapshotEntry, "id">): Promise<number> {
   const db = await openSnapshotDb();
-  return new Promise<number>((resolve, reject) => {
-    const tx = db.transaction(STORE_NAME, "readwrite");
+  
+  // 1. Fetch all existing snapshots for this session
+  const existing: SnapshotEntry[] = await new Promise((resolve, reject) => {
+    const tx = db.transaction(STORE_NAME, "readonly");
     const store = tx.objectStore(STORE_NAME);
-    const req = store.add(entry);
-    req.onsuccess = () => resolve(req.result as number);
+    const index = store.index("sessionId");
+    const req = index.getAll(IDBKeyRange.only(entry.sessionId));
+    req.onsuccess = () => resolve(req.result as SnapshotEntry[]);
     req.onerror = () => reject(req.error);
   });
+
+  // 2. Anti-duplication check: Skip if same type was captured within 5 seconds (5000ms)
+  const entryTime = new Date(entry.capturedAt).getTime();
+  const duplicate = existing.find(
+    (item) =>
+      item.evidenceType === entry.evidenceType &&
+      Math.abs(new Date(item.capturedAt).getTime() - entryTime) < 5000
+  );
+  if (duplicate) {
+    return -1; // Skip saving
+  }
+
+  const K = 5; // Max 5 snapshots
+  if (existing.length < K) {
+    return new Promise<number>((resolve, reject) => {
+      const tx = db.transaction(STORE_NAME, "readwrite");
+      const store = tx.objectStore(STORE_NAME);
+      const req = store.add(entry);
+      req.onsuccess = () => resolve(req.result as number);
+      req.onerror = () => reject(req.error);
+    });
+  }
+
+  // 3. Find item with lowest severity score
+  let lowestItem: SnapshotEntry = existing[0];
+  let lowestScore = SEVERITY_SCORE[lowestItem.severity] ?? 0;
+
+  for (const item of existing) {
+    const score = SEVERITY_SCORE[item.severity] ?? 0;
+    if (score < lowestScore) {
+      lowestScore = score;
+      lowestItem = item;
+    } else if (score === lowestScore) {
+      // Tie breaker: discard the older one (replaces older files)
+      if (item.capturedAt.localeCompare(lowestItem.capturedAt) < 0) {
+        lowestItem = item;
+      }
+    }
+  }
+
+  const newScore = SEVERITY_SCORE[entry.severity] ?? 0;
+  if (newScore > lowestScore) {
+    // Evict lowest item and add new item
+    return new Promise<number>((resolve, reject) => {
+      const tx = db.transaction(STORE_NAME, "readwrite");
+      const store = tx.objectStore(STORE_NAME);
+      if (lowestItem.id !== undefined) {
+        store.delete(lowestItem.id);
+      }
+      const req = store.add(entry);
+      req.onsuccess = () => resolve(req.result as number);
+      req.onerror = () => reject(req.error);
+    });
+  }
+
+  return -1; // New snapshot is not severe enough, skip saving
 }
 
 // ────────────────────────────────────────────────────────────
@@ -182,6 +293,17 @@ export async function clearSessionSnapshots(sessionId: number): Promise<void> {
       req.onsuccess = done;
       req.onerror = () => reject(req.error);
     }
+  });
+}
+
+export async function deleteSnapshot(id: number): Promise<void> {
+  const db = await openSnapshotDb();
+  return new Promise<void>((resolve, reject) => {
+    const tx = db.transaction(STORE_NAME, "readwrite");
+    const store = tx.objectStore(STORE_NAME);
+    const req = store.delete(id);
+    req.onsuccess = () => resolve();
+    req.onerror = () => reject(req.error);
   });
 }
 

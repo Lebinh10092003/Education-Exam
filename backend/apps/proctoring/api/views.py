@@ -29,6 +29,8 @@ from ..services import (
     resolve_violation_case,
     stop_admin_live_view,
     update_media_status,
+    generate_evidence_presigned_url,
+    confirm_evidence_upload,
 )
 from .querysets import build_exam_monitoring_hub_queryset, build_exam_monitoring_hub_summary, build_violation_case_queryset
 from .serializers import (
@@ -48,6 +50,9 @@ from .serializers import (
     SessionHeartbeatWriteSerializer,
     ViolationCaseResolveSerializer,
     ViolationCaseSerializer,
+    EvidencePresignedUrlRequestSerializer,
+    EvidencePresignedUrlResponseSerializer,
+    EvidenceConfirmSerializer,
 )
 
 
@@ -141,6 +146,87 @@ class CandidateSessionEvidenceView(APIView):
         )
         output = ProctorEvidenceSerializer(evidence)
         return Response(output.data, status=status.HTTP_201_CREATED)
+
+
+class CandidateSessionEvidencePresignedUrlView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    @extend_schema(
+        request=EvidencePresignedUrlRequestSerializer,
+        responses={status.HTTP_200_OK: EvidencePresignedUrlResponseSerializer},
+    )
+    def post(self, request, session_id):
+        session = _get_candidate_session(session_id, request.user)
+        serializer = EvidencePresignedUrlRequestSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        
+        result = generate_evidence_presigned_url(
+            session=session,
+            evidence_type=serializer.validated_data["evidence_type"],
+            file_name=serializer.validated_data["file_name"],
+            content_type=serializer.validated_data["content_type"],
+            request=request,
+        )
+        return Response(result, status=status.HTTP_200_OK)
+
+
+class CandidateSessionEvidenceConfirmView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    @extend_schema(
+        request=EvidenceConfirmSerializer,
+        responses={status.HTTP_201_CREATED: ProctorEvidenceSerializer},
+    )
+    def post(self, request, session_id):
+        session = _get_candidate_session(session_id, request.user)
+        serializer = EvidenceConfirmSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        
+        event = None
+        event_id = serializer.validated_data.get("event_id")
+        if event_id is not None:
+            event = get_object_or_404(ProctorEvent, pk=event_id, session=session)
+            
+        evidence = confirm_evidence_upload(
+            session=session,
+            evidence_type=serializer.validated_data["evidence_type"],
+            object_key=serializer.validated_data["object_key"],
+            metadata=serializer.validated_data.get("metadata", {}),
+            uploaded_by=request.user,
+            event=event,
+        )
+        output = ProctorEvidenceSerializer(evidence)
+        return Response(output.data, status=status.HTTP_201_CREATED)
+
+
+class CandidateSessionEvidenceMockUploadView(APIView):
+    permission_classes = [IsAuthenticated]
+    
+    from rest_framework.parsers import BaseParser
+    class PlainBinaryParser(BaseParser):
+        media_type = '*/*'
+        def parse(self, stream, media_type=None, parser_context=None):
+            return stream.read()
+            
+    parser_classes = [PlainBinaryParser]
+
+    def put(self, request, session_id):
+        session = get_object_or_404(ExamSession, pk=session_id)
+        if session.candidate_id != request.user.id and not request.user.has_platform_permission("proctoring.view"):
+            return Response({"detail": "Access denied."}, status=status.HTTP_403_FORBIDDEN)
+            
+        object_key = request.query_params.get("key")
+        if not object_key:
+            return Response({"detail": "Missing key parameter."}, status=status.HTTP_400_BAD_REQUEST)
+            
+        from django.core.files.storage import default_storage
+        from django.core.files.base import ContentFile
+        
+        file_content = ContentFile(request.data)
+        default_storage.save(object_key, file_content)
+        
+        return Response({"status": "success"}, status=status.HTTP_200_OK)
+
 
 
 class CandidateSessionMediaPublishTokenView(APIView):

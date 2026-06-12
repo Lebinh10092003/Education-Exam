@@ -44,6 +44,10 @@ import {
   compressSnapshotForUpload,
   getTopViolationSnapshots,
   saveSnapshotLocally,
+  saveExamDraft,
+  getExamDraft,
+  clearExamDraft,
+  deleteSnapshot,
 } from "../lib/snapshotStore";
 import { getStoredTokens } from "../lib/storage";
 
@@ -188,22 +192,52 @@ const getCandidateConnectionStatus = (failedHeartbeatCount: number): ConnectionS
 const parseLiveRequestEnabled = (value: boolean | string | undefined) =>
   value === true || value === "1" || value === "true";
 
-const saveToLocalStorage = (sessionId: number, questionId: number, payload: any) => {
+const saveToLocalDraft = async (sessionId: number, questionId: number, payload: any) => {
   try {
-    const key = `eduexam_pending_sync_${sessionId}`;
-    const dataStr = localStorage.getItem(key);
-    const pending = dataStr ? JSON.parse(dataStr) : {};
-    pending[questionId] = {
-      payload,
-      timestamp: Date.now()
+    const draft = await getExamDraft(sessionId) ?? {
+      sessionId,
+      answers: {},
+      version: 0,
+      timestamp: Date.now(),
     };
-    localStorage.setItem(key, JSON.stringify(pending));
+    draft.answers[String(questionId)] = payload;
+    draft.version += 1;
+    draft.timestamp = Date.now();
+    await saveExamDraft(draft);
   } catch (err) {
-    console.error("Failed to save answer to local storage", err);
+    console.error("Failed to save answer to IndexedDB, falling back to LocalStorage", err);
+    try {
+      const key = `eduexam_pending_sync_${sessionId}`;
+      const dataStr = localStorage.getItem(key);
+      const pending = dataStr ? JSON.parse(dataStr) : {};
+      pending[questionId] = {
+        payload,
+        timestamp: Date.now()
+      };
+      localStorage.setItem(key, JSON.stringify(pending));
+    } catch (localErr) {
+      console.error("Failed to save answer to local storage", localErr);
+    }
   }
 };
 
-const removeFromLocalStorage = (sessionId: number, questionId: number) => {
+const removeFromLocalDraft = async (sessionId: number, questionId: number) => {
+  try {
+    const draft = await getExamDraft(sessionId);
+    if (draft && draft.answers[String(questionId)]) {
+      delete draft.answers[String(questionId)];
+      if (Object.keys(draft.answers).length === 0) {
+        await clearExamDraft(sessionId);
+      } else {
+        draft.version += 1;
+        draft.timestamp = Date.now();
+        await saveExamDraft(draft);
+      }
+    }
+  } catch (err) {
+    console.error("Failed to remove answer from IndexedDB", err);
+  }
+  
   try {
     const key = `eduexam_pending_sync_${sessionId}`;
     const dataStr = localStorage.getItem(key);
@@ -221,27 +255,49 @@ const removeFromLocalStorage = (sessionId: number, questionId: number) => {
   }
 };
 
-const syncLocalStorageQueue = async (sessionId: number) => {
+const syncLocalDraftQueue = async (sessionId: number) => {
   try {
-    const key = `eduexam_pending_sync_${sessionId}`;
-    const dataStr = localStorage.getItem(key);
-    if (!dataStr) return;
-    const pending = JSON.parse(dataStr);
-    const questionIds = Object.keys(pending);
-    for (const questionId of questionIds) {
-      const { payload } = pending[questionId];
-      try {
-        await apiRequest(`/api/v1/exam-sessions/${sessionId}/answers/${questionId}/`, {
-          method: "PUT",
-          body: payload,
-        });
-        removeFromLocalStorage(sessionId, Number(questionId));
-      } catch (err) {
-        break;
+    const draft = await getExamDraft(sessionId);
+    if (draft && draft.answers) {
+      const questionIds = Object.keys(draft.answers);
+      for (const questionId of questionIds) {
+        const payload = draft.answers[questionId];
+        try {
+          await apiRequest(`/api/v1/exam-sessions/${sessionId}/answers/${questionId}/`, {
+            method: "PUT",
+            body: payload,
+          });
+          await removeFromLocalDraft(sessionId, Number(questionId));
+        } catch (err) {
+          break;
+        }
       }
     }
   } catch (err) {
-    console.error("Failed to sync local storage queue", err);
+    console.error("Failed to sync IndexedDB drafts queue", err);
+  }
+
+  try {
+    const key = `eduexam_pending_sync_${sessionId}`;
+    const dataStr = localStorage.getItem(key);
+    if (dataStr) {
+      const pending = JSON.parse(dataStr);
+      const questionIds = Object.keys(pending);
+      for (const questionId of questionIds) {
+        const { payload } = pending[questionId];
+        try {
+          await apiRequest(`/api/v1/exam-sessions/${sessionId}/answers/${questionId}/`, {
+            method: "PUT",
+            body: payload,
+          });
+          await removeFromLocalDraft(sessionId, Number(questionId));
+        } catch (err) {
+          break;
+        }
+      }
+    }
+  } catch (err) {
+    console.error("Failed to sync local storage fallback queue", err);
   }
 };
 
@@ -416,7 +472,7 @@ export function TakeExam() {
     }
 
     setIsSaving(true);
-    saveToLocalStorage(session.id, questionId, payload);
+    await saveToLocalDraft(session.id, questionId, payload);
     
     try {
       const response = await enqueueSessionMutation(() =>
@@ -433,7 +489,7 @@ export function TakeExam() {
       });
       setLastSavedAt(response.updated_at);
       dirtyEssayQuestionIdsRef.current.delete(questionId);
-      removeFromLocalStorage(session.id, questionId);
+      await removeFromLocalDraft(session.id, questionId);
     } catch (saveError) {
       const message = saveError instanceof Error ? saveError.message : t("examSession.saveAnswerError");
       notify.error(message);
@@ -614,6 +670,32 @@ export function TakeExam() {
       const nextSession = await apiRequest<CandidateSession>(`/api/v1/exams/${examId}/start-session/`, {
         method: "POST",
       });
+      
+      try {
+        const localDraft = await getExamDraft(nextSession.id);
+        const localFallbackStr = localStorage.getItem(`eduexam_pending_sync_${nextSession.id}`);
+        const localFallback = localFallbackStr ? JSON.parse(localFallbackStr) : null;
+        
+        nextSession.questions = nextSession.questions.map((q) => {
+          let localAns = localDraft?.answers[String(q.id)];
+          if (!localAns && localFallback && localFallback[String(q.id)]) {
+            localAns = localFallback[String(q.id)].payload;
+          }
+          if (localAns) {
+            return {
+              ...q,
+              selected_option_keys: localAns.selected_option_keys ?? q.selected_option_keys,
+              answer_text: localAns.answer_text ?? q.answer_text,
+              is_answered: true,
+              is_marked_for_review: localAns.is_marked_for_review ?? q.is_marked_for_review,
+            };
+          }
+          return q;
+        });
+      } catch (err) {
+        console.error("Failed to load local draft answers", err);
+      }
+
       setSession(nextSession);
       setLatestViolationNotice(null);
       setProctoringBlockReason(null);
@@ -627,7 +709,7 @@ export function TakeExam() {
         0,
       );
       setCurrentQuestionIndex(nextIndex === -1 ? 0 : nextIndex);
-      void syncLocalStorageQueue(nextSession.id).catch(() => undefined);
+      void syncLocalDraftQueue(nextSession.id).catch(() => undefined);
     } catch (loadError) {
       setError(loadError instanceof Error ? loadError.message : t("examSession.unavailableDescription"));
     } finally {
@@ -888,7 +970,7 @@ export function TakeExam() {
     }
 
     const autosave = () => {
-      void syncLocalStorageQueue(session.id).catch(() => undefined);
+      void syncLocalDraftQueue(session.id).catch(() => undefined);
       if (autosavePendingRef.current || !autosaveDirtyRef.current) {
         return;
       }
@@ -968,7 +1050,7 @@ export function TakeExam() {
       if (document.hidden) {
         void reportViolation("tab_switch", "warning", t("examSession.tabSwitchWarning"));
       } else {
-        void syncLocalStorageQueue(session.id).catch(() => undefined);
+        void syncLocalDraftQueue(session.id).catch(() => undefined);
       }
     };
 
@@ -980,7 +1062,7 @@ export function TakeExam() {
 
     const handleOnline = () => {
       setConnectionStatus("unstable");
-      void syncLocalStorageQueue(session.id).catch(() => undefined);
+      void syncLocalDraftQueue(session.id).catch(() => undefined);
     };
     const handleOffline = () => setConnectionStatus("offline");
 
@@ -1126,7 +1208,7 @@ export function TakeExam() {
    * Sau khi upload xong, toan bo snapshot local duoc xoa.
    */
   const uploadPendingSnapshots = async (sessionId: number) => {
-    const MAX_UPLOADS = 3;
+    const MAX_UPLOADS = 5;
     let snapshots;
     try {
       snapshots = await getTopViolationSnapshots(sessionId, MAX_UPLOADS);
@@ -1148,16 +1230,13 @@ export function TakeExam() {
             { message: entry.message, compressed: true, original_size: entry.blob.size },
           ),
         );
+        // Xóa snapshot cục bộ trong IndexedDB chỉ khi upload thành công
+        if (entry.id !== undefined) {
+          await deleteSnapshot(entry.id);
+        }
       } catch {
-        // Neu upload that bai, tiep tuc voi snapshot tiep theo
+        // Nếu upload thất bại (ví dụ R2 lỗi), giữ nguyên snapshot trong IndexedDB để có thể tải lại sau
       }
-    }
-
-    // Don dep IndexedDB sau khi upload xong
-    try {
-      await clearSessionSnapshots(sessionId);
-    } catch {
-      // Loi don dep khong quan trong, bo qua
     }
   };
 
@@ -1169,8 +1248,8 @@ export function TakeExam() {
     setIsSubmitting(true);
     try {
       await persistEssayAnswer();
-      // Upload top-3 snapshot vi pham truoc khi nop bai
-      await uploadPendingSnapshots(session.id);
+      
+      // Nop bai len server TRUOC de dam bao khong mat bai lam
       const response = await enqueueSessionMutation(() =>
         apiRequest<SubmissionSummary>(`/api/v1/exam-sessions/${session.id}/submit/`, {
           method: "POST",
@@ -1189,6 +1268,15 @@ export function TakeExam() {
           : current,
       );
       notify.success(t("examSession.submitSuccess"));
+
+      // Tải ảnh vi phạm len sau khi da nop bai thanh cong (chay bat dong bo)
+      const currentSessionId = session.id;
+      setTimeout(() => {
+        void uploadPendingSnapshots(currentSessionId).catch((err) => {
+          console.error("Failed to upload pending evidence snapshots", err);
+        });
+      }, 500);
+
     } catch (submitError) {
       const message = submitError instanceof Error ? submitError.message : t("examSession.submitUnavailable");
       notify.error(message);

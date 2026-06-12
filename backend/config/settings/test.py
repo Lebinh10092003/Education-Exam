@@ -36,3 +36,5 @@ STORAGES = {
         "BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage",
     },
 }
+USE_S3_STORAGE = False
+

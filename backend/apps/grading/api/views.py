@@ -10,8 +10,9 @@ from django.utils import timezone
 from openpyxl import Workbook
 from rest_framework import generics, mixins, status, viewsets
 from rest_framework.decorators import action
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
+from rest_framework.exceptions import ValidationError
 
 from apps.exam_authoring.models import Exam, ExamAssignment
 from apps.identity.permissions import HasAPIPermissionCode
@@ -25,6 +26,7 @@ from .serializers import (
     ResultReviewSerializer,
     ResultSerializer,
     ResultSummarySerializer,
+    PublicResultSerializer,
 )
 
 
@@ -455,6 +457,34 @@ class ResultViewSet(
         output = ResultSerializer(result)
         return Response(output.data, status=status.HTTP_200_OK)
 
+    @action(detail=False, methods=["post"], url_path="bulk-publish")
+    def bulk_publish(self, request):
+        exam_id = request.data.get("exam_id")
+        if not exam_id:
+            return Response({"detail": "exam_id is required."}, status=status.HTTP_400_BAD_REQUEST)
+
+        results = Result.objects.select_related("session").filter(
+            session__exam_id=exam_id,
+            workflow_status=Result.WorkflowStatus.FINALIZED,
+            publish_state=Result.PublishState.DRAFT,
+        )
+
+        count = 0
+        for result in results:
+            try:
+                publish_result(result=result, published_by=request.user, request=request)
+                count += 1
+            except ValidationError:
+                continue
+
+        return Response(
+            {
+                "detail": f"Successfully published {count} finalized result(s).",
+                "published_count": count,
+            },
+            status=status.HTTP_200_OK,
+        )
+
     @action(detail=True, methods=["get"], url_path="review")
     def review(self, request, pk=None):
         result = (
@@ -625,4 +655,57 @@ class CandidateResultListView(generics.ListAPIView):
                 | Q(session__exam__subject__code__icontains=search)
             )
         return queryset
+
+
+class PublicResultLookupView(generics.ListAPIView):
+    permission_classes = [AllowAny]
+    serializer_class = PublicResultSerializer
+
+    def get_queryset(self):
+        lookup_type = self.request.query_params.get("type", "personal")
+        queryset = Result.objects.select_related(
+            "session",
+            "session__candidate",
+            "session__exam",
+            "session__exam__subject",
+        ).filter(
+            publish_state=Result.PublishState.PUBLISHED,
+            session__exam__status__in=[Exam.Status.CLOSED, Exam.Status.ARCHIVED],
+        )
+
+        if lookup_type == "username":
+            username = self.request.query_params.get("username", "").strip()
+            if not username:
+                return Result.objects.none()
+            queryset = queryset.filter(session__candidate__username__iexact=username)
+
+        elif lookup_type == "personal":
+            full_name = self.request.query_params.get("full_name", "").strip()
+            date_of_birth_str = self.request.query_params.get("date_of_birth", "").strip()
+            phone_number = self.request.query_params.get("phone_number", "").strip()
+
+            if not full_name or not date_of_birth_str or not phone_number:
+                return Result.objects.none()
+
+            parsed_dob = None
+            for fmt in ("%Y-%m-%d", "%d/%m/%Y"):
+                try:
+                    parsed_dob = datetime.strptime(date_of_birth_str, fmt).date()
+                    break
+                except ValueError:
+                    continue
+
+            if not parsed_dob:
+                return Result.objects.none()
+
+            queryset = queryset.filter(
+                session__candidate__full_name__iexact=full_name,
+                session__candidate__profile__date_of_birth=parsed_dob,
+                session__candidate__profile__phone_number=phone_number,
+            )
+        else:
+            return Result.objects.none()
+
+        return queryset
+
 

@@ -153,10 +153,90 @@ class ExamSessionViewSet(mixins.RetrieveModelMixin, viewsets.GenericViewSet):
 
     @action(detail=True, methods=["post"])
     def autosave(self, request, pk=None):
+        from django.core.cache import cache
+        from rest_framework.exceptions import ValidationError
+        
+        cache_key = f"exam_session_cache:{pk}"
+        cached_data = cache.get(cache_key)
+        now = timezone.now()
+        
+        if cached_data is not None:
+            # Check candidate ownership
+            if cached_data["candidate_id"] != request.user.id:
+                raise PermissionDenied(
+                    t(vi="Bạn không có quyền truy cập phiên thi này.", en="You do not have access to this session.")
+                )
+            
+            # Check session expiration
+            # If expired, delete cache and fallback to DB to execute _expire_if_needed write
+            if cached_data["status"] == "in_progress" and cached_data["expires_at"] <= now.timestamp():
+                cache.delete(cache_key)
+                cached_data = None
+            elif cached_data["status"] != "in_progress":
+                raise ValidationError(t(vi="Phiên thi này hiện không nhận câu trả lời.", en="This session is not accepting answers."))
+
+        if cached_data is not None:
+            # Check exam phase / interaction allowance using cached exam info
+            exam_status = cached_data["exam_status"]
+            opens_at = cached_data["exam_opens_at"]
+            closes_at = cached_data["exam_closes_at"]
+            has_published_results = cached_data["has_published_results"]
+            
+            # Replicate resolve_exam_phase logic
+            phase = "open"
+            if exam_status == "draft":
+                phase = "draft"
+            elif exam_status == "archived":
+                phase = "closed"
+            elif exam_status == "closed":
+                phase = "results" if has_published_results else "closed"
+            elif closes_at and closes_at <= now.timestamp():
+                phase = "results" if has_published_results else "closed"
+            elif exam_status == "paused":
+                phase = "paused"
+            elif exam_status == "open":
+                phase = "open"
+            elif exam_status == "scheduled":
+                if opens_at and opens_at <= now.timestamp():
+                    phase = "open"
+                else:
+                    phase = "scheduled"
+                    
+            if phase == "paused":
+                raise ValidationError(t(vi="Bài thi này đang tạm dừng.", en="This exam is currently paused."))
+            elif phase in {"closed", "results"}:
+                raise ValidationError(t(vi="Bài thi này đã kết thúc.", en="This exam has already ended."))
+            elif phase == "scheduled":
+                raise ValidationError(t(vi="Bài thi này chưa mở.", en="This exam is not open yet."))
+            elif phase != "open":
+                raise ValidationError(t(vi="Bài thi này đã kết thúc.", en="This exam has already ended."))
+                
+            # Valid cache read! Return simulated receipt
+            serializer = AutosaveSnapshotWriteSerializer(data=request.data)
+            serializer.is_valid(raise_exception=True)
+            
+            snapshot = {
+                "id": None,
+                "answered_count": cached_data["answered_count"],
+                "marked_count": cached_data["marked_count"],
+                "payload": serializer.validated_data.get("payload") or {},
+                "created_at": now,
+            }
+            output = AutosaveSnapshotSerializer(snapshot)
+            return Response(output.data)
+
+        # Fallback to DB if cache miss
         session = self.get_object()
         serializer = AutosaveSnapshotWriteSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
+        
+        # Build the receipt (this runs the DB checks)
         snapshot = build_autosave_receipt(session=session, payload=serializer.validated_data.get("payload"))
+        
+        # Seed the cache for subsequent autosave calls
+        from apps.exam_delivery.services import set_session_cache
+        set_session_cache(session)
+        
         output = AutosaveSnapshotSerializer(snapshot)
         return Response(output.data)
 

@@ -1,4 +1,7 @@
 import logging
+import uuid
+import boto3
+from django.urls import reverse
 
 from asgiref.sync import async_to_sync
 from channels.layers import get_channel_layer
@@ -785,3 +788,106 @@ def assert_admin_monitoring_access(*, user):
             t(vi="Bạn không có quyền theo dõi dữ liệu giám sát.", en="You do not have permission to monitor proctoring data.")
         )
     return user
+
+
+def sanitize_path_segment(value: str) -> str:
+    import re
+    if not value:
+        return "default"
+    sanitized = re.sub(r'[\/\\:\*\?"<>\|]', '_', str(value))
+    return sanitized.strip().strip('.') or "default"
+
+
+def get_grade_folder_name(session) -> str:
+    import re
+    candidate = session.candidate
+    profile = getattr(candidate, 'profile', None)
+    student_class = getattr(profile, 'student_class', '') if profile else ''
+    
+    if student_class:
+        match = re.match(r'^(\d+)', student_class.strip())
+        if match:
+            return f"Khối {match.group(1)}"
+        return f"Khối {student_class.strip()}"
+    return "Khối Khác"
+
+
+def generate_evidence_presigned_url(*, session, evidence_type, file_name, content_type, request=None):
+    ext = file_name.split('.')[-1] if '.' in file_name else 'jpg'
+    
+    subject_name = sanitize_path_segment(session.exam.subject.name)
+    exam_name = sanitize_path_segment(session.exam.name)
+    grade_folder = sanitize_path_segment(get_grade_folder_name(session))
+    
+    if session.started_at:
+        exam_date = session.started_at.strftime("%Y-%m-%d")
+    else:
+        exam_date = timezone.now().strftime("%Y-%m-%d")
+        
+    candidate_username = sanitize_path_segment(session.candidate.username)
+    unique_id = uuid.uuid4().hex
+    unique_name = f"{candidate_username}_{unique_id}.{ext}"
+    
+    object_key = f"{subject_name}/{exam_name}/{grade_folder}/{exam_date}/{candidate_username}/{unique_name}"
+    
+    use_s3 = getattr(settings, 'USE_S3_STORAGE', False)
+    if use_s3:
+        s3_client = boto3.client(
+            's3',
+            aws_access_key_id=getattr(settings, 'AWS_ACCESS_KEY_ID', None),
+            aws_secret_access_key=getattr(settings, 'AWS_SECRET_ACCESS_KEY', None),
+            endpoint_url=getattr(settings, 'AWS_S3_ENDPOINT_URL', None),
+            region_name=getattr(settings, 'AWS_S3_REGION_NAME', 'us-east-1'),
+        )
+        bucket_name = getattr(settings, 'AWS_STORAGE_BUCKET_NAME', '')
+        upload_url = s3_client.generate_presigned_url(
+            ClientMethod='put_object',
+            Params={
+                'Bucket': bucket_name,
+                'Key': object_key,
+                'ContentType': content_type,
+            },
+            ExpiresIn=300
+        )
+    else:
+        url_path = reverse('proctoring-session-evidence-mock-upload', kwargs={'session_id': session.id})
+        if request:
+            upload_url = request.build_absolute_uri(f"{url_path}?key={object_key}")
+        else:
+            upload_url = f"{url_path}?key={object_key}"
+            
+    return {
+        "upload_url": upload_url,
+        "object_key": object_key,
+    }
+
+
+@transaction.atomic
+def confirm_evidence_upload(*, session, evidence_type, object_key, metadata=None, uploaded_by=None, event=None):
+    evidence = ProctorEvidence(
+        session=session,
+        event=event,
+        uploaded_by=uploaded_by,
+        evidence_type=evidence_type,
+        metadata=metadata or {},
+    )
+    evidence.file.name = object_key
+    evidence.save()
+    
+    if event is not None:
+        for case in event.violation_cases.all():
+            case.evidences.add(evidence)
+            
+    _broadcast_exam_monitoring_update(
+        exam_id=session.exam_id,
+        message_type="evidence",
+        payload={
+            "id": evidence.id,
+            "session_id": session.id,
+            "candidate_id": session.candidate_id,
+            "evidence_type": evidence.evidence_type,
+            "captured_at": evidence.captured_at.isoformat(),
+        },
+    )
+    return evidence
+

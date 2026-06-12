@@ -167,3 +167,137 @@ def test_submit_session_is_idempotent_and_auto_scores_objective_items(subject, a
     assert session.status == "submitted"
     assert float(session.objective_score) == 1.0
     assert session.manual_grading_required is True
+
+
+@pytest.mark.django_db
+def test_start_session_with_random_rules_enforces_difficulty_equality(subject, admin_user, candidate_user):
+    from django.contrib.auth import get_user_model
+    from apps.exam_authoring.services import create_exam
+    from apps.question_bank.services import create_question
+    from apps.exam_delivery.services import start_or_resume_session
+    from apps.institutions.models import CandidateGroup, GroupMembership, School
+
+    candidate_user_2 = get_user_model().objects.create_user(
+        email="candidate2@example.com",
+        password="secret123",
+        full_name="Candidate 2",
+    )
+
+    school = School.objects.create(name="School A", code="SCH_TEST")
+    group = CandidateGroup.objects.create(name="Test Group")
+    GroupMembership.objects.create(group=group, user=candidate_user)
+    GroupMembership.objects.create(group=group, user=candidate_user_2)
+
+    q_man_1 = create_question(
+        subject=subject,
+        created_by=admin_user,
+        difficulty="easy",
+        question_type="multiple_choice",
+        question_text="Manual Q1",
+        options=[{"key": "A", "text": "A"}],
+        correct_option_keys=["A"],
+    )
+    q_man_2 = create_question(
+        subject=subject,
+        created_by=admin_user,
+        difficulty="medium",
+        question_type="essay",
+        question_text="Manual Q2",
+    )
+
+    q_easy_1 = create_question(
+        subject=subject,
+        created_by=admin_user,
+        difficulty="easy",
+        question_type="multiple_choice",
+        question_text="Easy Q1",
+        options=[{"key": "A", "text": "A"}],
+        correct_option_keys=["A"],
+    )
+    q_easy_2 = create_question(
+        subject=subject,
+        created_by=admin_user,
+        difficulty="easy",
+        question_type="multiple_choice",
+        question_text="Easy Q2",
+        options=[{"key": "A", "text": "A"}],
+        correct_option_keys=["A"],
+    )
+    q_easy_3 = create_question(
+        subject=subject,
+        created_by=admin_user,
+        difficulty="easy",
+        question_type="multiple_choice",
+        question_text="Easy Q3",
+        options=[{"key": "A", "text": "A"}],
+        correct_option_keys=["A"],
+    )
+
+    q_hard_1 = create_question(
+        subject=subject,
+        created_by=admin_user,
+        difficulty="hard",
+        question_type="multiple_choice",
+        question_text="Hard Q1",
+        options=[{"key": "A", "text": "A"}],
+        correct_option_keys=["A"],
+    )
+    q_hard_2 = create_question(
+        subject=subject,
+        created_by=admin_user,
+        difficulty="hard",
+        question_type="multiple_choice",
+        question_text="Hard Q2",
+        options=[{"key": "A", "text": "A"}],
+        correct_option_keys=["A"],
+    )
+
+    now = timezone.now()
+    exam = create_exam(
+        name="Dynamic Difficulty Test Exam",
+        subject=subject,
+        created_by=admin_user,
+        status="scheduled",
+        duration_minutes=60,
+        passing_score=50,
+        opening_at=now - timedelta(hours=1),
+        closing_at=now + timedelta(hours=2),
+        manual_question_ids=[q_man_1.id, q_man_2.id],
+        random_rules=[
+            {"difficulty": "easy", "question_type": "multiple_choice", "tag_ids": [], "count": 1},
+            {"difficulty": "hard", "question_type": "multiple_choice", "tag_ids": [], "count": 1},
+        ],
+        group_ids=[group.id],
+    )
+
+    session_1 = start_or_resume_session(exam=exam, candidate=candidate_user)
+    questions_1 = list(session_1.questions.select_related("question_revision", "question_revision__question").order_by("sort_order"))
+
+    session_2 = start_or_resume_session(exam=exam, candidate=candidate_user_2)
+    questions_2 = list(session_2.questions.select_related("question_revision", "question_revision__question").order_by("sort_order"))
+
+    assert len(questions_1) == 4
+    assert len(questions_2) == 4
+
+    q1_rev_ids = {q.question_revision_id for q in questions_1}
+    q2_rev_ids = {q.question_revision_id for q in questions_2}
+    
+    assert q_man_1.current_revision_id in q1_rev_ids
+    assert q_man_2.current_revision_id in q1_rev_ids
+    assert q_man_1.current_revision_id in q2_rev_ids
+    assert q_man_2.current_revision_id in q2_rev_ids
+
+    def count_by_difficulty(session_qs):
+        counts = {"easy": 0, "medium": 0, "hard": 0}
+        for q in session_qs:
+            diff = q.question_revision.question.difficulty
+            counts[diff] += 1
+        return counts
+
+    assert count_by_difficulty(questions_1) == {"easy": 2, "medium": 1, "hard": 1}
+    assert count_by_difficulty(questions_2) == {"easy": 2, "medium": 1, "hard": 1}
+
+    random_q1_revs = {q.question_revision_id for q in questions_1 if q.exam_item.source == "random"}
+    random_q2_revs = {q.question_revision_id for q in questions_2 if q.exam_item.source == "random"}
+    
+    assert random_q1_revs != random_q2_revs

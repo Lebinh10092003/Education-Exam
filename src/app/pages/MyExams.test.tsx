@@ -65,6 +65,83 @@ describe("student exam flows", () => {
       throw new Error(`Unhandled apiRequest path: ${path}`);
     });
     await i18n.changeLanguage("en");
+
+    // Mock browser APIs for automated system checks
+    Object.defineProperty(navigator, 'storage', {
+      value: {
+        estimate: () => Promise.resolve({ quota: 500 * 1024 * 1024, usage: 0 })
+      },
+      writable: true,
+      configurable: true
+    });
+
+    Object.defineProperty(window, 'indexedDB', {
+      value: {},
+      writable: true,
+      configurable: true
+    });
+    
+    Object.defineProperty(window, 'Worker', {
+      value: class {
+        onmessage: any = null;
+        onerror: any = null;
+        postMessage() {
+          setTimeout(() => {
+            if (this.onmessage) this.onmessage({ data: 'pong' });
+          }, 10);
+        }
+        terminate() {}
+      },
+      writable: true,
+      configurable: true
+    });
+    
+    Object.defineProperty(navigator, 'mediaDevices', {
+      value: {
+        getUserMedia: () => Promise.resolve({
+          getVideoTracks: () => [{ stop: () => {} }],
+          getTracks: () => [{ stop: () => {} }]
+        }),
+        getDisplayMedia: () => Promise.resolve({
+          getVideoTracks: () => [{ stop: () => {}, readyState: 'live' }],
+          getTracks: () => [{ stop: () => {} }]
+        })
+      },
+      writable: true,
+      configurable: true
+    });
+
+    Object.defineProperty(HTMLVideoElement.prototype, 'play', {
+      value: function() {
+        setTimeout(() => {
+          if (this.onloadedmetadata) this.onloadedmetadata();
+        }, 10);
+        return Promise.resolve();
+      },
+      writable: true,
+      configurable: true
+    });
+
+    Object.defineProperty(HTMLVideoElement.prototype, 'srcObject', {
+      set(val) {
+        this._srcObject = val;
+        setTimeout(() => {
+          if (this.onloadedmetadata) this.onloadedmetadata();
+        }, 10);
+      },
+      get() {
+        return this._srcObject;
+      },
+      configurable: true
+    });
+
+    Object.defineProperty(HTMLCanvasElement.prototype, 'toBlob', {
+      value: function(callback: any) {
+        callback(new Blob(['fake-blob-bytes'], { type: 'image/jpeg' }));
+      },
+      writable: true,
+      configurable: true
+    });
   });
 
   it("renders assigned exams and links available exams to the instructions route", async () => {
@@ -93,6 +170,11 @@ describe("student exam flows", () => {
     );
 
     expect(await screen.findByRole("button", { name: /^start exam$/i })).toBeDisabled();
+
+    // Click Run Check button and wait for it to pass
+    const checkButton = screen.getByRole("button", { name: /run check/i });
+    await user.click(checkButton);
+    await screen.findByText("System Ready");
 
     const checkboxes = screen.getAllByRole("checkbox");
     for (const checkbox of checkboxes) {

@@ -58,6 +58,9 @@ vi.mock("../lib/snapshotStore", () => ({
   clearSessionSnapshots: (...args: unknown[]) => mockClearSessionSnapshots(...args),
   compressSnapshotForUpload: (...args: unknown[]) => mockCompressSnapshotForUpload(...args),
   countSessionSnapshots: vi.fn().mockResolvedValue(0),
+  saveExamDraft: vi.fn().mockResolvedValue(undefined),
+  getExamDraft: vi.fn().mockResolvedValue(null),
+  clearExamDraft: vi.fn().mockResolvedValue(undefined),
 }));
 
 

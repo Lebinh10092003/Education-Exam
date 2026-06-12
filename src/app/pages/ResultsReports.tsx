@@ -233,6 +233,41 @@ export function ResultsReports() {
     }
   };
 
+  const bulkPublishResults = async () => {
+    if (examFilter === "all") {
+      notify.error("Chọn một kỳ thi trước khi công bố điểm hàng loạt.");
+      return;
+    }
+
+    const examName = exams.data?.results.find((e) => String(e.id) === examFilter)?.name ?? "";
+
+    const confirmed = await notify.confirm({
+      title: "Công bố tất cả điểm thi?",
+      text: `Tất cả kết quả thi đã hoàn tất chấm điểm của kỳ thi "${examName}" sẽ được công bố công khai.`,
+      confirmText: "Công bố ngay",
+      confirmButtonColor: "#2563eb",
+    });
+    if (!confirmed) {
+      return;
+    }
+
+    try {
+      const res = await mutation.run(() =>
+        apiRequest<{ published_count: number }>("/api/v1/results/bulk-publish/", {
+          method: "POST",
+          body: {
+            exam_id: Number(examFilter),
+          },
+        }),
+      );
+      notify.success(`Đã công bố thành công ${res.published_count} kết quả thi.`);
+      await Promise.all([resultsList.reload(), summary.reload()]);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Không thể công bố tất cả kết quả.";
+      notify.error(message);
+    }
+  };
+
   const downloadSingleResult = (result: ResultRecord) => {
     const payload = JSON.stringify(result, null, 2);
     const blob = new Blob([payload], { type: "application/json;charset=utf-8" });
@@ -276,6 +311,13 @@ export function ResultsReports() {
             >
               <FileSpreadsheet className="mr-2 h-4 w-4" />
               Xuất DS thí sinh
+            </Button>
+            <Button
+              className="bg-blue-600 text-white hover:bg-blue-700 font-semibold"
+              onClick={() => void bulkPublishResults()}
+              disabled={examFilter === "all" || mutation.isSubmitting}
+            >
+              Công bố tất cả điểm thi
             </Button>
           </div>
         }
