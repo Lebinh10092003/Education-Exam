@@ -2,7 +2,12 @@ import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it } from "vitest";
 
-import { questionImportTemplate } from "../../lib/importTemplates";
+import {
+  examStudentImportTemplate,
+  groupMembershipImportTemplate,
+  questionImportTemplate,
+  userImportTemplate,
+} from "../../lib/importTemplates";
 import { ImportTemplateActions } from "./ImportTemplateActions";
 
 describe("ImportTemplateActions", () => {
@@ -26,5 +31,19 @@ describe("ImportTemplateActions", () => {
 
     expect(dialogContent).toHaveClass("sm:max-w-5xl");
     expect(screen.getByText(/backend-compatible csv, json, or xlsx rows/i)).toBeInTheDocument();
+  });
+
+  it("includes school name columns in user and student import templates", () => {
+    for (const template of [
+      userImportTemplate,
+      examStudentImportTemplate,
+      groupMembershipImportTemplate,
+    ]) {
+      const csv = template.formats[0];
+
+      expect(csv.sample.split("\n")[0]).toContain("school");
+      expect(csv.sample).toContain("Tiểu học Nguyễn Tri Phương");
+      expect(csv.mappingNotes.join(" ")).toMatch(/create or reuse/i);
+    }
   });
 });

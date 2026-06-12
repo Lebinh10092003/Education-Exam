@@ -111,6 +111,44 @@ def test_admin_can_import_users_via_csv(api_client, admin_token):
 
 
 @pytest.mark.django_db
+def test_admin_can_import_users_with_school_name_auto_created(api_client, admin_token):
+    from django.core.files.uploadedfile import SimpleUploadedFile
+    from django.contrib.auth import get_user_model
+    from apps.identity.models import Role
+    from apps.institutions.models import School
+
+    Role.objects.get_or_create(slug="candidate", defaults={"name": "Candidate"})
+
+    api_client.credentials(HTTP_AUTHORIZATION=f"Bearer {admin_token}")
+
+    csv_data = (
+        "full_name,email,password,phone_number,status,is_active,is_staff,school_code,school,role_slugs\n"
+        "Candidate New,newcand@example.com,pass123,+84900000001,active,true,false,,Tiểu học Nguyễn Tri Phương,candidate\n"
+    )
+    uploaded_file = SimpleUploadedFile(
+        "import.csv",
+        csv_data.encode("utf-8"),
+        content_type="text/csv",
+    )
+
+    response = api_client.post(
+        "/api/v1/users/import-csv/",
+        {"file": uploaded_file},
+        format="multipart",
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["created_users"] == 1
+    assert payload["failed_rows"] == 0
+
+    school = School.objects.get(name="Tiểu học Nguyễn Tri Phương")
+    user_model = get_user_model()
+    created_user = user_model.objects.select_related("profile").get(email="newcand@example.com")
+    assert created_user.profile.school == school
+
+
+@pytest.mark.django_db
 def test_admin_can_import_users_with_minimal_columns(api_client, admin_token):
     from django.core.files.uploadedfile import SimpleUploadedFile
     from django.contrib.auth import get_user_model

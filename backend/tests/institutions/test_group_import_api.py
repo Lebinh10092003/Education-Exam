@@ -47,6 +47,32 @@ def test_group_membership_import_creates_candidate_and_membership(api_client, ad
 
 
 @pytest.mark.django_db
+def test_group_membership_import_creates_missing_school_from_name(api_client, admin_token):
+    from apps.identity.models import Profile
+    from apps.institutions.models import GroupMembership, School
+
+    group, _ = _build_group()
+    csv_content = (
+        "full_name,email,phone_number,student_class,cccd,date_of_birth,school_code,school\n"
+        "Le Van Binh,,0901234567,12,012345678901,24/08/2003,,Tiểu học Nguyễn Tri Phương\n"
+    ).encode("utf-8")
+    upload = SimpleUploadedFile("members.csv", csv_content, content_type="text/csv")
+
+    api_client.credentials(HTTP_AUTHORIZATION=f"Bearer {admin_token}")
+    response = api_client.post(f"/api/v1/groups/{group.id}/memberships/import/", {"file": upload})
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["created_users"] == 1
+    assert payload["failed_rows"] == 0
+
+    school = School.objects.get(name="Tiểu học Nguyễn Tri Phương")
+    membership = GroupMembership.objects.select_related("user__profile").get(group=group)
+    profile = Profile.objects.get(user=membership.user)
+    assert profile.school == school
+
+
+@pytest.mark.django_db
 def test_group_membership_import_returns_row_errors_without_aborting_the_batch(api_client, admin_token):
     from apps.institutions.models import GroupMembership
 
