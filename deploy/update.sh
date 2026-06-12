@@ -108,7 +108,7 @@ verify_production() {
         echo "wget is unavailable in $CADDY_CONTAINER; skipping in-network frontend probe."
     fi
 
-    curl -fsSIL --max-redirs 2 "https://$DOMAIN/" >/dev/null
+    curl -fsSIL --max-redirs 5 "https://$DOMAIN/" >/dev/null
     curl -fsS "https://$DOMAIN/api/v1/health/live/" >/dev/null
 }
 
