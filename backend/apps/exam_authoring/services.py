@@ -778,22 +778,17 @@ def _force_close_exam_sessions(*, exam, actor):
 
 
 def _auto_publish_closed_results(*, exam, actor, request=None):
-    from apps.grading.models import Result
-    from apps.grading.services import publish_result
+    from apps.grading.services import publish_results_for_exam
 
     if not exam.show_results_immediately:
         return
 
-    for result in (
-        Result.objects.select_related("session", "session__exam")
-        .filter(
-            session__exam=exam,
-            workflow_status=Result.WorkflowStatus.FINALIZED,
-            publish_state=Result.PublishState.DRAFT,
-        )
-        .order_by("id")
-    ):
-        publish_result(result=result, published_by=actor, request=request)
+    publish_results_for_exam(
+        exam=exam,
+        published_by=actor,
+        request=request,
+        audit_action="result.auto_published",
+    )
 
 
 def transition_exam_status(*, exam, next_status, actor, bonus_minutes=0, request=None):

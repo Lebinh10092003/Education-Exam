@@ -67,6 +67,9 @@ class Result(TimeStampedModel):
 
     class PublishState(models.TextChoices):
         DRAFT = "draft", "Draft"
+        REVIEWING = "reviewing", "Reviewing"
+        LOCKED = "locked", "Locked"
+        SCHEDULED = "scheduled", "Scheduled"
         PUBLISHED = "published", "Published"
 
     session = models.OneToOneField(
@@ -95,6 +98,16 @@ class Result(TimeStampedModel):
         on_delete=models.SET_NULL,
         related_name="published_results",
     )
+    locked_at = models.DateTimeField(null=True, blank=True)
+    locked_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="locked_results",
+    )
+    scheduled_publish_at = models.DateTimeField(null=True, blank=True)
+    publication_note = models.TextField(blank=True)
 
     class Meta:
         ordering = ("-created_at",)

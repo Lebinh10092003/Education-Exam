@@ -80,6 +80,7 @@ class ManualGradingTaskGradeSerializer(serializers.Serializer):
 class ResultSerializer(serializers.ModelSerializer):
     candidate = serializers.SerializerMethodField()
     exam = serializers.SerializerMethodField()
+    locked_by = ResultUserSummarySerializer(read_only=True)
     score = serializers.DecimalField(source="total_score", max_digits=8, decimal_places=2, read_only=True)
     original_score = serializers.DecimalField(source="original_total_score", max_digits=8, decimal_places=2, read_only=True)
     total_marks = serializers.DecimalField(source="max_score", max_digits=8, decimal_places=2, read_only=True)
@@ -110,6 +111,10 @@ class ResultSerializer(serializers.ModelSerializer):
             "completed_date",
             "time_taken_minutes",
             "published_at",
+            "locked_at",
+            "locked_by",
+            "scheduled_publish_at",
+            "publication_note",
         )
 
     @extend_schema_field(ResultUserSummarySerializer)
@@ -165,8 +170,26 @@ class ResultSummarySerializer(serializers.Serializer):
     pass_count = serializers.IntegerField()
     fail_count = serializers.IntegerField()
     pending_count = serializers.IntegerField()
+    pending_grading_count = serializers.IntegerField()
+    reviewing_count = serializers.IntegerField()
+    locked_count = serializers.IntegerField()
+    scheduled_count = serializers.IntegerField()
+    published_count = serializers.IntegerField()
     average_percentage = serializers.DecimalField(max_digits=8, decimal_places=2)
     score_distribution = ScoreDistributionBucketSerializer(many=True)
+
+
+class ResultPublicationNoteSerializer(serializers.Serializer):
+    note = serializers.CharField(required=False, allow_blank=True)
+
+
+class ResultSchedulePublicationSerializer(serializers.Serializer):
+    scheduled_publish_at = serializers.DateTimeField()
+    note = serializers.CharField(required=False, allow_blank=True)
+
+
+class ResultExamPublishSerializer(serializers.Serializer):
+    exam = serializers.IntegerField()
 
 
 class ResultReviewSerializer(serializers.Serializer):
