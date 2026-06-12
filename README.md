@@ -116,19 +116,6 @@ Write-Host ">>> HOÀN THÀNH! Dự án đã được chạy thành công." -Fore
 
 ---
 
-## 🔑 Tài Khoản Demo Mặc Định
-
-Sau khi chạy lệnh reset dữ liệu demo, các tài khoản sau sẽ được tạo sẵn để bạn sử dụng đăng nhập:
-
-| Vai Trò | Email | Mật Khẩu |
-| :--- | :--- | :--- |
-| **Quản trị viên (Admin)** | `admin@example.com` | `admin123456` |
-| **Giám thị (Proctor)** | `proctor1@example.com` | `admin123456` |
-| **Giáo viên tạo đề (Examiner)** | `examiner1@example.com` | `admin123456` |
-| **Thí sinh (Candidate)** | `candidate01@example.com` | `admin123456` |
-
----
-
 ## 🌐 Các Địa Chỉ Truy Cập
 
 - 🖥️ **Frontend**: [http://127.0.0.1:5173](http://127.0.0.1:5173)

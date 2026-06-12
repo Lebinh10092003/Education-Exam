@@ -82,6 +82,9 @@ describe("Login", () => {
 
     renderLoginPage({ login });
 
+    await user.type(screen.getByLabelText(/Email hoặc tên đăng nhập/i), "candidate@example.com");
+    await user.type(screen.getByLabelText(/Mật khẩu/i), "admin123456");
+
     await user.click(screen.getByRole("button", { name: "Đăng nhập" }));
 
     await waitFor(() => {

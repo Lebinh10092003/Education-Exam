@@ -59,8 +59,8 @@ export function Login() {
   const { isSubmitting, run } = useMutationState();
   const { t } = useTranslation(["auth", "common"]);
 
-  const [identifier, setIdentifier] = useState("candidate@example.com");
-  const [password, setPassword] = useState("admin123456");
+  const [identifier, setIdentifier] = useState("");
+  const [password, setPassword] = useState("");
   const [rememberMe, setRememberMe] = useState(true);
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
@@ -241,14 +241,6 @@ export function Login() {
                   )}
                 </Button>
               </form>
-
-              <div className="mt-5 rounded-lg border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-950 dark:border-emerald-900 dark:bg-emerald-950/30 dark:text-emerald-100">
-                <p className="flex items-center gap-2 font-bold">
-                  <CheckCircle className="h-4 w-4" />
-                  {t("auth:login.demoCredentials")}
-                </p>
-                <p className="mt-2 font-mono text-xs">candidate@example.com / admin123456</p>
-              </div>
 
               <div className="mt-6 text-center">
                 <Link to="/" className="text-sm font-semibold text-slate-600 hover:text-blue-700 dark:text-slate-300 dark:hover:text-blue-300">
