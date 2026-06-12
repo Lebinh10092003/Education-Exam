@@ -29,6 +29,7 @@ const lazyRoute = <
 
 const DashboardRoute = lazyRoute(() => import("./pages/Dashboard"), "Dashboard");
 const LandingPageRoute = lazyRoute(() => import("./pages/LandingPage"), "LandingPage");
+const RegistrationPageRoute = lazyRoute(() => import("./pages/RegistrationPage"), "RegistrationPage");
 const UserManagementRoute = lazyRoute(() => import("./pages/UserManagement"), "UserManagement");
 const GroupManagementRoute = lazyRoute(() => import("./pages/GroupManagement"), "GroupManagement");
 const GroupMembersRoute = lazyRoute(() => import("./pages/GroupMembersPage"), "GroupMembersPage");
@@ -93,6 +94,10 @@ export const routeConfig = [
   {
     path: "/",
     Component: LandingPageRoute,
+  },
+  {
+    path: "/register",
+    Component: RegistrationPageRoute,
   },
   {
     path: "/",

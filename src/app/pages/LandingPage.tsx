@@ -32,7 +32,6 @@ import { Card, CardContent } from "../components/ui/card";
 import { Input } from "../components/ui/input";
 import { Label } from "../components/ui/label";
 
-const REGISTRATION_URL = "https://dangky.fermat.edu.vn/";
 const SCO_URL = "https://www.schoolconnectonline.com/olympiad/vietnam.aspx";
 const AYSBC_URL = "https://asiaysbc.com/";
 const ZALO_URL = "https://zalo.me/fermattech";
@@ -303,9 +302,9 @@ export function LandingPage() {
               asChild
               className="hidden rounded-xl bg-gradient-to-r from-blue-600 to-cyan-500 px-6 text-white hover:from-blue-700 hover:to-cyan-600 shadow-md shadow-blue-500/20 sm:inline-flex transition-all duration-300 text-xs font-bold uppercase tracking-widest border-0"
             >
-              <a href={REGISTRATION_URL} target="_blank" rel="noreferrer">
+              <Link to="/register">
                 {t("hero.ctaRegister")}
-              </a>
+              </Link>
             </Button>
             <Button asChild variant="outline" className="hidden rounded-lg border-slate-300 px-3 sm:inline-flex">
               <Link to={isAuthenticated ? portalPath : "/login"}>
@@ -357,9 +356,9 @@ export function LandingPage() {
 
               <div className="mt-10 flex flex-col gap-4 sm:flex-row justify-center lg:justify-start">
                 <Button asChild size="lg" className="rounded-xl bg-gradient-to-r from-blue-600 to-cyan-500 px-8 text-white hover:from-blue-700 hover:to-cyan-600 shadow-lg shadow-blue-500/25 transition-all duration-300 text-sm font-bold uppercase tracking-widest h-14 border-0 w-full sm:w-auto">
-                  <a href={REGISTRATION_URL} target="_blank" rel="noreferrer">
+                  <Link to="/register">
                     {t("hero.ctaRegister")}
-                  </a>
+                  </Link>
                 </Button>
                 <Button
                   size="lg"
