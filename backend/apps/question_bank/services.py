@@ -5,6 +5,7 @@ from io import BytesIO, StringIO
 from django.db import transaction
 from django.utils.text import slugify
 from openpyxl import load_workbook
+from rest_framework.exceptions import ValidationError
 
 from apps.academics.models import Subject
 
@@ -39,13 +40,13 @@ def _normalize_tags(tag_values):
 def _validate_question_payload(question_type, options, correct_option_keys):
     if question_type in {Question.Type.MULTIPLE_CHOICE, Question.Type.TRUE_FALSE}:
         if not options:
-            raise ValueError("Objective questions require options.")
+            raise ValidationError("Objective questions require options.")
         if not correct_option_keys:
-            raise ValueError("Objective questions require correct option keys.")
+            raise ValidationError("Objective questions require correct option keys.")
         option_keys = {option["key"] for option in options}
         invalid_keys = [key for key in correct_option_keys if key not in option_keys]
         if invalid_keys:
-            raise ValueError(f"Correct option keys not found in options: {', '.join(invalid_keys)}")
+            raise ValidationError(f"Correct option keys not found in options: {', '.join(invalid_keys)}")
 
 
 def _create_revision(

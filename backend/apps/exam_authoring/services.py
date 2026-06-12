@@ -58,10 +58,10 @@ def _parse_student_import_date(value):
 
 def _decode_csv_upload(uploaded_file):
     if not uploaded_file:
-        raise ValueError("A CSV file is required.")
+        raise ValidationError("A CSV file is required.")
     file_name = getattr(uploaded_file, "name", "") or ""
     if not file_name.lower().endswith(".csv"):
-        raise ValueError("Only CSV imports are supported.")
+        raise ValidationError("Only CSV imports are supported.")
 
     uploaded_file.seek(0)
     decoded = uploaded_file.read().decode("utf-8-sig")
@@ -69,7 +69,7 @@ def _decode_csv_upload(uploaded_file):
     headers = reader.fieldnames or []
     missing_headers = [header for header in CSV_REQUIRED_STUDENT_IMPORT_FIELDS if header not in headers]
     if missing_headers:
-        raise ValueError(f"Missing required columns: {', '.join(missing_headers)}")
+        raise ValidationError(f"Missing required columns: {', '.join(missing_headers)}")
     return list(reader)
 
 
@@ -322,7 +322,12 @@ def _normalize_random_rules(random_rules):
 
 def _validate_schedule(opens_at, closes_at):
     if opens_at and closes_at and closes_at <= opens_at:
-        raise ValueError("closing_at must be after opening_at.")
+        raise ValidationError(
+            t(
+                vi="Thời gian đóng phải sau thời gian mở.",
+                en="closing_at must be after opening_at.",
+            )
+        )
 
 
 def _resolve_manual_revisions(*, subject, manual_question_ids):
@@ -336,13 +341,23 @@ def _resolve_manual_revisions(*, subject, manual_question_ids):
     }
     missing_ids = [question_id for question_id in question_ids if question_id not in questions]
     if missing_ids:
-        raise ValueError(f"Questions not found for subject {subject.code}: {', '.join(map(str, missing_ids))}")
+        raise ValidationError(
+            t(
+                vi=f"Không tìm thấy câu hỏi cho môn {subject.code}: {', '.join(map(str, missing_ids))}",
+                en=f"Questions not found for subject {subject.code}: {', '.join(map(str, missing_ids))}",
+            )
+        )
 
     revisions = []
     for question_id in question_ids:
         question = questions[question_id]
         if question.current_revision_id is None:
-            raise ValueError(f"Question {question_id} does not have an active revision.")
+            raise ValidationError(
+                t(
+                    vi=f"Câu hỏi {question_id} chưa có phiên bản đang hoạt động.",
+                    en=f"Question {question_id} does not have an active revision.",
+                )
+            )
         revisions.append(question.current_revision)
     return revisions
 
@@ -451,14 +466,24 @@ def _validate_assignments(*, group_ids=None, user_ids=None):
         found_group_ids = set(CandidateGroup.objects.filter(id__in=resolved_group_ids).values_list("id", flat=True))
         missing_group_ids = [group_id for group_id in resolved_group_ids if group_id not in found_group_ids]
         if missing_group_ids:
-            raise ValueError(f"Unknown group ids: {', '.join(map(str, missing_group_ids))}")
+            raise ValidationError(
+                t(
+                    vi=f"Không tìm thấy nhóm: {', '.join(map(str, missing_group_ids))}",
+                    en=f"Unknown group ids: {', '.join(map(str, missing_group_ids))}",
+                )
+            )
 
     if resolved_user_ids is not UNSET:
         user_model = get_user_model()
         found_user_ids = set(user_model.objects.filter(id__in=resolved_user_ids).values_list("id", flat=True))
         missing_user_ids = [user_id for user_id in resolved_user_ids if user_id not in found_user_ids]
         if missing_user_ids:
-            raise ValueError(f"Unknown user ids: {', '.join(map(str, missing_user_ids))}")
+            raise ValidationError(
+                t(
+                    vi=f"Không tìm thấy người dùng: {', '.join(map(str, missing_user_ids))}",
+                    en=f"Unknown user ids: {', '.join(map(str, missing_user_ids))}",
+                )
+            )
 
     return resolved_group_ids, resolved_user_ids
 

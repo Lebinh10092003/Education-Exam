@@ -5,6 +5,7 @@ from io import StringIO
 
 from django.contrib.auth import get_user_model
 from django.db import transaction
+from rest_framework.exceptions import ValidationError
 
 from apps.identity.models import Profile, Role, UserRole
 from apps.identity.utils import (
@@ -37,11 +38,11 @@ def _parse_optional_date(value):
 
 def _decode_csv_upload(uploaded_file):
     if not uploaded_file:
-        raise ValueError("A CSV file is required.")
+        raise ValidationError("A CSV file is required.")
 
     file_name = getattr(uploaded_file, "name", "") or ""
     if not file_name.lower().endswith(".csv"):
-        raise ValueError("Only CSV imports are supported.")
+        raise ValidationError("Only CSV imports are supported.")
 
     uploaded_file.seek(0)
     decoded = uploaded_file.read().decode("utf-8-sig")
@@ -49,7 +50,7 @@ def _decode_csv_upload(uploaded_file):
     headers = reader.fieldnames or []
     missing_headers = [header for header in CSV_REQUIRED_GROUP_IMPORT_FIELDS if header not in headers]
     if missing_headers:
-        raise ValueError(f"Missing required columns: {', '.join(missing_headers)}")
+        raise ValidationError(f"Missing required columns: {', '.join(missing_headers)}")
     return list(reader)
 
 
