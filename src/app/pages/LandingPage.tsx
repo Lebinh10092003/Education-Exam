@@ -49,6 +49,7 @@ type Tone = {
 type Category = {
   key: string;
   icon: LucideIcon;
+  image?: string;
   tone: Tone;
 };
 
@@ -64,61 +65,67 @@ const categoryItems: Category[] = [
   {
     key: "math",
     icon: Network,
+    image: "https://images.unsplash.com/photo-1635070041078-e363dbe005cb?auto=format&fit=crop&q=80&w=600",
     tone: {
-      badge: "bg-teal-50 text-teal-700",
-      border: "border-teal-100 dark:border-teal-900/50",
-      icon: "bg-teal-600 text-white shadow-lg shadow-teal-500/20",
-      text: "text-teal-700 dark:text-teal-400",
+      badge: "bg-slate-100 text-slate-900 dark:bg-slate-800 dark:text-slate-100",
+      border: "border-slate-200 dark:border-slate-800",
+      icon: "bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900",
+      text: "text-slate-900 dark:text-white",
     },
   },
   {
     key: "coding",
     icon: Code2,
+    image: "https://images.unsplash.com/photo-1555066931-4365d14bab8c?auto=format&fit=crop&q=80&w=600",
     tone: {
-      badge: "bg-cyan-50 text-cyan-700",
-      border: "border-cyan-100 dark:border-cyan-900/50",
-      icon: "bg-cyan-600 text-white shadow-lg shadow-cyan-500/20",
-      text: "text-cyan-700 dark:text-cyan-400",
+      badge: "bg-slate-100 text-slate-900 dark:bg-slate-800 dark:text-slate-100",
+      border: "border-slate-200 dark:border-slate-800",
+      icon: "bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900",
+      text: "text-slate-900 dark:text-white",
     },
   },
   {
     key: "ai",
     icon: BrainCircuit,
+    image: "https://images.unsplash.com/photo-1620712943543-bcc4688e7485?auto=format&fit=crop&q=80&w=600",
     tone: {
-      badge: "bg-violet-50 text-violet-700",
-      border: "border-violet-100 dark:border-violet-900/50",
-      icon: "bg-violet-600 text-white shadow-lg shadow-violet-500/20",
-      text: "text-violet-700 dark:text-violet-400",
+      badge: "bg-slate-100 text-slate-900 dark:bg-slate-800 dark:text-slate-100",
+      border: "border-slate-200 dark:border-slate-800",
+      icon: "bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900",
+      text: "text-slate-900 dark:text-white",
     },
   },
   {
     key: "science",
     icon: Atom,
+    image: "https://images.unsplash.com/photo-1532094349884-543bc11b234d?auto=format&fit=crop&q=80&w=600",
     tone: {
-      badge: "bg-emerald-50 text-emerald-700",
-      border: "border-emerald-100 dark:border-emerald-900/50",
-      icon: "bg-emerald-600 text-white shadow-lg shadow-emerald-500/20",
-      text: "text-emerald-700 dark:text-emerald-400",
+      badge: "bg-slate-100 text-slate-900 dark:bg-slate-800 dark:text-slate-100",
+      border: "border-slate-200 dark:border-slate-800",
+      icon: "bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900",
+      text: "text-slate-900 dark:text-white",
     },
   },
   {
     key: "english",
     icon: Languages,
+    image: "https://images.unsplash.com/photo-1456513080510-7bf3a84b82f8?auto=format&fit=crop&q=80&w=600",
     tone: {
-      badge: "bg-amber-50 text-amber-700",
-      border: "border-amber-100 dark:border-amber-900/50",
-      icon: "bg-amber-500 text-white shadow-lg shadow-amber-500/20",
-      text: "text-amber-700 dark:text-amber-400",
+      badge: "bg-slate-100 text-slate-900 dark:bg-slate-800 dark:text-slate-100",
+      border: "border-slate-200 dark:border-slate-800",
+      icon: "bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900",
+      text: "text-slate-900 dark:text-white",
     },
   },
   {
     key: "finance",
     icon: Activity,
+    image: "https://images.unsplash.com/photo-1611974789855-9c2a0a7236a3?auto=format&fit=crop&q=80&w=600",
     tone: {
-      badge: "bg-indigo-50 text-indigo-700",
-      border: "border-indigo-100 dark:border-indigo-900/50",
-      icon: "bg-indigo-600 text-white shadow-lg shadow-indigo-500/20",
-      text: "text-indigo-700 dark:text-indigo-400",
+      badge: "bg-slate-100 text-slate-900 dark:bg-slate-800 dark:text-slate-100",
+      border: "border-slate-200 dark:border-slate-800",
+      icon: "bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900",
+      text: "text-slate-900 dark:text-white",
     },
   },
 ];
@@ -262,20 +269,20 @@ export function LandingPage() {
             <BrandMark />
           </Link>
 
-          <nav className="hidden items-center gap-6 text-sm font-semibold text-slate-600 md:flex dark:text-slate-300">
-            <button className="hover:text-teal-600 dark:hover:text-teal-400 transition-colors" onClick={() => scrollToId("competitions")}>
+          <nav className="hidden items-center gap-8 text-xs font-bold uppercase tracking-widest text-slate-500 md:flex dark:text-slate-400">
+            <button className="hover:text-slate-950 dark:hover:text-white transition-colors" onClick={() => scrollToId("competitions")}>
               {t("nav.competitions")}
             </button>
-            <button className="hover:text-teal-600 dark:hover:text-teal-400 transition-colors" onClick={() => scrollToId("partners")}>
+            <button className="hover:text-slate-950 dark:hover:text-white transition-colors" onClick={() => scrollToId("partners")}>
               {t("nav.partners")}
             </button>
-            <button className="hover:text-teal-600 dark:hover:text-teal-400 transition-colors" onClick={() => scrollToId("journey")}>
+            <button className="hover:text-slate-950 dark:hover:text-white transition-colors" onClick={() => scrollToId("journey")}>
               {t("nav.journey")}
             </button>
-            <button className="hover:text-teal-600 dark:hover:text-teal-400 transition-colors" onClick={() => scrollToId("result-lookup")}>
+            <button className="hover:text-slate-950 dark:hover:text-white transition-colors" onClick={() => scrollToId("result-lookup")}>
               {t("lookup.title")}
             </button>
-            <button className="hover:text-teal-600 dark:hover:text-teal-400 transition-colors" onClick={() => scrollToId("support")}>
+            <button className="hover:text-slate-950 dark:hover:text-white transition-colors" onClick={() => scrollToId("support")}>
               {t("nav.support")}
             </button>
           </nav>
@@ -294,7 +301,7 @@ export function LandingPage() {
             </Button>
             <Button
               asChild
-              className="hidden rounded-lg bg-gradient-to-r from-teal-600 to-cyan-600 px-4 text-white hover:from-teal-700 hover:to-cyan-700 sm:inline-flex border-0 shadow-md shadow-teal-500/20 transition-all duration-300"
+              className="hidden rounded-none bg-slate-950 px-6 text-white hover:bg-slate-800 dark:bg-white dark:text-slate-950 dark:hover:bg-slate-200 sm:inline-flex transition-colors text-xs font-bold uppercase tracking-widest"
             >
               <a href={REGISTRATION_URL} target="_blank" rel="noreferrer">
                 {t("hero.ctaRegister")}
@@ -310,119 +317,50 @@ export function LandingPage() {
       </header>
 
       <main>
-        <section className="relative overflow-hidden border-b border-slate-200 bg-slate-50 dark:border-slate-800 dark:bg-slate-950 min-h-[600px] flex items-center">
-          <div className="absolute inset-0 z-0 pointer-events-none opacity-40 dark:opacity-20">
-            <svg className="absolute h-full w-full" xmlns="http://www.w3.org/2000/svg">
-              <defs>
-                <pattern id="hero-grid" width="40" height="40" patternUnits="userSpaceOnUse">
-                  <path d="M0 40L40 0H20L0 20M40 40V20L20 40" stroke="currentColor" strokeWidth="1" className="text-teal-900/10 dark:text-teal-500/10" fill="none" />
-                </pattern>
-                <radialGradient id="hero-glow" cx="50%" cy="50%" r="50%">
-                  <stop offset="0%" stopColor="rgba(20, 184, 166, 0.15)" />
-                  <stop offset="100%" stopColor="rgba(20, 184, 166, 0)" />
-                </radialGradient>
-              </defs>
-              <rect width="100%" height="100%" fill="url(#hero-grid)" />
-              <rect width="100%" height="100%" fill="url(#hero-glow)" />
-            </svg>
+        <section className="relative overflow-hidden bg-slate-950 min-h-[85vh] flex items-center">
+          {/* Minimalist Background Image */}
+          <div className="absolute inset-0 z-0">
+            <img src="https://images.unsplash.com/photo-1522202176988-66273c2fd55f?auto=format&fit=crop&q=80&w=2000" alt="Students learning" className="h-full w-full object-cover opacity-60 dark:opacity-40" />
+            <div className="absolute inset-0 bg-slate-900/40 mix-blend-multiply" />
+            <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-900/20 to-slate-900/80" />
           </div>
-          <div className="absolute inset-0 bg-gradient-to-br from-slate-50 via-slate-50/90 to-teal-50/40 dark:from-slate-950 dark:via-slate-950/90 dark:to-slate-950/40 z-0 pointer-events-none" />
-          <div className="relative z-10 mx-auto grid max-w-7xl gap-12 px-4 py-16 sm:px-6 sm:py-20 lg:grid-cols-[1.05fr_0.95fr] lg:items-center lg:px-8 lg:py-24 w-full">
-            <div>
-              <div className="inline-flex items-center gap-2 rounded-full border border-teal-200/60 bg-white/60 backdrop-blur px-3 py-1 text-xs font-bold text-teal-800 shadow-sm dark:border-teal-800/60 dark:bg-teal-950/40 dark:text-teal-300">
-                <Sparkles className="h-3.5 w-3.5 text-teal-600 dark:text-teal-400" />
-                {t("hero.badge")}
-              </div>
-              <h1 className="mt-6 max-w-4xl text-4xl font-bold tracking-normal text-slate-950 sm:text-5xl lg:text-6xl dark:text-white">
-                {t("hero.title")}
-              </h1>
-              <p className="mt-6 max-w-2xl text-lg leading-8 text-slate-600 dark:text-slate-300">
-                {t("hero.subtitle")}
-              </p>
 
-              <div className="mt-8 flex flex-col gap-3 sm:flex-row">
-                <Button asChild size="lg" className="rounded-lg bg-gradient-to-r from-teal-600 to-cyan-600 px-6 text-white hover:from-teal-700 hover:to-cyan-700 transition-all duration-300 hover:shadow-lg hover:shadow-teal-600/30 border-0">
-                  <a href={REGISTRATION_URL} target="_blank" rel="noreferrer">
-                    {t("hero.ctaRegister")}
-                    <ExternalLink className="ml-2 h-4 w-4" />
-                  </a>
-                </Button>
-                <Button
-                  size="lg"
-                  variant="outline"
-                  className="rounded-lg border-slate-300 bg-white px-6 dark:bg-slate-950 transition-all duration-200 hover:border-slate-400"
-                  onClick={() => scrollToId("competitions")}
-                >
-                  {t("hero.ctaExplore")}
-                  <ArrowRight className="ml-2 h-4 w-4" />
-                </Button>
-                <Button asChild size="lg" variant="ghost" className="rounded-lg px-6 text-blue-800 dark:text-blue-200">
-                  <Link to="/login">{t("hero.ctaLogin")}</Link>
-                </Button>
-              </div>
-
-              <div className="mt-10 grid max-w-2xl grid-cols-3 gap-3">
-                {[
-                  ["6+", t("hero.statsCompetitions")],
-                  ["3", t("hero.statsPartners")],
-                  ["1-12", t("hero.statsGrades")],
-                ].map(([value, label]) => (
-                  <div key={label} className="rounded-lg border border-slate-200 bg-white/85 backdrop-blur-sm p-4 dark:border-teal-900/40 dark:bg-slate-900/50 transition duration-300 hover:shadow-md hover:-translate-y-0.5 hover:border-teal-400 dark:hover:border-teal-500">
-                    <p className="text-2xl font-bold text-teal-700 dark:text-teal-400">{value}</p>
-                    <p className="mt-1 text-xs font-semibold text-slate-600 dark:text-slate-400">{label}</p>
-                  </div>
-                ))}
-              </div>
+          <div className="relative z-10 mx-auto w-full max-w-5xl px-4 py-24 sm:px-6 lg:px-8 flex flex-col items-center text-center">
+            <div className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 backdrop-blur-md px-4 py-1.5 text-[10px] font-bold uppercase tracking-[0.2em] text-white shadow-sm mb-8">
+              <Sparkles className="h-3 w-3" />
+              {t("hero.badge")}
             </div>
+            
+            <h1 className="max-w-4xl text-5xl font-extrabold tracking-tight text-white sm:text-6xl lg:text-7xl">
+              {t("hero.title")}
+            </h1>
+            
+            <p className="mt-8 max-w-2xl text-lg leading-relaxed text-slate-300 sm:text-xl font-light">
+              {t("hero.subtitle")}
+            </p>
 
-            <div className="relative">
-              <div className="rounded-lg border border-slate-200 bg-white/70 backdrop-blur-md p-5 shadow-xl shadow-slate-200/50 dark:border-slate-800/80 dark:bg-slate-900/60 dark:shadow-none transition-all duration-300 hover:shadow-2xl hover:-translate-y-1">
-                <div className="flex items-start justify-between gap-4 border-b border-slate-100 pb-5 dark:border-slate-800">
-                  <div>
-                    <p className="text-xs font-bold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
-                      FermatTech
-                    </p>
-                    <h2 className="mt-2 text-xl font-bold text-slate-950 dark:text-white">{t("hero.visualTitle")}</h2>
-                    <p className="mt-2 text-sm leading-6 text-slate-600 dark:text-slate-300">{t("hero.visualSubtitle")}</p>
-                  </div>
-                  <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-teal-500 to-cyan-600 text-white shadow-md shadow-teal-500/20">
-                    <CalendarDays className="h-5 w-5" />
-                  </div>
+            <div className="mt-12 flex flex-col gap-4 sm:flex-row justify-center w-full sm:w-auto">
+              <Button asChild size="lg" className="rounded-none bg-white px-10 text-slate-950 hover:bg-slate-200 transition-colors duration-300 text-xs font-bold uppercase tracking-widest h-14 w-full sm:w-auto">
+                <a href={REGISTRATION_URL} target="_blank" rel="noreferrer">
+                  {t("hero.ctaRegister")}
+                </a>
+              </Button>
+              <Button
+                size="lg"
+                variant="outline"
+                className="rounded-none border border-white/30 bg-white/5 backdrop-blur-sm px-10 text-white hover:bg-white/10 hover:border-white/50 transition-all duration-300 text-xs font-bold uppercase tracking-widest h-14 w-full sm:w-auto"
+                onClick={() => scrollToId("competitions")}
+              >
+                {t("hero.ctaExplore")}
+              </Button>
+            </div>
+            
+            <div className="mt-20 grid grid-cols-2 md:grid-cols-4 gap-8 md:gap-16 items-center opacity-70 grayscale contrast-200 brightness-200">
+              {partnerItems.map((partner) => (
+                <div key={partner.key} className="flex items-center justify-center">
+                  <img src={partner.logo} alt={partner.initials} className="h-10 w-auto object-contain" />
                 </div>
-
-                <div className="mt-5 rounded-lg border border-teal-100 bg-teal-50/50 p-4 dark:border-teal-900/50 dark:bg-teal-950/30">
-                  <div className="flex items-center justify-between gap-3">
-                    <div>
-                      <p className="text-sm font-bold text-slate-950 dark:text-white">{t("hero.visualExam")}</p>
-                      <p className="mt-1 text-xs font-semibold text-teal-800 dark:text-teal-400">{t("hero.visualStatus")}</p>
-                    </div>
-                    <Award className="h-8 w-8 text-teal-600 dark:text-teal-400" />
-                  </div>
-                </div>
-
-                <div className="mt-5 space-y-3">
-                  {[t("hero.visualChecklist1"), t("hero.visualChecklist2"), t("hero.visualChecklist3")].map((item) => (
-                    <div
-                      key={item}
-                      className="flex items-center gap-3 rounded-lg border border-slate-200 bg-white px-4 py-3 dark:border-slate-800 dark:bg-slate-950"
-                    >
-                      <CheckCircle className="h-5 w-5 text-emerald-600" />
-                      <span className="text-sm font-semibold text-slate-700 dark:text-slate-200">{item}</span>
-                    </div>
-                  ))}
-                </div>
-
-                <div className="mt-5 grid grid-cols-3 gap-3 text-center">
-                  {partnerItems.map((partner) => (
-                    <div key={partner.key} className="rounded-lg border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-950 flex flex-col items-center justify-center">
-                      <img src={partner.logo} alt={partner.initials} className="mx-auto h-8 w-8 object-contain" />
-                      <p className="mt-2 text-[11px] font-bold text-slate-600 dark:text-slate-300 text-center">
-                        {t(`partners.${partner.key}.name`)}
-                      </p>
-                    </div>
-                  ))}
-                </div>
-              </div>
+              ))}
             </div>
           </div>
         </section>
@@ -562,17 +500,19 @@ export function LandingPage() {
           </div>
         </section>
 
-        <section id="journey" className="border-y border-slate-200 bg-slate-50 py-16 dark:border-slate-800 dark:bg-slate-900/40">
+        <section id="journey" className="border-y border-slate-200 bg-white py-24 dark:border-slate-800 dark:bg-slate-950">
           <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
             <SectionHeading title={t("journey.title")} subtitle={t("journey.subtitle")} />
-            <div className="mt-10 grid gap-4 md:grid-cols-5">
+            <div className="mt-16 grid gap-8 md:grid-cols-5">
               {journeyKeys.map((key, index) => (
-                <div key={key} className="rounded-lg border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-950 transition-all duration-300 hover:shadow-lg hover:-translate-y-1 hover:border-teal-400/50 dark:hover:border-teal-500/50">
-                  <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-gradient-to-br from-teal-500 to-cyan-600 text-sm font-bold text-white shadow-md shadow-teal-500/20">
-                    {index + 1}
+                <div key={key} className="group relative pt-8">
+                  <div className="absolute top-0 left-0 text-7xl font-black text-slate-50 dark:text-slate-900 transition-colors group-hover:text-slate-100 dark:group-hover:text-slate-800/80 -z-10 select-none">
+                    0{index + 1}
                   </div>
-                  <h3 className="mt-4 text-base font-bold text-slate-950 dark:text-white">{t(`journey.steps.${key}.title`)}</h3>
-                  <p className="mt-2 text-sm leading-6 text-slate-600 dark:text-slate-300">{t(`journey.steps.${key}.desc`)}</p>
+                  <div className="relative z-10 pl-4 border-l-2 border-slate-200 dark:border-slate-800 group-hover:border-slate-950 dark:group-hover:border-white transition-colors">
+                    <h3 className="text-lg font-bold text-slate-950 dark:text-white">{t(`journey.steps.${key}.title`)}</h3>
+                    <p className="mt-3 text-sm leading-relaxed text-slate-600 dark:text-slate-400">{t(`journey.steps.${key}.desc`)}</p>
+                  </div>
                 </div>
               ))}
             </div>
@@ -596,37 +536,39 @@ export function LandingPage() {
               </div>
             </div>
 
-            <div className="rounded-lg border border-teal-200 bg-teal-50/50 p-6 dark:border-teal-900/50 dark:bg-teal-950/30">
-              <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-gradient-to-br from-teal-500 to-cyan-600 text-white shadow-md shadow-teal-500/20">
-                <Users className="h-6 w-6" />
+            <div className="rounded-3xl bg-slate-950 p-8 sm:p-12 dark:bg-slate-900 flex flex-col justify-center">
+              <div className="flex items-center gap-4 mb-6">
+                <div className="flex h-14 w-14 items-center justify-center rounded-full bg-white text-slate-950">
+                  <Users className="h-6 w-6" />
+                </div>
+                <div>
+                  <h2 className="text-2xl font-bold text-white">{t("support.title")}</h2>
+                  <p className="mt-1 text-sm text-slate-400">{t("support.subtitle")}</p>
+                </div>
               </div>
-              <h2 className="mt-5 text-3xl font-bold text-slate-950 dark:text-white">{t("support.title")}</h2>
-              <p className="mt-3 text-base leading-7 text-slate-700 dark:text-slate-200">{t("support.subtitle")}</p>
-              <p className="mt-4 rounded-lg border border-teal-200 bg-white p-4 text-sm font-semibold text-teal-900 dark:border-teal-800 dark:bg-slate-950 dark:text-teal-200">
-                {t("support.note")}
-              </p>
-              <div className="mt-6 grid gap-3 sm:grid-cols-3">
+              
+              <div className="mt-6 grid gap-4 sm:grid-cols-3">
                 <a
                   href={ZALO_URL}
                   target="_blank"
                   rel="noreferrer"
-                  className="rounded-lg border border-teal-200 bg-white p-4 text-sm font-bold text-slate-950 hover:border-teal-400 dark:border-teal-800 dark:bg-slate-950 dark:text-white flex flex-col items-start transition-all duration-200 hover:shadow-md hover:-translate-y-0.5"
+                  className="rounded-xl border border-slate-800 bg-slate-900/50 p-5 text-sm font-bold text-white hover:bg-slate-800 transition-all flex flex-col items-center text-center group"
                 >
-                  <img src="/fermat-logo.png" className="mb-3 h-5 w-5 object-contain" alt="FermatTech" />
+                  <img src="/fermat-logo.png" className="mb-4 h-6 w-6 object-contain grayscale group-hover:grayscale-0 transition-all" alt="FermatTech" />
                   {t("support.zalo")}
                 </a>
                 <a
                   href={`tel:${SUPPORT_PHONE.replace(/\s/g, "")}`}
-                  className="rounded-lg border border-teal-200 bg-white p-4 text-sm font-bold text-slate-950 hover:border-teal-400 dark:border-teal-800 dark:bg-slate-950 dark:text-white transition-all duration-200 hover:shadow-md hover:-translate-y-0.5"
+                  className="rounded-xl border border-slate-800 bg-slate-900/50 p-5 text-sm font-bold text-white hover:bg-slate-800 transition-all flex flex-col items-center text-center"
                 >
-                  <Phone className="mb-3 h-5 w-5 text-teal-600 dark:text-teal-400" />
+                  <Phone className="mb-4 h-6 w-6 text-slate-400" />
                   {SUPPORT_PHONE}
                 </a>
                 <a
                   href={`mailto:${SUPPORT_EMAIL}`}
-                  className="rounded-lg border border-teal-200 bg-white p-4 text-sm font-bold text-slate-950 hover:border-teal-400 dark:border-teal-800 dark:bg-slate-950 dark:text-white transition-all duration-200 hover:shadow-md hover:-translate-y-0.5"
+                  className="rounded-xl border border-slate-800 bg-slate-900/50 p-5 text-sm font-bold text-white hover:bg-slate-800 transition-all flex flex-col items-center text-center"
                 >
-                  <Mail className="mb-3 h-5 w-5 text-teal-600 dark:text-teal-400" />
+                  <Mail className="mb-4 h-6 w-6 text-slate-400" />
                   {SUPPORT_EMAIL}
                 </a>
               </div>
@@ -638,10 +580,10 @@ export function LandingPage() {
           <div className="mx-auto max-w-4xl px-4 sm:px-6 lg:px-8">
             <SectionHeading title={t("lookup.title")} subtitle={t("lookup.subtitle")} />
 
-            <Card className="mt-10 overflow-hidden border border-slate-200/80 bg-white/70 backdrop-blur-md shadow-lg dark:border-cyan-900/40 dark:bg-slate-900/60 dark:shadow-[0_0_30px_rgba(8,145,178,0.1)] rounded-2xl">
-              <CardContent className="p-6 sm:p-8">
-                <div className="flex justify-center border-b border-slate-100 dark:border-slate-800 pb-4 mb-6">
-                  <div className="flex gap-2 p-1 bg-slate-100 dark:bg-slate-800/50 rounded-lg">
+            <div className="mt-16 overflow-hidden border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900 rounded-xl shadow-sm">
+              <div className="p-8 sm:p-12">
+                <div className="flex justify-center border-b border-slate-200 dark:border-slate-800 pb-8 mb-8">
+                  <div className="flex gap-2 p-1 bg-slate-100 dark:bg-slate-800 rounded-lg">
                     <button
                       type="button"
                       onClick={() => {
@@ -649,10 +591,10 @@ export function LandingPage() {
                         setResults(null);
                         setHasSearched(false);
                       }}
-                      className={`px-4 py-2 text-sm font-semibold rounded-md transition-all duration-200 ${
+                      className={`px-6 py-2.5 text-sm font-bold rounded-md transition-all duration-200 ${
                         lookupType === "username"
-                          ? "bg-gradient-to-r from-teal-600 to-cyan-600 text-white shadow"
-                          : "text-slate-600 dark:text-slate-300 hover:bg-slate-200/50 dark:hover:bg-slate-700/50"
+                          ? "bg-white dark:bg-slate-700 text-slate-950 dark:text-white shadow-sm"
+                          : "text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200"
                       }`}
                     >
                       {t("lookup.tabUsername")}
@@ -664,10 +606,10 @@ export function LandingPage() {
                         setResults(null);
                         setHasSearched(false);
                       }}
-                      className={`px-4 py-2 text-sm font-semibold rounded-md transition-all duration-200 ${
+                      className={`px-6 py-2.5 text-sm font-bold rounded-md transition-all duration-200 ${
                         lookupType === "personal"
-                          ? "bg-gradient-to-r from-teal-600 to-cyan-600 text-white shadow"
-                          : "text-slate-600 dark:text-slate-300 hover:bg-slate-200/50 dark:hover:bg-slate-700/50"
+                          ? "bg-white dark:bg-slate-700 text-slate-950 dark:text-white shadow-sm"
+                          : "text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200"
                       }`}
                     >
                       {t("lookup.tabPersonal")}
@@ -727,11 +669,11 @@ export function LandingPage() {
                     </div>
                   )}
 
-                  <div className="flex justify-end pt-2">
+                  <div className="flex justify-end pt-6">
                     <Button
                       type="submit"
                       disabled={isSearching}
-                      className="w-full sm:w-auto bg-gradient-to-r from-teal-600 to-cyan-600 hover:from-teal-700 hover:to-cyan-700 text-white rounded-lg transition-all duration-300 hover:shadow-lg hover:shadow-teal-500/25 border-0"
+                      className="w-full sm:w-auto bg-slate-950 hover:bg-slate-800 dark:bg-white dark:text-slate-950 dark:hover:bg-slate-200 text-white rounded-none px-8 py-6 text-xs font-bold uppercase tracking-widest transition-colors duration-300"
                     >
                       {isSearching ? t("lookup.searching") : t("lookup.btnSearch")}
                     </Button>
@@ -798,8 +740,8 @@ export function LandingPage() {
                     )}
                   </div>
                 )}
-              </CardContent>
-            </Card>
+              </div>
+            </div>
           </div>
         </section>
 
