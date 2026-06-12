@@ -301,7 +301,7 @@ export function LandingPage() {
             </Button>
             <Button
               asChild
-              className="hidden rounded-none bg-slate-950 px-6 text-white hover:bg-slate-800 dark:bg-white dark:text-slate-950 dark:hover:bg-slate-200 sm:inline-flex transition-colors text-xs font-bold uppercase tracking-widest"
+              className="hidden rounded-xl bg-gradient-to-r from-blue-600 to-cyan-500 px-6 text-white hover:from-blue-700 hover:to-cyan-600 shadow-md shadow-blue-500/20 sm:inline-flex transition-all duration-300 text-xs font-bold uppercase tracking-widest border-0"
             >
               <a href={REGISTRATION_URL} target="_blank" rel="noreferrer">
                 {t("hero.ctaRegister")}
@@ -317,50 +317,67 @@ export function LandingPage() {
       </header>
 
       <main>
-        <section className="relative overflow-hidden bg-slate-950 min-h-[85vh] flex items-center">
-          {/* Minimalist Background Image */}
-          <div className="absolute inset-0 z-0">
-            <img src="https://images.unsplash.com/photo-1522202176988-66273c2fd55f?auto=format&fit=crop&q=80&w=2000" alt="Students learning" className="h-full w-full object-cover opacity-60 dark:opacity-40" />
-            <div className="absolute inset-0 bg-slate-900/40 mix-blend-multiply" />
-            <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-900/20 to-slate-900/80" />
+        <section className="relative overflow-hidden bg-slate-50 min-h-[85vh] flex items-center dark:bg-slate-950 py-24 lg:py-0">
+          {/* Bright Tech Background */}
+          <div className="absolute inset-0 z-0 pointer-events-none">
+            <svg className="absolute h-full w-full" xmlns="http://www.w3.org/2000/svg">
+              <defs>
+                <pattern id="hero-dot-grid" width="30" height="30" patternUnits="userSpaceOnUse">
+                  <circle cx="2" cy="2" r="1.5" className="text-slate-300 dark:text-slate-800" fill="currentColor" />
+                </pattern>
+                <radialGradient id="hero-glow-blue" cx="30%" cy="50%" r="50%">
+                  <stop offset="0%" stopColor="rgba(59, 130, 246, 0.15)" />
+                  <stop offset="100%" stopColor="rgba(59, 130, 246, 0)" />
+                </radialGradient>
+                <radialGradient id="hero-glow-cyan" cx="80%" cy="20%" r="40%">
+                  <stop offset="0%" stopColor="rgba(6, 182, 212, 0.15)" />
+                  <stop offset="100%" stopColor="rgba(6, 182, 212, 0)" />
+                </radialGradient>
+              </defs>
+              <rect width="100%" height="100%" fill="url(#hero-dot-grid)" />
+              <rect width="100%" height="100%" fill="url(#hero-glow-blue)" />
+              <rect width="100%" height="100%" fill="url(#hero-glow-cyan)" />
+            </svg>
           </div>
 
-          <div className="relative z-10 mx-auto w-full max-w-5xl px-4 py-24 sm:px-6 lg:px-8 flex flex-col items-center text-center">
-            <div className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 backdrop-blur-md px-4 py-1.5 text-[10px] font-bold uppercase tracking-[0.2em] text-white shadow-sm mb-8">
-              <Sparkles className="h-3 w-3" />
-              {t("hero.badge")}
-            </div>
-            
-            <h1 className="max-w-4xl text-5xl font-extrabold tracking-tight text-white sm:text-6xl lg:text-7xl">
-              {t("hero.title")}
-            </h1>
-            
-            <p className="mt-8 max-w-2xl text-lg leading-relaxed text-slate-300 sm:text-xl font-light">
-              {t("hero.subtitle")}
-            </p>
+          <div className="relative z-10 mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8 flex flex-col lg:flex-row items-center gap-12 lg:gap-8">
+            <div className="flex-1 text-center lg:text-left mt-8 lg:mt-0">
+              <div className="inline-flex items-center gap-2 rounded-full border border-blue-200 bg-white/80 backdrop-blur-md px-4 py-1.5 text-xs font-bold uppercase tracking-widest text-blue-700 shadow-sm mb-8 dark:border-blue-900/50 dark:bg-blue-900/20 dark:text-blue-400">
+                <Sparkles className="h-3.5 w-3.5" />
+                {t("hero.badge")}
+              </div>
+              
+              <h1 className="text-5xl font-extrabold tracking-tight text-slate-950 sm:text-6xl lg:text-[4.5rem] dark:text-white leading-[1.1] max-w-3xl mx-auto lg:mx-0">
+                {t("hero.title")}
+              </h1>
+              
+              <p className="mt-6 text-lg leading-relaxed text-slate-600 sm:text-xl font-medium max-w-2xl mx-auto lg:mx-0 dark:text-slate-300">
+                {t("hero.subtitle")}
+              </p>
 
-            <div className="mt-12 flex flex-col gap-4 sm:flex-row justify-center w-full sm:w-auto">
-              <Button asChild size="lg" className="rounded-none bg-white px-10 text-slate-950 hover:bg-slate-200 transition-colors duration-300 text-xs font-bold uppercase tracking-widest h-14 w-full sm:w-auto">
-                <a href={REGISTRATION_URL} target="_blank" rel="noreferrer">
-                  {t("hero.ctaRegister")}
-                </a>
-              </Button>
-              <Button
-                size="lg"
-                variant="outline"
-                className="rounded-none border border-white/30 bg-white/5 backdrop-blur-sm px-10 text-white hover:bg-white/10 hover:border-white/50 transition-all duration-300 text-xs font-bold uppercase tracking-widest h-14 w-full sm:w-auto"
-                onClick={() => scrollToId("competitions")}
-              >
-                {t("hero.ctaExplore")}
-              </Button>
+              <div className="mt-10 flex flex-col gap-4 sm:flex-row justify-center lg:justify-start">
+                <Button asChild size="lg" className="rounded-xl bg-gradient-to-r from-blue-600 to-cyan-500 px-8 text-white hover:from-blue-700 hover:to-cyan-600 shadow-lg shadow-blue-500/25 transition-all duration-300 text-sm font-bold uppercase tracking-widest h-14 border-0 w-full sm:w-auto">
+                  <a href={REGISTRATION_URL} target="_blank" rel="noreferrer">
+                    {t("hero.ctaRegister")}
+                  </a>
+                </Button>
+                <Button
+                  size="lg"
+                  variant="outline"
+                  className="rounded-xl border border-slate-300 bg-white/60 backdrop-blur-sm px-8 text-slate-700 hover:bg-slate-100 transition-all duration-300 text-sm font-bold uppercase tracking-widest h-14 dark:border-slate-700 dark:bg-slate-900/50 dark:text-slate-200 dark:hover:bg-slate-800 w-full sm:w-auto"
+                  onClick={() => scrollToId("competitions")}
+                >
+                  {t("hero.ctaExplore")}
+                </Button>
+              </div>
             </div>
-            
-            <div className="mt-20 grid grid-cols-2 md:grid-cols-4 gap-8 md:gap-16 items-center opacity-70 grayscale contrast-200 brightness-200">
-              {partnerItems.map((partner) => (
-                <div key={partner.key} className="flex items-center justify-center">
-                  <img src={partner.logo} alt={partner.initials} className="h-10 w-auto object-contain" />
-                </div>
-              ))}
+
+            <div className="flex-1 w-full max-w-lg lg:max-w-none relative">
+              <div className="absolute -inset-4 bg-gradient-to-r from-blue-500 to-cyan-400 rounded-3xl opacity-20 blur-2xl animate-pulse dark:opacity-30"></div>
+              <div className="relative rounded-2xl overflow-hidden border border-white/40 shadow-2xl bg-white dark:border-slate-800 dark:bg-slate-900 aspect-[4/3] sm:aspect-[16/10] lg:aspect-[4/3]">
+                <img src="https://images.unsplash.com/photo-1522202176988-66273c2fd55f?auto=format&fit=crop&q=80&w=1200" alt="Students learning" className="w-full h-full object-cover" />
+                <div className="absolute inset-0 bg-gradient-to-t from-slate-900/40 to-transparent"></div>
+              </div>
             </div>
           </div>
         </section>
@@ -418,27 +435,42 @@ export function LandingPage() {
           </div>
         </section>
 
-        <section className="bg-slate-50 py-16 dark:bg-slate-900/40">
-          <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+        <section className="bg-slate-50 py-24 dark:bg-slate-900/40 relative">
+          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full h-full max-w-3xl bg-blue-500/10 blur-[100px] rounded-full pointer-events-none dark:bg-blue-500/5"></div>
+          <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 relative z-10">
             <SectionHeading title={t("categories.title")} subtitle={t("categories.subtitle")} />
-            <div className="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            <div className="mt-16 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
               {categoryItems.map((category) => {
                 const Icon = category.icon;
 
                 return (
-                  <Card key={category.key} className={`rounded-lg border ${category.tone.border} bg-white dark:border-slate-800 dark:bg-slate-950`}>
-                    <CardContent className="p-5">
-                      <div className={`flex h-10 w-10 items-center justify-center rounded-lg ${category.tone.icon}`}>
-                        <Icon className="h-5 w-5" />
+                  <div key={category.key} className="group relative overflow-hidden rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm hover:shadow-2xl hover:shadow-blue-500/10 transition-all duration-500 hover:-translate-y-1">
+                    <div className="aspect-[16/9] w-full overflow-hidden bg-slate-100 dark:bg-slate-800 relative">
+                      {category.image && (
+                        <>
+                          <img src={category.image} alt={category.key} className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-110" />
+                          <div className="absolute inset-0 bg-gradient-to-t from-blue-900/60 via-blue-900/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+                        </>
+                      )}
+                      <div className="absolute bottom-4 right-4 flex h-12 w-12 items-center justify-center rounded-xl bg-white/90 backdrop-blur-md shadow-lg text-blue-600 dark:bg-slate-900/90 dark:text-cyan-400 translate-y-8 opacity-0 group-hover:translate-y-0 group-hover:opacity-100 transition-all duration-500 delay-100">
+                        <Icon className="h-6 w-6" />
                       </div>
-                      <h3 className="mt-4 text-lg font-bold text-slate-950 dark:text-white">
-                        {t(`categories.${category.key}.title`)}
-                      </h3>
-                      <p className="mt-2 text-sm leading-6 text-slate-600 dark:text-slate-300">
+                    </div>
+                    <div className="p-6">
+                      <div className="flex items-center gap-3 mb-3">
+                        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-50 text-blue-600 dark:bg-blue-900/30 dark:text-cyan-400 group-hover:bg-gradient-to-br group-hover:from-blue-600 group-hover:to-cyan-500 group-hover:text-white transition-colors duration-500">
+                          <Icon className="h-4 w-4" />
+                        </div>
+                        <h3 className="text-xl font-bold text-slate-900 dark:text-white">
+                          {t(`categories.${category.key}.title`)}
+                        </h3>
+                      </div>
+                      <p className="text-sm leading-relaxed text-slate-600 dark:text-slate-400">
                         {t(`categories.${category.key}.desc`)}
                       </p>
-                    </CardContent>
-                  </Card>
+                    </div>
+                    <div className="absolute inset-0 rounded-2xl border-2 border-transparent group-hover:border-blue-500/30 dark:group-hover:border-cyan-400/30 pointer-events-none transition-colors duration-500"></div>
+                  </div>
                 );
               })}
             </div>
@@ -503,14 +535,15 @@ export function LandingPage() {
         <section id="journey" className="border-y border-slate-200 bg-white py-24 dark:border-slate-800 dark:bg-slate-950">
           <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
             <SectionHeading title={t("journey.title")} subtitle={t("journey.subtitle")} />
-            <div className="mt-16 grid gap-8 md:grid-cols-5">
+            <div className="mt-16 grid gap-8 md:grid-cols-5 relative">
+              <div className="absolute top-12 left-8 right-8 h-1 bg-gradient-to-r from-blue-100 via-blue-200 to-cyan-100 hidden md:block rounded-full dark:from-slate-800 dark:via-blue-900/50 dark:to-slate-800"></div>
               {journeyKeys.map((key, index) => (
-                <div key={key} className="group relative pt-8">
-                  <div className="absolute top-0 left-0 text-7xl font-black text-slate-50 dark:text-slate-900 transition-colors group-hover:text-slate-100 dark:group-hover:text-slate-800/80 -z-10 select-none">
-                    0{index + 1}
+                <div key={key} className="group relative pt-8 md:pt-0">
+                  <div className="md:absolute md:top-8 md:left-1/2 md:-translate-x-1/2 flex h-10 w-10 items-center justify-center rounded-full bg-white border-4 border-slate-50 dark:bg-slate-900 dark:border-slate-950 text-slate-400 font-bold z-10 group-hover:border-blue-100 group-hover:text-blue-600 group-hover:shadow-[0_0_15px_rgba(59,130,246,0.3)] transition-all duration-300 dark:group-hover:border-blue-900/50 dark:group-hover:text-cyan-400">
+                    {index + 1}
                   </div>
-                  <div className="relative z-10 pl-4 border-l-2 border-slate-200 dark:border-slate-800 group-hover:border-slate-950 dark:group-hover:border-white transition-colors">
-                    <h3 className="text-lg font-bold text-slate-950 dark:text-white">{t(`journey.steps.${key}.title`)}</h3>
+                  <div className="md:pt-24 md:text-center text-left pl-12 md:pl-0 relative z-10">
+                    <h3 className="text-lg font-bold text-slate-950 dark:text-white group-hover:text-blue-600 dark:group-hover:text-cyan-400 transition-colors">{t(`journey.steps.${key}.title`)}</h3>
                     <p className="mt-3 text-sm leading-relaxed text-slate-600 dark:text-slate-400">{t(`journey.steps.${key}.desc`)}</p>
                   </div>
                 </div>
@@ -536,39 +569,42 @@ export function LandingPage() {
               </div>
             </div>
 
-            <div className="rounded-3xl bg-slate-950 p-8 sm:p-12 dark:bg-slate-900 flex flex-col justify-center">
-              <div className="flex items-center gap-4 mb-6">
-                <div className="flex h-14 w-14 items-center justify-center rounded-full bg-white text-slate-950">
+            <div className="rounded-3xl bg-gradient-to-br from-blue-600 to-cyan-500 p-8 sm:p-12 shadow-2xl shadow-blue-500/20 flex flex-col justify-center relative overflow-hidden">
+              <div className="absolute -right-20 -top-20 w-64 h-64 bg-white/10 rounded-full blur-3xl pointer-events-none"></div>
+              <div className="absolute -left-10 -bottom-10 w-40 h-40 bg-cyan-300/20 rounded-full blur-2xl pointer-events-none"></div>
+              
+              <div className="relative z-10 flex items-center gap-4 mb-6">
+                <div className="flex h-14 w-14 items-center justify-center rounded-full bg-white text-blue-600 shadow-lg">
                   <Users className="h-6 w-6" />
                 </div>
                 <div>
                   <h2 className="text-2xl font-bold text-white">{t("support.title")}</h2>
-                  <p className="mt-1 text-sm text-slate-400">{t("support.subtitle")}</p>
+                  <p className="mt-1 text-sm text-blue-100">{t("support.subtitle")}</p>
                 </div>
               </div>
               
-              <div className="mt-6 grid gap-4 sm:grid-cols-3">
+              <div className="relative z-10 mt-6 grid gap-4 sm:grid-cols-3">
                 <a
                   href={ZALO_URL}
                   target="_blank"
                   rel="noreferrer"
-                  className="rounded-xl border border-slate-800 bg-slate-900/50 p-5 text-sm font-bold text-white hover:bg-slate-800 transition-all flex flex-col items-center text-center group"
+                  className="rounded-xl bg-white/10 border border-white/20 p-5 text-sm font-bold text-white hover:bg-white hover:text-blue-600 shadow-sm backdrop-blur-sm transition-all flex flex-col items-center text-center group"
                 >
-                  <img src="/fermat-logo.png" className="mb-4 h-6 w-6 object-contain grayscale group-hover:grayscale-0 transition-all" alt="FermatTech" />
+                  <img src="/fermat-logo.png" className="mb-4 h-6 w-6 object-contain group-hover:brightness-100 transition-all" alt="FermatTech" />
                   {t("support.zalo")}
                 </a>
                 <a
                   href={`tel:${SUPPORT_PHONE.replace(/\s/g, "")}`}
-                  className="rounded-xl border border-slate-800 bg-slate-900/50 p-5 text-sm font-bold text-white hover:bg-slate-800 transition-all flex flex-col items-center text-center"
+                  className="rounded-xl bg-white/10 border border-white/20 p-5 text-sm font-bold text-white hover:bg-white hover:text-blue-600 shadow-sm backdrop-blur-sm transition-all flex flex-col items-center text-center group"
                 >
-                  <Phone className="mb-4 h-6 w-6 text-slate-400" />
+                  <Phone className="mb-4 h-6 w-6 text-white group-hover:text-blue-600" />
                   {SUPPORT_PHONE}
                 </a>
                 <a
                   href={`mailto:${SUPPORT_EMAIL}`}
-                  className="rounded-xl border border-slate-800 bg-slate-900/50 p-5 text-sm font-bold text-white hover:bg-slate-800 transition-all flex flex-col items-center text-center"
+                  className="rounded-xl bg-white/10 border border-white/20 p-5 text-sm font-bold text-white hover:bg-white hover:text-blue-600 shadow-sm backdrop-blur-sm transition-all flex flex-col items-center text-center group"
                 >
-                  <Mail className="mb-4 h-6 w-6 text-slate-400" />
+                  <Mail className="mb-4 h-6 w-6 text-white group-hover:text-blue-600" />
                   {SUPPORT_EMAIL}
                 </a>
               </div>
@@ -576,14 +612,17 @@ export function LandingPage() {
           </div>
         </section>
 
-        <section id="result-lookup" className="border-t border-slate-200 py-16 dark:border-slate-800 bg-white dark:bg-slate-950">
-          <div className="mx-auto max-w-4xl px-4 sm:px-6 lg:px-8">
+        <section id="result-lookup" className="relative border-t border-slate-200 py-24 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 overflow-hidden">
+          <div className="absolute top-0 right-0 -translate-y-1/2 translate-x-1/3 w-[800px] h-[800px] bg-cyan-400/10 rounded-full blur-[120px] pointer-events-none"></div>
+          <div className="absolute bottom-0 left-0 translate-y-1/3 -translate-x-1/3 w-[600px] h-[600px] bg-blue-500/10 rounded-full blur-[100px] pointer-events-none"></div>
+          <div className="mx-auto max-w-4xl px-4 sm:px-6 lg:px-8 relative z-10">
             <SectionHeading title={t("lookup.title")} subtitle={t("lookup.subtitle")} />
 
-            <div className="mt-16 overflow-hidden border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900 rounded-xl shadow-sm">
-              <div className="p-8 sm:p-12">
+            <div className="mt-16 overflow-hidden border border-white/60 bg-white/80 backdrop-blur-xl dark:border-slate-800/80 dark:bg-slate-900/80 rounded-3xl shadow-xl shadow-blue-900/5">
+              <div className="p-8 sm:p-12 relative">
+                <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-blue-500 to-cyan-400"></div>
                 <div className="flex justify-center border-b border-slate-200 dark:border-slate-800 pb-8 mb-8">
-                  <div className="flex gap-2 p-1 bg-slate-100 dark:bg-slate-800 rounded-lg">
+                  <div className="flex gap-2 p-1.5 bg-slate-100/80 dark:bg-slate-800/80 rounded-xl">
                     <button
                       type="button"
                       onClick={() => {
@@ -591,10 +630,10 @@ export function LandingPage() {
                         setResults(null);
                         setHasSearched(false);
                       }}
-                      className={`px-6 py-2.5 text-sm font-bold rounded-md transition-all duration-200 ${
+                      className={`px-8 py-3 text-sm font-bold rounded-lg transition-all duration-300 ${
                         lookupType === "username"
-                          ? "bg-white dark:bg-slate-700 text-slate-950 dark:text-white shadow-sm"
-                          : "text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200"
+                          ? "bg-white dark:bg-slate-700 text-blue-600 dark:text-cyan-400 shadow-md"
+                          : "text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 hover:bg-slate-200/50 dark:hover:bg-slate-700/50"
                       }`}
                     >
                       {t("lookup.tabUsername")}
@@ -606,10 +645,10 @@ export function LandingPage() {
                         setResults(null);
                         setHasSearched(false);
                       }}
-                      className={`px-6 py-2.5 text-sm font-bold rounded-md transition-all duration-200 ${
+                      className={`px-8 py-3 text-sm font-bold rounded-lg transition-all duration-300 ${
                         lookupType === "personal"
-                          ? "bg-white dark:bg-slate-700 text-slate-950 dark:text-white shadow-sm"
-                          : "text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200"
+                          ? "bg-white dark:bg-slate-700 text-blue-600 dark:text-cyan-400 shadow-md"
+                          : "text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 hover:bg-slate-200/50 dark:hover:bg-slate-700/50"
                       }`}
                     >
                       {t("lookup.tabPersonal")}
@@ -673,7 +712,7 @@ export function LandingPage() {
                     <Button
                       type="submit"
                       disabled={isSearching}
-                      className="w-full sm:w-auto bg-slate-950 hover:bg-slate-800 dark:bg-white dark:text-slate-950 dark:hover:bg-slate-200 text-white rounded-none px-8 py-6 text-xs font-bold uppercase tracking-widest transition-colors duration-300"
+                      className="w-full sm:w-auto bg-gradient-to-r from-blue-600 to-cyan-500 hover:from-blue-700 hover:to-cyan-600 shadow-lg shadow-blue-500/25 text-white rounded-xl px-10 py-6 text-sm font-bold uppercase tracking-widest transition-all duration-300 border-0"
                     >
                       {isSearching ? t("lookup.searching") : t("lookup.btnSearch")}
                     </Button>
