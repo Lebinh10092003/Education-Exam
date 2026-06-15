@@ -115,12 +115,13 @@ class ProctorEvidenceCreateSerializer(serializers.Serializer):
 
 
 class MediaProviderTokenSerializer(serializers.Serializer):
-    provider = serializers.CharField()
-    server_url = serializers.CharField()
-    room_name = serializers.CharField()
-    participant_name = serializers.CharField()
-    access_token = serializers.CharField()
-    expires_at = serializers.CharField()
+    provider = serializers.CharField(required=False, allow_blank=True, default="")
+    server_url = serializers.CharField(required=False, allow_blank=True, default="")
+    room_name = serializers.CharField(required=False, allow_blank=True, default="")
+    participant_name = serializers.CharField(required=False, allow_blank=True, default="")
+    access_token = serializers.CharField(required=False, allow_blank=True, default="")
+    expires_at = serializers.CharField(required=False, allow_blank=True, default="")
+    vps_overloaded = serializers.BooleanField(required=False, default=False)
 
 
 class ProctoringMediaStateSerializer(serializers.ModelSerializer):

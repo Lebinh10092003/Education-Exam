@@ -513,7 +513,21 @@ def issue_candidate_publish_token(*, session, user):
                 en="Live webcam has not been requested for this session.",
             )
         )
+
+    from .system_resources import check_vps_overloaded
+    if check_vps_overloaded():
+        return {
+            "provider": "",
+            "server_url": "",
+            "room_name": "",
+            "participant_name": "",
+            "access_token": "",
+            "expires_at": "",
+            "vps_overloaded": True,
+        }
+
     payload = get_media_provider().build_publish_token(session=session, user=user)
+    payload["vps_overloaded"] = False
     update_media_status(
         session=session,
         provider=payload["provider"],

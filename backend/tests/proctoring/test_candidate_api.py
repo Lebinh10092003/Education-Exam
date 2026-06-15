@@ -219,3 +219,33 @@ def test_candidate_direct_upload_evidence_flow(api_client, subject, admin_user, 
     # Clean up file
     default_storage.delete(object_key)
 
+
+@pytest.mark.django_db
+def test_candidate_publish_token_overloaded_fallback(api_client, subject, admin_user, candidate_user, fake_redis, settings):
+    from apps.proctoring.runtime import mark_live_request
+
+    _, session = build_active_session(
+        subject=subject,
+        admin_user=admin_user,
+        candidate_user=candidate_user,
+    )
+    mark_live_request(session_id=session.id, enabled=True, payload={"requested_by": admin_user.id})
+    token = str(RefreshToken.for_user(candidate_user).access_token)
+    api_client.credentials(HTTP_AUTHORIZATION=f"Bearer {token}")
+
+    # Force resource overload
+    settings.PROCTORING_FORCE_RESOURCE_OVERLOAD = True
+
+    response = api_client.post(
+        f"/api/v1/proctoring/sessions/{session.id}/media/publish-token/",
+        {},
+        format="json",
+    )
+
+    assert response.status_code == 200
+    res_data = response.json()
+    assert res_data["vps_overloaded"] is True
+    assert res_data["access_token"] == ""
+    assert res_data["provider"] == ""
+
+

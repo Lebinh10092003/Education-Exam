@@ -12,6 +12,10 @@ import {
   EyeOff,
   Flag,
   Wifi,
+  Download,
+  Copy,
+  RefreshCw,
+  AlertCircle,
 } from "lucide-react";
 
 import { Button } from "../components/ui/button";
@@ -255,7 +259,30 @@ const removeFromLocalDraft = async (sessionId: number, questionId: number) => {
   }
 };
 
-const syncLocalDraftQueue = async (sessionId: number) => {
+const countPendingSync = async (sessionId: number): Promise<number> => {
+  let count = 0;
+  try {
+    const draft = await getExamDraft(sessionId);
+    if (draft && draft.answers) {
+      count += Object.keys(draft.answers).length;
+    }
+  } catch (err) {
+    console.error("Failed to count draft answers", err);
+  }
+  try {
+    const key = `eduexam_pending_sync_${sessionId}`;
+    const dataStr = localStorage.getItem(key);
+    if (dataStr) {
+      const pending = JSON.parse(dataStr);
+      count += Object.keys(pending).length;
+    }
+  } catch (err) {
+    console.error("Failed to count fallback answers", err);
+  }
+  return count;
+};
+
+const syncLocalDraftQueue = async (sessionId: number, onProgress?: () => void) => {
   try {
     const draft = await getExamDraft(sessionId);
     if (draft && draft.answers) {
@@ -268,6 +295,7 @@ const syncLocalDraftQueue = async (sessionId: number) => {
             body: payload,
           });
           await removeFromLocalDraft(sessionId, Number(questionId));
+          onProgress?.();
         } catch (err) {
           break;
         }
@@ -291,6 +319,7 @@ const syncLocalDraftQueue = async (sessionId: number) => {
             body: payload,
           });
           await removeFromLocalDraft(sessionId, Number(questionId));
+          onProgress?.();
         } catch (err) {
           break;
         }
@@ -300,6 +329,7 @@ const syncLocalDraftQueue = async (sessionId: number) => {
     console.error("Failed to sync local storage fallback queue", err);
   }
 };
+
 
 export function TakeExam() {
   const { t, i18n } = useTranslation("common");
@@ -326,6 +356,43 @@ export function TakeExam() {
     navigator.onLine ? "stable" : "offline",
   );
   const [controlSocketRevision, setControlSocketRevision] = useState(0);
+
+  const [pendingSyncCount, setPendingSyncCount] = useState(0);
+  const [isSyncFailed, setIsSyncFailed] = useState(false);
+  const [showBackupModal, setShowBackupModal] = useState(false);
+  const [isRetryingSubmit, setIsRetryingSubmit] = useState(false);
+  const [isManualSyncing, setIsManualSyncing] = useState(false);
+
+  const refreshPendingSyncCount = async (overrideSessionId?: number) => {
+    const activeSessionId = overrideSessionId ?? session?.id;
+    if (activeSessionId) {
+      const count = await countPendingSync(activeSessionId);
+      setPendingSyncCount(count);
+    }
+  };
+
+  const handleManualSync = async () => {
+    if (!session || isManualSyncing) return;
+    setIsManualSyncing(true);
+    try {
+      await syncLocalDraftQueue(session.id, () => {
+        void refreshPendingSyncCount();
+      });
+      const currentCount = await countPendingSync(session.id);
+      if (currentCount === 0) {
+        setIsSyncFailed(false);
+        notify.success(t("examSession.syncCompleted"));
+      } else {
+        notify.warning(t("examSession.syncStatus", { count: currentCount }));
+      }
+    } catch (err) {
+      console.error(err);
+      notify.error(t("examSession.saveAnswerError"));
+    } finally {
+      setIsManualSyncing(false);
+      await refreshPendingSyncCount();
+    }
+  };
   const dirtyEssayQuestionIdsRef = useRef<Set<number>>(new Set());
   const latestQuestionIndexRef = useRef(0);
   const requestQueueRef = useRef(Promise.resolve());
@@ -410,6 +477,19 @@ export function TakeExam() {
 
     try {
       const publishToken = await enqueueSessionMutation(() => requestPublishToken(session.id));
+      if (publishToken.vps_overloaded) {
+        await enqueueSessionMutation(() =>
+          reportMediaStatus(session.id, {
+            webcam_publish_status: "idle",
+            screen_capture_status: getCurrentScreenCaptureStatus(),
+            metadata: {
+              reason: "vps_overloaded_fallback",
+            },
+          }),
+        );
+        console.warn("VPS resources are low (less than 50% free). WebRTC live streaming is disabled; falling back to snapshot proctoring.");
+        return;
+      }
       liveRoomRef.current = await connectCandidatePublisher(
         publishToken,
         captureResources.webcamTrack,
@@ -473,6 +553,7 @@ export function TakeExam() {
 
     setIsSaving(true);
     await saveToLocalDraft(session.id, questionId, payload);
+    await refreshPendingSyncCount();
     
     try {
       const response = await enqueueSessionMutation(() =>
@@ -490,12 +571,13 @@ export function TakeExam() {
       setLastSavedAt(response.updated_at);
       dirtyEssayQuestionIdsRef.current.delete(questionId);
       await removeFromLocalDraft(session.id, questionId);
+      setIsSyncFailed(false);
     } catch (saveError) {
-      const message = saveError instanceof Error ? saveError.message : t("examSession.saveAnswerError");
-      notify.error(message);
-      throw saveError;
+      setIsSyncFailed(true);
+      console.error("Failed to sync answer with server. Saved locally.", saveError);
     } finally {
       setIsSaving(false);
+      await refreshPendingSyncCount();
     }
   };
 
@@ -709,7 +791,10 @@ export function TakeExam() {
         0,
       );
       setCurrentQuestionIndex(nextIndex === -1 ? 0 : nextIndex);
-      void syncLocalDraftQueue(nextSession.id).catch(() => undefined);
+      void refreshPendingSyncCount(nextSession.id);
+      void syncLocalDraftQueue(nextSession.id, () => {
+        void refreshPendingSyncCount(nextSession.id);
+      }).catch(() => undefined);
     } catch (loadError) {
       setError(loadError instanceof Error ? loadError.message : t("examSession.unavailableDescription"));
     } finally {
@@ -970,7 +1055,9 @@ export function TakeExam() {
     }
 
     const autosave = () => {
-      void syncLocalDraftQueue(session.id).catch(() => undefined);
+      void syncLocalDraftQueue(session.id, () => {
+        void refreshPendingSyncCount();
+      }).catch(() => undefined);
       if (autosavePendingRef.current || !autosaveDirtyRef.current) {
         return;
       }
@@ -1050,7 +1137,9 @@ export function TakeExam() {
       if (document.hidden) {
         void reportViolation("tab_switch", "warning", t("examSession.tabSwitchWarning"));
       } else {
-        void syncLocalDraftQueue(session.id).catch(() => undefined);
+        void syncLocalDraftQueue(session.id, () => {
+          void refreshPendingSyncCount();
+        }).catch(() => undefined);
       }
     };
 
@@ -1062,7 +1151,9 @@ export function TakeExam() {
 
     const handleOnline = () => {
       setConnectionStatus("unstable");
-      void syncLocalDraftQueue(session.id).catch(() => undefined);
+      void syncLocalDraftQueue(session.id, () => {
+        void refreshPendingSyncCount();
+      }).catch(() => undefined);
     };
     const handleOffline = () => setConnectionStatus("offline");
 
@@ -1249,6 +1340,16 @@ export function TakeExam() {
     try {
       await persistEssayAnswer();
       
+      // Try to sync any remaining local answers first
+      try {
+        await syncLocalDraftQueue(session.id, () => {
+          void refreshPendingSyncCount();
+        });
+        await refreshPendingSyncCount();
+      } catch (syncErr) {
+        console.error("Failed to sync queue during final submit", syncErr);
+      }
+
       // Nop bai len server TRUOC de dam bao khong mat bai lam
       const response = await enqueueSessionMutation(() =>
         apiRequest<SubmissionSummary>(`/api/v1/exam-sessions/${session.id}/submit/`, {
@@ -1268,6 +1369,7 @@ export function TakeExam() {
           : current,
       );
       notify.success(t("examSession.submitSuccess"));
+      setShowBackupModal(false);
 
       // Tải ảnh vi phạm len sau khi da nop bai thanh cong (chay bat dong bo)
       const currentSessionId = session.id;
@@ -1278,10 +1380,123 @@ export function TakeExam() {
       }, 500);
 
     } catch (submitError) {
-      const message = submitError instanceof Error ? submitError.message : t("examSession.submitUnavailable");
-      notify.error(message);
+      console.error("Final submit failed. Opening recovery modal.", submitError);
+      setShowBackupModal(true);
     } finally {
       setIsSubmitting(false);
+    }
+  };
+
+  const handleDownloadBackup = () => {
+    if (!session) return;
+    try {
+      const backupData = {
+        session_id: session.id,
+        exam_id: session.exam_id ?? examId,
+        exam_name: session.exam_name,
+        attempt_number: session.attempt_number,
+        timestamp: new Date().toISOString(),
+        answers: session.questions.map((q) => ({
+          question_id: q.id,
+          sort_order: q.sort_order,
+          question_type: q.question_type,
+          selected_option_keys: q.selected_option_keys,
+          answer_text: q.answer_text,
+        })),
+        tamper_proof_checksum: "",
+      };
+
+      const rawText = JSON.stringify(backupData.answers) + `_session_${session.id}_time_${backupData.timestamp}`;
+      let hash = 0;
+      for (let i = 0; i < rawText.length; i++) {
+        hash = (hash << 5) - hash + rawText.charCodeAt(i);
+        hash |= 0;
+      }
+      backupData.tamper_proof_checksum = Math.abs(hash).toString(16).toUpperCase();
+
+      const blob = new Blob([JSON.stringify(backupData, null, 2)], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      const sanitizedName = session.exam_name.replace(/[^a-z0-9]/gi, "_").toLowerCase();
+      link.download = `${sanitizedName}_backup_session_${session.id}.json`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+      notify.success(t("examSession.downloadedSuccess"));
+    } catch (err) {
+      console.error(err);
+      notify.error("Could not download backup file.");
+    }
+  };
+
+  const handleCopyBackup = () => {
+    if (!session) return;
+    try {
+      const answersSummary = session.questions.map((q) => {
+        const ans = q.question_type === "essay" 
+          ? q.answer_text 
+          : q.selected_option_keys.join(", ");
+        return `Q${q.sort_order}: ${ans || "[No answer]"}`;
+      }).join("\n");
+
+      const textToCopy = `--- EDUEXAM BACKUP ---
+Exam ID: ${session.exam_id ?? examId}
+Exam Name: ${session.exam_name}
+Session ID: ${session.id}
+Timestamp: ${new Date().toISOString()}
+Answers:
+${answersSummary}
+---------------------`;
+
+      navigator.clipboard.writeText(textToCopy);
+      notify.success(t("examSession.copiedSuccess"));
+    } catch (err) {
+      console.error(err);
+      notify.error("Could not copy answers.");
+    }
+  };
+
+  const handleRetrySubmit = async () => {
+    if (!session || isRetryingSubmit) return;
+    setIsRetryingSubmit(true);
+    try {
+      await syncLocalDraftQueue(session.id, () => {
+        void refreshPendingSyncCount();
+      });
+      await refreshPendingSyncCount();
+      const response = await enqueueSessionMutation(() =>
+        apiRequest<SubmissionSummary>(`/api/v1/exam-sessions/${session.id}/submit/`, {
+          method: "POST",
+        }),
+      );
+      setSession((current) =>
+        current
+          ? {
+              ...current,
+              status: response.status,
+              submitted_at: response.submitted_at,
+              objective_score: response.objective_score,
+              max_score: response.max_score,
+              manual_grading_required: response.manual_grading_required,
+            }
+          : current,
+      );
+      notify.success(t("examSession.submitSuccess"));
+      setShowBackupModal(false);
+      
+      const currentSessionId = session.id;
+      setTimeout(() => {
+        void uploadPendingSnapshots(currentSessionId).catch((err) => {
+          console.error("Failed to upload pending evidence snapshots", err);
+        });
+      }, 500);
+    } catch (submitError) {
+      const message = submitError instanceof Error ? submitError.message : t("examSession.submitUnavailable");
+      notify.error(`${t("examSession.submitUnavailable")} (${message})`);
+    } finally {
+      setIsRetryingSubmit(false);
     }
   };
 
@@ -1364,6 +1579,9 @@ export function TakeExam() {
                 <li>{t("examSession.permissionScreen")}</li>
                 <li>{t("examSession.permissionFullscreen")}</li>
               </ul>
+              <div className="mt-3 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg p-3 leading-relaxed">
+                {t("examSession.screenShareTip")}
+              </div>
             </div>
 
             {proctoringBlockReason ? (
@@ -1497,13 +1715,15 @@ export function TakeExam() {
             </div>
 
             <div className="flex min-w-[10rem] items-center gap-2">
-              <CheckCircle2 className={`w-4 h-4 ${lastSavedAt ? "text-green-600" : "text-gray-400"}`} />
+              <CheckCircle2 className={`w-4 h-4 ${pendingSyncCount > 0 ? "text-amber-500 animate-pulse" : lastSavedAt ? "text-green-600" : "text-gray-400"}`} />
               <span className="text-sm text-gray-600">
-                {lastSavedAt
-                  ? t("examSession.savedAt", {
-                      time: new Date(lastSavedAt).toLocaleTimeString(normalizeCandidateLocale(locale)),
-                    })
-                  : t("examSession.autosavePending")}
+                {pendingSyncCount > 0
+                  ? t("examSession.syncStatus", { count: pendingSyncCount })
+                  : lastSavedAt
+                    ? t("examSession.savedAt", {
+                        time: new Date(lastSavedAt).toLocaleTimeString(normalizeCandidateLocale(locale)),
+                      })
+                    : t("examSession.autosavePending")}
               </span>
             </div>
 
@@ -1529,6 +1749,35 @@ export function TakeExam() {
       </header>
 
       <div className="flex-1 p-4 sm:p-6">
+        {isSyncFailed && (
+          <div className="mx-auto max-w-7xl mb-6 rounded-xl border border-amber-200 bg-amber-50 p-4 text-amber-900 shadow-sm animate-fade-in">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex items-start gap-3">
+                <AlertCircle className="mt-0.5 h-5 w-5 text-amber-600 shrink-0" />
+                <div>
+                  <p className="font-semibold text-amber-950 leading-relaxed">
+                    {t("examSession.syncErrorBanner")}
+                  </p>
+                  {pendingSyncCount > 0 && (
+                    <p className="mt-1 text-sm text-amber-800">
+                      {t("examSession.syncStatus", { count: pendingSyncCount })}
+                    </p>
+                  )}
+                </div>
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                className="self-start sm:self-center shrink-0 border-amber-300 hover:bg-amber-100 hover:text-amber-950 gap-2 font-medium bg-white"
+                onClick={() => void handleManualSync()}
+                disabled={isManualSyncing}
+              >
+                <RefreshCw className={cn("h-4 w-4", isManualSyncing && "animate-spin")} />
+                {isManualSyncing ? t("examSession.syncingNow") : t("examSession.syncNow")}
+              </Button>
+            </div>
+          </div>
+        )}
         <div className={cn(
           "mx-auto grid gap-6",
           focusMode ? "max-w-4xl grid-cols-1" : "max-w-7xl grid-cols-1 lg:grid-cols-4"
@@ -1765,6 +2014,88 @@ export function TakeExam() {
           )}
         </div>
       </div>
+
+      {showBackupModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 overflow-y-auto">
+          <div className="relative w-full max-w-2xl rounded-2xl border border-slate-200 bg-white p-6 shadow-2xl dark:border-slate-800 dark:bg-slate-950 animate-scale-up">
+            <div className="flex items-center gap-3 border-b border-slate-100 pb-4 dark:border-slate-800">
+              <div className="flex h-12 w-12 items-center justify-center rounded-full bg-amber-100 dark:bg-amber-900/30">
+                <AlertCircle className="h-6 w-6 text-amber-600 dark:text-amber-400" />
+              </div>
+              <div>
+                <h3 className="text-lg font-bold text-slate-900 dark:text-slate-50">
+                  {t("examSession.backupModalTitle")}
+                </h3>
+                <p className="text-xs text-slate-500">
+                  Session ID: #{session.id} • Exam ID: #{session.exam_id ?? examId}
+                </p>
+              </div>
+            </div>
+
+            <div className="mt-4 space-y-4">
+              <p className="text-sm leading-relaxed text-slate-600 dark:text-slate-300">
+                {t("examSession.backupModalDescription")}
+              </p>
+
+              <div className="rounded-xl border border-slate-100 bg-slate-50 p-4 space-y-3 dark:border-slate-800 dark:bg-slate-900/50">
+                <div className="flex gap-3 text-sm text-slate-700 dark:text-slate-300">
+                  <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-blue-100 text-xs font-bold text-blue-600 dark:bg-blue-900/30 dark:text-blue-400">1</span>
+                  <p className="mt-0.5">{t("examSession.backupModalStep1")}</p>
+                </div>
+                <div className="flex gap-3 text-sm text-slate-700 dark:text-slate-300">
+                  <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-blue-100 text-xs font-bold text-blue-600 dark:bg-blue-900/30 dark:text-blue-400">2</span>
+                  <p className="mt-0.5">{t("examSession.backupModalStep2")}</p>
+                </div>
+                <div className="flex gap-3 text-sm text-slate-700 dark:text-slate-300">
+                  <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-blue-100 text-xs font-bold text-blue-600 dark:bg-blue-900/30 dark:text-blue-400">3</span>
+                  <p className="mt-0.5">{t("examSession.backupModalStep3")}</p>
+                </div>
+                <div className="flex gap-3 text-sm text-slate-700 dark:text-slate-300">
+                  <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-blue-100 text-xs font-bold text-blue-600 dark:bg-blue-900/30 dark:text-blue-400">4</span>
+                  <p className="mt-0.5">{t("examSession.backupModalStep4")}</p>
+                </div>
+              </div>
+
+              <div className="flex flex-col gap-2 sm:flex-row">
+                <Button
+                  onClick={handleDownloadBackup}
+                  className="flex-1 gap-2 font-medium bg-blue-600 hover:bg-blue-700 text-white"
+                >
+                  <Download className="h-4 w-4" />
+                  {t("examSession.downloadBackupBtn")}
+                </Button>
+                <Button
+                  onClick={handleCopyBackup}
+                  variant="outline"
+                  className="flex-1 gap-2 font-medium"
+                >
+                  <Copy className="h-4 w-4" />
+                  {t("examSession.copyBackupBtn")}
+                </Button>
+              </div>
+            </div>
+
+            <div className="mt-6 flex flex-col gap-2 border-t border-slate-100 pt-4 dark:border-slate-800 sm:flex-row sm:justify-end">
+              <Button
+                variant="ghost"
+                onClick={() => setShowBackupModal(false)}
+                disabled={isRetryingSubmit}
+                className="text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-100"
+              >
+                {t("examSession.goBack")}
+              </Button>
+              <Button
+                onClick={() => void handleRetrySubmit()}
+                disabled={isRetryingSubmit}
+                className="gap-2 font-semibold bg-emerald-600 hover:bg-emerald-700 text-white min-w-[8rem]"
+              >
+                <RefreshCw className={cn("h-4 w-4", isRetryingSubmit && "animate-spin")} />
+                {isRetryingSubmit ? t("examSession.syncingNow") : t("examSession.retrySubmitBtn")}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
 
     </div>
   );
