@@ -51,6 +51,18 @@ export function ExamInstructions() {
     workspace: false,
   });
 
+  const deviceType = useMemo(() => {
+    const ua = navigator.userAgent;
+    const isMobile = /mobile|iphone|ipod|android/i.test(ua);
+    const isMac = /macintosh|mac os x/i.test(ua) && !isMobile;
+    const isIPad = /ipad/i.test(ua) || (isMac && navigator.maxTouchPoints > 1);
+    
+    if (isMobile) return "mobile";
+    if (isIPad) return "tablet";
+    if (isMac) return "mac";
+    return "windows";
+  }, []);
+
   const [autoCheckState, setAutoCheckState] = useState<{
     status: "idle" | "running" | "pass" | "fail";
     indexedDb: "pending" | "running" | "pass" | "fail";
@@ -147,7 +159,14 @@ export function ExamInstructions() {
     let screenPass = true;
     if (exam.enable_proctoring) {
       try {
-        const stream = await navigator.mediaDevices.getDisplayMedia({ video: true });
+        const stream = await navigator.mediaDevices.getDisplayMedia({
+          video: {
+            displaySurface: "monitor",
+          },
+          audio: false,
+          selfBrowserSurface: "exclude",
+          systemAudio: "exclude",
+        } as any);
         const track = stream.getVideoTracks()[0];
         screenPass = !!track && track.readyState !== "ended";
         stream.getTracks().forEach((t) => t.stop());
@@ -353,6 +372,46 @@ export function ExamInstructions() {
               </div>
             </div>
 
+            {exam.enable_proctoring && (
+              <div className={`rounded-2xl border p-5 animate-fade-in ${
+                deviceType === "mobile" 
+                  ? "border-red-200 bg-red-50 text-red-900" 
+                  : deviceType === "mac" || deviceType === "tablet"
+                    ? "border-blue-200 bg-blue-50 text-blue-900"
+                    : "border-amber-200 bg-amber-50 text-amber-900"
+              }`}>
+                <div className="flex items-start gap-3">
+                  <AlertTriangle className={`mt-0.5 h-5 w-5 shrink-0 ${
+                    deviceType === "mobile" 
+                      ? "text-red-600" 
+                      : deviceType === "mac" || deviceType === "tablet"
+                        ? "text-blue-600"
+                        : "text-amber-600"
+                  }`} />
+                  <div className="space-y-1 text-sm">
+                    <p className="font-semibold">
+                      {deviceType === "mobile" 
+                        ? t("examInstructions.deviceNotices.mobileTitle")
+                        : deviceType === "mac"
+                          ? t("examInstructions.deviceNotices.macTitle")
+                          : deviceType === "tablet"
+                            ? t("examInstructions.deviceNotices.ipadTitle")
+                            : t("examInstructions.deviceNotices.windowsTitle")}
+                    </p>
+                    <p className="leading-relaxed text-xs opacity-90">
+                      {deviceType === "mobile" 
+                        ? t("examInstructions.deviceNotices.mobileDesc")
+                        : deviceType === "mac"
+                          ? t("examInstructions.deviceNotices.macDesc")
+                          : deviceType === "tablet"
+                            ? t("examInstructions.deviceNotices.ipadDesc")
+                            : t("examInstructions.deviceNotices.windowsDesc")}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+
             <div className="rounded-2xl border border-slate-200 bg-slate-50 p-5 space-y-4">
               <div className="flex items-center justify-between">
                 <h3 className="font-semibold text-slate-900">{t("examInstructions.systemCheckTitle", { defaultValue: "Automated System Check" })}</h3>
@@ -445,6 +504,11 @@ export function ExamInstructions() {
                   </>
                 )}
               </div>
+              {exam.enable_proctoring && (
+                <div className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-xl p-3 leading-relaxed">
+                  {t("examSession.screenShareTip")}
+                </div>
+              )}
             </div>
 
             <div className="space-y-3">

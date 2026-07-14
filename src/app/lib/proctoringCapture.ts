@@ -16,7 +16,14 @@ export async function requestProctoringStreams(): Promise<ProctoringCaptureResou
   }
 
   const webcamStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
-  const screenStream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: false });
+  const screenStream = await navigator.mediaDevices.getDisplayMedia({
+    video: {
+      displaySurface: "monitor",
+    },
+    audio: false,
+    selfBrowserSurface: "exclude",
+    systemAudio: "exclude",
+  } as any);
   const webcamTrack = webcamStream.getVideoTracks()[0];
   const microphoneTrack = webcamStream.getAudioTracks()[0] ?? null;
   const screenTrack = screenStream.getVideoTracks()[0];

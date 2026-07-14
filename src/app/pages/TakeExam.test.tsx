@@ -353,6 +353,77 @@ describe("TakeExam", () => {
     expect(mockConnectCandidatePublisher).toHaveBeenCalledTimes(1);
   });
 
+  it("does not publish webcam when VPS is overloaded, falling back to local snapshots", async () => {
+    const user = userEvent.setup();
+
+    renderTakeExam();
+
+    await user.click(await screen.findByRole("button", { name: /start monitoring/i }));
+
+    await waitFor(() => {
+      expect(mockApiRequest).toHaveBeenCalledWith(
+        "/api/v1/proctoring/sessions/77/media/status/",
+        expect.objectContaining({ method: "POST" }),
+      );
+    });
+    expect(websocketInstances).toHaveLength(1);
+
+    // Mock publish-token endpoint returning overloaded
+    mockApiRequest.mockImplementationOnce(async (path: string, options?: { method?: string }) => {
+      if (path === "/api/v1/proctoring/sessions/77/media/publish-token/" && options?.method === "POST") {
+        return {
+          vps_overloaded: true,
+          provider: "",
+          server_url: "",
+          room_name: "",
+          participant_name: "",
+          access_token: "",
+          expires_at: "",
+        };
+      }
+      return { status: "success" };
+    });
+
+    // Reset calls to connect candidate publisher
+    mockConnectCandidatePublisher.mockClear();
+
+    await act(async () => {
+      websocketInstances[0].onmessage?.({
+        data: JSON.stringify({
+          type: "live_request",
+          payload: { enabled: true },
+        }),
+      });
+      await Promise.resolve();
+    });
+
+    await waitFor(() => {
+      expect(mockApiRequest).toHaveBeenCalledWith(
+        "/api/v1/proctoring/sessions/77/media/publish-token/",
+        expect.objectContaining({ method: "POST" }),
+      );
+    });
+
+    // Ensure we did NOT connect to the publisher
+    expect(mockConnectCandidatePublisher).not.toHaveBeenCalled();
+
+    // Verify it reports status with overloaded reason metadata
+    await waitFor(() => {
+      expect(mockApiRequest).toHaveBeenCalledWith(
+        "/api/v1/proctoring/sessions/77/media/status/",
+        expect.objectContaining({
+          method: "POST",
+          body: expect.objectContaining({
+            webcam_publish_status: "idle",
+            metadata: expect.objectContaining({
+              reason: "vps_overloaded_fallback",
+            }),
+          }),
+        }),
+      );
+    });
+  });
+
   it("keeps the exam locked until fullscreen is restored after permissions are granted", async () => {
     const user = userEvent.setup();
     mockRequestFullscreen
@@ -459,5 +530,70 @@ describe("TakeExam", () => {
         expect.objectContaining({ method: "POST" }),
       );
     });
+  });
+
+  it("displays a warning banner when save answer fails", async () => {
+    const user = userEvent.setup();
+    mockApiRequest.mockImplementation(async (path: string, options?: { method?: string; body?: unknown }) => {
+      if (path === "/api/v1/exams/1/start-session/" && options?.method === "POST") {
+        return sessionPayload;
+      }
+      if (path === "/api/v1/proctoring/sessions/77/capability/" && options?.method === "POST") {
+        return { id: 1 };
+      }
+      if (path === "/api/v1/proctoring/sessions/77/media/status/" && options?.method === "POST") {
+        return { webcam_publish_status: "idle", screen_capture_status: "ready" };
+      }
+      if (path === "/api/v1/exam-sessions/77/answers/301/" && options?.method === "PUT") {
+        throw new Error("503 Service Unavailable");
+      }
+      throw new Error(`Unhandled apiRequest path: ${path}`);
+    });
+
+    renderTakeExam();
+
+    await user.click(await screen.findByRole("button", { name: /start monitoring/i }));
+    await user.click(screen.getByLabelText(/2/i));
+
+    await waitFor(() => {
+      expect(screen.getByText(/server connection interrupted/i)).toBeInTheDocument();
+    });
+  });
+
+  it("opens the backup modal when exam submission fails and allows copying/downloading backup answers", async () => {
+    const user = userEvent.setup();
+    Object.defineProperty(navigator, "clipboard", {
+      value: {
+        writeText: vi.fn().mockResolvedValue(undefined),
+      },
+      configurable: true,
+    });
+    mockApiRequest.mockImplementation(async (path: string, options?: { method?: string; body?: unknown }) => {
+      if (path === "/api/v1/exams/1/start-session/" && options?.method === "POST") {
+        return sessionPayload;
+      }
+      if (path === "/api/v1/proctoring/sessions/77/capability/" && options?.method === "POST") {
+        return { id: 1 };
+      }
+      if (path === "/api/v1/proctoring/sessions/77/media/status/" && options?.method === "POST") {
+        return { webcam_publish_status: "idle", screen_capture_status: "ready" };
+      }
+      if (path === "/api/v1/exam-sessions/77/submit/" && options?.method === "POST") {
+        throw new Error("500 Internal Server Error");
+      }
+      throw new Error(`Unhandled apiRequest path: ${path}`);
+    });
+
+    renderTakeExam();
+
+    await user.click(await screen.findByRole("button", { name: /start monitoring/i }));
+    await user.click(screen.getByRole("button", { name: /submit exam/i }));
+
+    expect(await screen.findByText(/unable to submit exam to server/i)).toBeInTheDocument();
+    expect(screen.getByText(/download the backup exam file/i)).toBeInTheDocument();
+
+    const copyBtn = screen.getByRole("button", { name: /copy backup code/i });
+    await user.click(copyBtn);
+    expect(mockNotifySuccess).toHaveBeenCalledWith("Backup code copied to clipboard!");
   });
 });

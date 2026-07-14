@@ -130,7 +130,6 @@ def _normalize_school_name_key(value):
         return f"college {normalized[len('cao dang '):].strip()}"
     if normalized.startswith("cd "):
         return f"college {normalized[len('cd '):].strip()}"
-
     return normalized
 
 

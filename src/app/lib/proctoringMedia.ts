@@ -10,6 +10,7 @@ export interface MediaTokenPayload {
   participant_name: string;
   access_token: string;
   expires_at: string;
+  vps_overloaded?: boolean;
 }
 
 export interface MediaStatusPayload {
