@@ -1786,11 +1786,8 @@ ${answersSummary}
             </div>
           </div>
         )}
-        <div className={cn(
-          "mx-auto grid gap-6",
-          focusMode ? "max-w-4xl grid-cols-1" : "max-w-7xl grid-cols-1 lg:grid-cols-4"
-        )}>
-          <div className={focusMode ? "lg:col-span-1" : "lg:col-span-3"}>
+        <div className="mx-auto grid gap-6 max-w-7xl grid-cols-1 lg:grid-cols-4">
+          <div className="lg:col-span-3">
             {latestViolationNotice ? (
               <div
                 className={`mb-4 rounded-xl border px-4 py-4 text-sm ${

@@ -407,6 +407,8 @@ def record_proctor_event(*, session, event_type, severity="info", metadata=None,
                 "audience": "candidate",
             },
         }
+        create_notifications_for_permission(**admin_notification_kwargs)
+        create_notification(**candidate_notification_kwargs)
 
     def publish_event_side_effects():
         _broadcast_exam_monitoring_update(

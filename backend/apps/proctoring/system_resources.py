@@ -12,18 +12,20 @@ def check_vps_overloaded() -> bool:
     - PROCTORING_SKIP_RESOURCE_CHECK: returns False (never overloaded)
     - PROCTORING_FORCE_RESOURCE_OVERLOAD: returns True (always overloaded)
     """
-    if getattr(settings, "PROCTORING_SKIP_RESOURCE_CHECK", False):
-        return False
-
     if getattr(settings, "PROCTORING_FORCE_RESOURCE_OVERLOAD", False):
         logger.info("System resource check: FORCED OVERLOAD by setting.")
         return True
+
+    if getattr(settings, "PROCTORING_SKIP_RESOURCE_CHECK", False):
+        return False
 
     try:
         import psutil
         cpu_usage = psutil.cpu_percent(interval=0.1)
         ram_usage = psutil.virtual_memory().percent
-        overloaded = cpu_usage > 50 or ram_usage > 50
+        cpu_threshold = getattr(settings, "PROCTORING_RESOURCE_CPU_THRESHOLD", 85.0)
+        ram_threshold = getattr(settings, "PROCTORING_RESOURCE_RAM_THRESHOLD", 90.0)
+        overloaded = cpu_usage > cpu_threshold or ram_usage > ram_threshold
         logger.info(
             f"System resource check (psutil): CPU={cpu_usage}%, RAM={ram_usage}%, overloaded={overloaded}"
         )
@@ -54,7 +56,9 @@ def check_vps_overloaded() -> bool:
                 )
                 ram_usage = ((mem_total - mem_free) / mem_total) * 100
 
-            overloaded = cpu_usage > 50 or ram_usage > 50
+            cpu_threshold = getattr(settings, "PROCTORING_RESOURCE_CPU_THRESHOLD", 85.0)
+            ram_threshold = getattr(settings, "PROCTORING_RESOURCE_RAM_THRESHOLD", 90.0)
+            overloaded = cpu_usage > cpu_threshold or ram_usage > ram_threshold
             logger.info(
                 f"System resource check (proc fallback): CPU={cpu_usage:.1f}%, RAM={ram_usage:.1f}%, overloaded={overloaded}"
             )
