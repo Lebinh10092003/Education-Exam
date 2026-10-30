@@ -28,11 +28,19 @@ from ..services import (
     grade_manual_task,
     grading_progress_by_question,
     publish_result,
+    lock_result,
+    publish_results_for_exam,
+    run_scheduled_publications,
+    schedule_result_publication,
+    unlock_result,
 )
 from .serializers import (
     ManualGradingTaskGradeSerializer,
     ManualGradingTaskSerializer,
+    ResultExamPublishSerializer,
+    ResultPublicationNoteSerializer,
     ResultReviewSerializer,
+    ResultSchedulePublicationSerializer,
     ResultSerializer,
     ResultSummarySerializer,
     PublicResultSerializer,
@@ -507,6 +515,7 @@ class ResultViewSet(
                 "session__exam",
                 "session__exam__subject",
                 "published_by",
+                "locked_by",
             )
             .order_by("-created_at")
         )
@@ -542,6 +551,11 @@ class ResultViewSet(
             "pass_count": finalized.filter(passed=True).count(),
             "fail_count": finalized.filter(passed=False).count(),
             "pending_count": pending,
+            "pending_grading_count": pending,
+            "reviewing_count": self.get_queryset().filter(publish_state=Result.PublishState.REVIEWING).count(),
+            "locked_count": self.get_queryset().filter(publish_state=Result.PublishState.LOCKED).count(),
+            "scheduled_count": self.get_queryset().filter(publish_state=Result.PublishState.SCHEDULED).count(),
+            "published_count": self.get_queryset().filter(publish_state=Result.PublishState.PUBLISHED).count(),
             "average_percentage": finalized.aggregate(avg=Avg("percentage"))["avg"] or Decimal("0.00"),
             "score_distribution": [
                 {"range": "0-40", "count": count_range(None, 40)},
@@ -566,10 +580,15 @@ class ResultViewSet(
         if not exam_id:
             return Response({"detail": "exam_id is required."}, status=status.HTTP_400_BAD_REQUEST)
 
-        results = Result.objects.select_related("session").filter(
-            session__exam_id=exam_id,
-            workflow_status=Result.WorkflowStatus.FINALIZED,
-            publish_state=Result.PublishState.DRAFT,
+        # Ket qua da cham xong co the o draft/reviewing/locked; bo qua ban da cong bo
+        # va ban da hen gio (de lich cong bo tu chay).
+        results = (
+            Result.objects.select_related("session")
+            .filter(
+                session__exam_id=exam_id,
+                workflow_status=Result.WorkflowStatus.FINALIZED,
+            )
+            .exclude(publish_state__in=[Result.PublishState.PUBLISHED, Result.PublishState.SCHEDULED])
         )
 
         count = 0
@@ -584,6 +603,76 @@ class ResultViewSet(
             {
                 "detail": f"Successfully published {count} finalized result(s).",
                 "published_count": count,
+            },
+            status=status.HTTP_200_OK,
+        )
+
+    @action(detail=True, methods=["post"])
+    def lock(self, request, pk=None):
+        result = self.get_object()
+        serializer = ResultPublicationNoteSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        result = lock_result(
+            result=result,
+            locked_by=request.user,
+            note=serializer.validated_data.get("note", ""),
+            request=request,
+        )
+        output = ResultSerializer(result)
+        return Response(output.data, status=status.HTTP_200_OK)
+
+    @action(detail=True, methods=["post"])
+    def unlock(self, request, pk=None):
+        result = self.get_object()
+        serializer = ResultPublicationNoteSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        result = unlock_result(
+            result=result,
+            unlocked_by=request.user,
+            note=serializer.validated_data.get("note", ""),
+            request=request,
+        )
+        output = ResultSerializer(result)
+        return Response(output.data, status=status.HTTP_200_OK)
+
+    @action(detail=True, methods=["post"], url_path="schedule-publication")
+    def schedule_publication(self, request, pk=None):
+        result = self.get_object()
+        serializer = ResultSchedulePublicationSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        result = schedule_result_publication(
+            result=result,
+            scheduled_by=request.user,
+            scheduled_publish_at=serializer.validated_data["scheduled_publish_at"],
+            note=serializer.validated_data.get("note", ""),
+            request=request,
+        )
+        output = ResultSerializer(result)
+        return Response(output.data, status=status.HTTP_200_OK)
+
+    @action(detail=False, methods=["post"], url_path="publish-exam")
+    def publish_exam(self, request):
+        serializer = ResultExamPublishSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        exam = get_object_or_404(Exam, pk=serializer.validated_data["exam"])
+        published_results = publish_results_for_exam(exam=exam, published_by=request.user, request=request)
+        output = ResultSerializer(published_results, many=True)
+        return Response(
+            {
+                "published_count": len(published_results),
+                "results": output.data,
+            },
+            status=status.HTTP_200_OK,
+        )
+
+    @action(detail=False, methods=["post"], url_path="run-scheduled-publications")
+    def run_scheduled(self, request):
+        published_results = run_scheduled_publications(actor=request.user, request=request)
+        output = ResultSerializer(published_results, many=True)
+        return Response(
+            {
+                "published_count": len(published_results),
+                "results": output.data,
             },
             status=status.HTTP_200_OK,
         )

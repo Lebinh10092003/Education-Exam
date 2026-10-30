@@ -5,6 +5,7 @@ from rest_framework import serializers
 
 from apps.exam_authoring.lifecycle import resolve_exam_phase
 from apps.exam_authoring.models import Exam
+from apps.grading.models import Result
 from apps.grading.api.serializers import ResultSerializer
 from apps.materials.api.serializers import MaterialSerializer
 from apps.platform_core.i18n import t
@@ -302,12 +303,57 @@ class CandidateDashboardStatsSerializer(serializers.Serializer):
     assigned_exam_count = serializers.IntegerField()
     upcoming_exam_count = serializers.IntegerField()
     published_result_count = serializers.IntegerField()
+    pending_result_count = serializers.IntegerField()
     average_percentage = serializers.DecimalField(max_digits=8, decimal_places=2)
     active_material_count = serializers.IntegerField()
+
+
+class CandidatePendingResultSerializer(serializers.ModelSerializer):
+    exam = serializers.SerializerMethodField()
+    submitted_at = serializers.DateTimeField(source="session.submitted_at", read_only=True)
+    status_label = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Result
+        fields = (
+            "id",
+            "workflow_status",
+            "publish_state",
+            "submitted_at",
+            "status_label",
+            "exam",
+        )
+
+    @extend_schema_field({
+        "type": "object",
+        "properties": {
+            "id": {"type": "integer"},
+            "name": {"type": "string"},
+            "subject_name": {"type": "string"},
+        },
+    })
+    def get_exam(self, obj):
+        exam = obj.session.exam
+        return {
+            "id": exam.id,
+            "name": exam.name,
+            "subject_name": exam.subject.name,
+        }
+
+    @extend_schema_field(OpenApiTypes.STR)
+    def get_status_label(self, obj):
+        if obj.workflow_status == Result.WorkflowStatus.PENDING_GRADING:
+            return "Pending grading"
+        if obj.publish_state == Result.PublishState.SCHEDULED:
+            return "Scheduled for publication"
+        if obj.publish_state == Result.PublishState.LOCKED:
+            return "Reviewed and locked"
+        return "Waiting for publication"
 
 
 class CandidateDashboardOverviewSerializer(serializers.Serializer):
     stats = CandidateDashboardStatsSerializer()
     upcoming_exams = CandidateAssignedExamSerializer(many=True)
     recent_results = ResultSerializer(many=True)
+    pending_results = CandidatePendingResultSerializer(many=True)
     recent_materials = MaterialSerializer(many=True)

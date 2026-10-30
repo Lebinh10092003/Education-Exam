@@ -88,6 +88,9 @@ def test_results_summary_returns_pass_fail_and_distribution_metrics(
     payload = response.json()
     assert payload["pass_count"] == 1
     assert payload["fail_count"] == 1
+    assert payload["pending_grading_count"] == 0
+    assert payload["reviewing_count"] == 2
+    assert payload["published_count"] == 0
     assert len(payload["score_distribution"]) == 4
 
 
@@ -100,6 +103,79 @@ def test_admin_can_publish_finalized_result(api_client, admin_token, subject, ad
 
     assert response.status_code == 200
     assert response.json()["publish_state"] == "published"
+
+
+@pytest.mark.django_db
+def test_admin_can_lock_schedule_and_unlock_result(api_client, admin_token, subject, admin_user, candidate_user):
+    result = _build_finalized_result(subject=subject, admin_user=admin_user, candidate_user=candidate_user)
+    api_client.credentials(HTTP_AUTHORIZATION=f"Bearer {admin_token}")
+
+    lock_response = api_client.post(
+        f"/api/v1/results/{result.id}/lock/",
+        {"note": "Reviewed by committee."},
+        format="json",
+    )
+
+    assert lock_response.status_code == 200
+    assert lock_response.json()["publish_state"] == "locked"
+    assert lock_response.json()["locked_by"]["email"] == admin_user.email
+
+    schedule_response = api_client.post(
+        f"/api/v1/results/{result.id}/schedule-publication/",
+        {
+            "scheduled_publish_at": (timezone.now() + timedelta(hours=1)).isoformat(),
+            "note": "Release after review window.",
+        },
+        format="json",
+    )
+
+    assert schedule_response.status_code == 200
+    assert schedule_response.json()["publish_state"] == "scheduled"
+    assert schedule_response.json()["scheduled_publish_at"] is not None
+
+    unlock_response = api_client.post(
+        f"/api/v1/results/{result.id}/unlock/",
+        {"note": "Needs another review."},
+        format="json",
+    )
+
+    assert unlock_response.status_code == 200
+    assert unlock_response.json()["publish_state"] == "reviewing"
+
+
+@pytest.mark.django_db
+def test_admin_can_bulk_publish_exam_results(api_client, admin_token, subject, admin_user, candidate_user):
+    result = _build_finalized_result(subject=subject, admin_user=admin_user, candidate_user=candidate_user)
+    api_client.credentials(HTTP_AUTHORIZATION=f"Bearer {admin_token}")
+
+    response = api_client.post("/api/v1/results/publish-exam/", {"exam": result.session.exam_id}, format="json")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["published_count"] == 1
+    assert payload["results"][0]["id"] == result.id
+    assert payload["results"][0]["publish_state"] == "published"
+
+
+@pytest.mark.django_db
+def test_admin_can_run_scheduled_publications(api_client, admin_token, subject, admin_user, candidate_user):
+    from apps.grading.models import Result
+    from apps.grading.services import lock_result
+
+    result = _build_finalized_result(subject=subject, admin_user=admin_user, candidate_user=candidate_user)
+    lock_result(result=result, locked_by=admin_user)
+    result.publish_state = Result.PublishState.SCHEDULED
+    result.scheduled_publish_at = timezone.now() - timedelta(minutes=1)
+    result.save(update_fields=["publish_state", "scheduled_publish_at", "updated_at"])
+    api_client.credentials(HTTP_AUTHORIZATION=f"Bearer {admin_token}")
+
+    response = api_client.post("/api/v1/results/run-scheduled-publications/", format="json")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["published_count"] == 1
+    assert payload["results"][0]["id"] == result.id
+    assert payload["results"][0]["publish_state"] == "published"
 
 
 @pytest.mark.django_db
@@ -288,7 +364,8 @@ def test_public_result_lookup_by_personal_info(api_client, subject, admin_user, 
 @pytest.mark.django_db
 def test_bulk_publish_results(api_client, admin_token, subject, admin_user, candidate_user):
     result = _build_finalized_result(subject=subject, admin_user=admin_user, candidate_user=candidate_user, publish=False)
-    assert result.publish_state == "draft"
+    # Quy trinh cong bo: ket qua da cham xong o trang thai "reviewing" cho toi khi cong bo.
+    assert result.publish_state in {"draft", "reviewing"}
 
     api_client.credentials(HTTP_AUTHORIZATION=f"Bearer {admin_token}")
     response = api_client.post(

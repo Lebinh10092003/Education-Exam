@@ -142,6 +142,7 @@ def test_grade_manual_task_updates_manual_score_and_finalizes_result_when_last_t
     assert task.status == "graded"
     assert float(session.result.manual_score) == 1.0
     assert session.result.workflow_status == "finalized"
+    assert session.result.publish_state == "reviewing"
 
 
 @pytest.mark.django_db
@@ -164,3 +165,157 @@ def test_publish_result_marks_result_as_published(subject, admin_user, candidate
 
     assert session.result.publish_state == "published"
     assert session.result.published_by_id == admin_user.id
+
+
+@pytest.mark.django_db
+def test_lock_schedule_and_publish_result_creates_one_candidate_notification(subject, admin_user, candidate_user):
+    from apps.exam_authoring.services import transition_exam_status
+    from apps.grading.services import grade_manual_task, lock_result, publish_result, schedule_result_publication
+    from apps.notifications.models import Notification
+
+    exam, session, _ = _build_submitted_session(
+        subject=subject,
+        admin_user=admin_user,
+        candidate_user=candidate_user,
+        include_essay=True,
+    )
+    task = session.manual_grading_tasks.first()
+    grade_manual_task(task=task, grader=admin_user, score_awarded="1.00")
+    transition_exam_status(exam=exam, next_status="closed", actor=admin_user)
+    session.result.refresh_from_db()
+
+    lock_result(result=session.result, locked_by=admin_user, note="Reviewed.")
+    session.result.refresh_from_db()
+    assert session.result.publish_state == "locked"
+    assert session.result.locked_by_id == admin_user.id
+
+    schedule_result_publication(
+        result=session.result,
+        scheduled_by=admin_user,
+        scheduled_publish_at=timezone.now() + timedelta(hours=1),
+        note="Release after review window.",
+    )
+    session.result.refresh_from_db()
+    assert session.result.publish_state == "scheduled"
+    assert session.result.scheduled_publish_at is not None
+
+    publish_result(result=session.result, published_by=admin_user)
+    publish_result(result=session.result, published_by=admin_user)
+    session.result.refresh_from_db()
+
+    assert session.result.publish_state == "published"
+    assert Notification.objects.filter(
+        recipient=candidate_user,
+        category=Notification.Category.RESULT,
+        metadata__result_id=session.result.id,
+    ).count() == 1
+
+
+@pytest.mark.django_db
+def test_publish_result_rejects_pending_grading_result(subject, admin_user, candidate_user):
+    from apps.exam_authoring.services import transition_exam_status
+    from apps.grading.services import publish_result
+    from rest_framework.exceptions import ValidationError
+
+    exam, session, _ = _build_submitted_session(
+        subject=subject,
+        admin_user=admin_user,
+        candidate_user=candidate_user,
+        include_essay=True,
+    )
+    transition_exam_status(exam=exam, next_status="closed", actor=admin_user)
+
+    with pytest.raises(ValidationError):
+        publish_result(result=session.result, published_by=admin_user)
+
+
+@pytest.mark.django_db
+def test_publish_results_for_exam_publishes_only_finalized_results(subject, admin_user, candidate_user, user):
+    from apps.exam_authoring.services import transition_exam_status
+    from apps.grading.services import grade_manual_task, publish_results_for_exam
+
+    exam, finalized_session, _ = _build_submitted_session(
+        subject=subject,
+        admin_user=admin_user,
+        candidate_user=candidate_user,
+        include_essay=True,
+    )
+    task = finalized_session.manual_grading_tasks.first()
+    grade_manual_task(task=task, grader=admin_user, score_awarded="1.00")
+
+    from apps.institutions.models import GroupMembership
+
+    group = exam.assignments.filter(group__isnull=False).first().group
+    GroupMembership.objects.create(group=group, user=user)
+    pending_session = None
+    from apps.exam_delivery.services import save_session_answer, start_or_resume_session, submit_session
+
+    pending_session = start_or_resume_session(exam=exam, candidate=user)
+    essay_session_question = pending_session.questions.filter(question_revision__question__question_type="essay").first()
+    save_session_answer(
+        session=pending_session,
+        session_question=essay_session_question,
+        answer_text="Still needs grading.",
+    )
+    submit_session(session=pending_session, submitted_by=user)
+
+    transition_exam_status(exam=exam, next_status="closed", actor=admin_user)
+    published = publish_results_for_exam(exam=exam, published_by=admin_user)
+    finalized_session.result.refresh_from_db()
+    pending_session.result.refresh_from_db()
+
+    assert [result.id for result in published] == [finalized_session.result.id]
+    assert finalized_session.result.publish_state == "published"
+    assert pending_session.result.publish_state == "draft"
+
+
+@pytest.mark.django_db
+def test_run_scheduled_publications_publishes_due_locked_results(subject, admin_user, candidate_user):
+    from apps.exam_authoring.services import transition_exam_status
+    from apps.grading.models import Result
+    from apps.grading.services import grade_manual_task, lock_result, run_scheduled_publications
+
+    exam, session, _ = _build_submitted_session(
+        subject=subject,
+        admin_user=admin_user,
+        candidate_user=candidate_user,
+        include_essay=True,
+    )
+    task = session.manual_grading_tasks.first()
+    grade_manual_task(task=task, grader=admin_user, score_awarded="1.00")
+    transition_exam_status(exam=exam, next_status="closed", actor=admin_user)
+    session.result.refresh_from_db()
+    lock_result(result=session.result, locked_by=admin_user)
+    session.result.publish_state = Result.PublishState.SCHEDULED
+    session.result.scheduled_publish_at = timezone.now() - timedelta(minutes=1)
+    session.result.save(update_fields=["publish_state", "scheduled_publish_at", "updated_at"])
+
+    published = run_scheduled_publications(actor=admin_user)
+    session.result.refresh_from_db()
+
+    assert [result.id for result in published] == [session.result.id]
+    assert session.result.publish_state == "published"
+
+
+@pytest.mark.django_db
+def test_manual_grading_after_closed_exam_auto_publishes_immediate_result(subject, admin_user, candidate_user):
+    from apps.exam_authoring.services import transition_exam_status
+    from apps.grading.services import grade_manual_task
+
+    exam, session, _ = _build_submitted_session(
+        subject=subject,
+        admin_user=admin_user,
+        candidate_user=candidate_user,
+        include_essay=True,
+        show_results_immediately=True,
+    )
+    transition_exam_status(exam=exam, next_status="closed", actor=admin_user)
+    session.result.refresh_from_db()
+    assert session.result.publish_state == "draft"
+
+    task = session.manual_grading_tasks.first()
+    grade_manual_task(task=task, grader=admin_user, score_awarded="1.00")
+    session.result.refresh_from_db()
+
+    assert session.result.workflow_status == "finalized"
+    assert session.result.publish_state == "published"

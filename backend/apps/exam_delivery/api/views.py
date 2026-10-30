@@ -101,6 +101,19 @@ class CandidateDashboardOverviewView(APIView):
             )
             .order_by("-published_at", "-created_at")
         )
+        pending_results = (
+            Result.objects.select_related(
+                "session",
+                "session__candidate",
+                "session__exam",
+                "session__exam__subject",
+            )
+            .filter(
+                session__candidate=request.user,
+            )
+            .exclude(publish_state=Result.PublishState.PUBLISHED)
+            .order_by("-session__submitted_at", "-created_at")
+        )
         active_materials = (
             Material.objects.select_related("subject", "uploaded_by")
             .filter(is_active=True, subject__in=accessible_subjects)
@@ -110,11 +123,13 @@ class CandidateDashboardOverviewView(APIView):
                 "assigned_exam_count": len(exams),
                 "upcoming_exam_count": len(upcoming_exams),
                 "published_result_count": published_results.count(),
+                "pending_result_count": pending_results.count(),
                 "average_percentage": published_results.aggregate(avg=Avg("percentage"))["avg"] or Decimal("0.00"),
                 "active_material_count": active_materials.count(),
             },
             "upcoming_exams": upcoming_exams[:5],
             "recent_results": list(published_results[:5]),
+            "pending_results": list(pending_results[:5]),
             "recent_materials": list(active_materials.order_by("-created_at", "title")[:6]),
         }
         serializer = CandidateDashboardOverviewSerializer(payload, context={"request": request})
