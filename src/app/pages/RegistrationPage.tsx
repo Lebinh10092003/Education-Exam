@@ -1,29 +1,58 @@
-import { useState } from "react";
-import { Link } from "react-router";
+import { useEffect, useState } from "react";
+import { Link, useSearchParams } from "react-router";
 import { useTranslation } from "react-i18next";
 import { ArrowLeft, CheckCircle, Sparkles } from "lucide-react";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import { Label } from "../components/ui/label";
-import { Checkbox } from "../components/ui/checkbox";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../components/ui/select";
+import { ApiError, apiRequest } from "../lib/http";
+import { fetchPublicCompetitions, formatIsoDate, type PublicCompetition } from "../lib/competitions";
 
-const EXAMS = [
-  { id: "imo", label: "IMO" },
-  { id: "ico", label: "ICO" },
-  { id: "sco-ieio", label: "SCO IEIO" },
-  { id: "sco-ifko", label: "SCO IFKO" },
-  { id: "sco-ieo", label: "SCO IEO" },
-  { id: "iso", label: "ISO" },
-];
+/** "02/11/2018" hoac "2/11/2018" -> "2018-11-02"; sai -> null. */
+export const parseBirthDate = (value: string): string | null => {
+  const match = /^\s*(\d{1,2})[/.-](\d{1,2})[/.-](\d{4})\s*$/.exec(value);
+  if (!match) return null;
+  const [day, month, year] = [Number(match[1]), Number(match[2]), Number(match[3])];
+  const date = new Date(year, month - 1, day);
+  if (date.getFullYear() !== year || date.getMonth() !== month - 1 || date.getDate() !== day || date >= new Date()) {
+    return null;
+  }
+  return `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+};
+
+const flattenApiErrors = (payload: unknown): string[] => {
+  if (!payload || typeof payload !== "object") return [];
+  return Object.values(payload as Record<string, unknown>).flatMap((value) =>
+    Array.isArray(value) ? value.map(String) : typeof value === "string" ? [value] : [],
+  );
+};
 
 export function RegistrationPage() {
   const { t } = useTranslation();
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Form State
-  const [selectedExams, setSelectedExams] = useState<string[]>([]);
+  // Danh sach cuoc thi dang mo dang ky (quan tri vien cap nhat tren he thong).
+  const [competitions, setCompetitions] = useState<PublicCompetition[] | null>(null);
+  const [submitError, setSubmitError] = useState<string | null>(null);
+  const [website, setWebsite] = useState(""); // o bay chong bot, nguoi that khong thay
+  const [selectedExams, setSelectedExams] = useState<number[]>([]);
+  const [searchParams] = useSearchParams();
+
+  useEffect(() => {
+    fetchPublicCompetitions({ all: true })
+      .then((items) => {
+        const open = items.filter((item) => item.accepts_registration);
+        setCompetitions(open);
+        // Bam "Dang ky" o trang chu -> chon san cuoc thi do.
+        const preselected = Number(searchParams.get("competition"));
+        if (open.some((item) => item.id === preselected)) {
+          setSelectedExams((prev) => (prev.includes(preselected) ? prev : [...prev, preselected]));
+        }
+      })
+      .catch(() => setCompetitions([]));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const [formData, setFormData] = useState({
     fullName: "",
     dob: "",
@@ -43,22 +72,59 @@ export function RegistrationPage() {
     setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
-  const handleExamToggle = (examId: string) => {
+  const handleExamToggle = (examId: number) => {
     setSelectedExams((prev) =>
       prev.includes(examId) ? prev.filter((id) => id !== examId) : [...prev, examId]
     );
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setSubmitError(null);
+    const dateOfBirth = parseBirthDate(formData.dob);
+    if (!dateOfBirth) {
+      setSubmitError("Ngày sinh chưa đúng định dạng ngày/tháng/năm, ví dụ 02/11/2012.");
+      return;
+    }
+    if (!formData.grade) {
+      setSubmitError("Vui lòng chọn khối thi.");
+      return;
+    }
     setIsSubmitting(true);
-    
-    // Simulate API call
-    setTimeout(() => {
-      console.log("Form Data Submitted:", { ...formData, exams: selectedExams });
-      setIsSubmitting(false);
+    try {
+      // Gui that ve he thong (truoc day chi gia lap va du lieu bi mat).
+      await apiRequest("/api/v1/public/competition-registrations/", {
+        method: "POST",
+        auth: false,
+        body: {
+          full_name: formData.fullName,
+          date_of_birth: dateOfBirth,
+          grade: formData.grade,
+          school: formData.school,
+          class_name: formData.className,
+          cccd: formData.cccd.trim(),
+          address: formData.address,
+          ward: formData.ward,
+          city: formData.city,
+          email: formData.email,
+          guardian_phone: formData.guardianPhone,
+          competition_ids: selectedExams,
+          website,
+        },
+      });
       setIsSubmitted(true);
-    }, 1500);
+    } catch (error) {
+      if (error instanceof ApiError && error.status === 429) {
+        setSubmitError("Bạn đã gửi quá nhiều lần, vui lòng thử lại sau ít phút.");
+      } else if (error instanceof ApiError) {
+        const details = flattenApiErrors(error.payload);
+        setSubmitError(details.length ? details.join(" ") : error.message);
+      } else {
+        setSubmitError("Không gửi được đăng ký. Vui lòng kiểm tra kết nối mạng và thử lại.");
+      }
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   if (isSubmitted) {
@@ -131,7 +197,7 @@ export function RegistrationPage() {
                   <Label htmlFor="cccd" className="text-slate-700 dark:text-slate-300 font-semibold">Số CCCD <span className="text-red-500">*</span></Label>
                   <Input id="cccd" name="cccd" value={formData.cccd} onChange={handleChange} required className="h-11 rounded-lg bg-slate-50 dark:bg-slate-900" placeholder="Gồm 12 chữ số..." />
                   <p className="text-xs text-slate-500 mt-1 italic">
-                    Thông tin CCCD chỉ được sử dụng cho mục đích xác minh nhân thân và cam kết bảo mật theo quy định.
+                    Thông tin CCCD chỉ được sử dụng cho mục đích xuất hóa đơn và xác minh danh tính, được bảo mật theo quy định.
                   </p>
                 </div>
               </div>
@@ -151,16 +217,24 @@ export function RegistrationPage() {
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="grade" className="text-slate-700 dark:text-slate-300 font-semibold">Khối thi <span className="text-red-500">*</span></Label>
-                    <Select onValueChange={(value) => setFormData(prev => ({ ...prev, grade: value }))} required>
-                      <SelectTrigger className="h-11 rounded-lg bg-slate-50 dark:bg-slate-900">
-                        <SelectValue placeholder="Chọn khối" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {Array.from({length: 12}).map((_, i) => (
-                          <SelectItem key={i} value={`Khoi ${i + 1}`}>Khối {i + 1}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    {/* O chon goc cua trinh duyet: tren dien thoai mo bo chon cua he dieu hanh, de thao tac hon. */}
+                    <select
+                      id="grade"
+                      name="grade"
+                      required
+                      value={formData.grade}
+                      onChange={(event) => setFormData((prev) => ({ ...prev, grade: event.target.value }))}
+                      className="h-11 w-full rounded-lg border border-input bg-slate-50 px-3 text-sm dark:bg-slate-900"
+                    >
+                      <option value="" disabled>
+                        Chọn khối
+                      </option>
+                      {Array.from({ length: 12 }).map((_, i) => (
+                        <option key={i} value={`Khối ${i + 1}`}>
+                          Khối {i + 1}
+                        </option>
+                      ))}
+                    </select>
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="className" className="text-slate-700 dark:text-slate-300 font-semibold">Lớp <span className="text-red-500">*</span></Label>
@@ -177,15 +251,44 @@ export function RegistrationPage() {
               <p className="text-sm text-slate-600 dark:text-slate-400 mb-4">
                 Nếu đăng ký 2/3 kỳ thi, vui lòng chọn các môn thi phù hợp.
               </p>
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-                {EXAMS.map((exam) => (
-                  <div key={exam.id} className="flex items-center space-x-3 bg-slate-50 dark:bg-slate-900 p-3 rounded-lg border border-slate-200 dark:border-slate-800 hover:border-blue-300 dark:hover:border-cyan-700 transition-colors cursor-pointer" onClick={() => handleExamToggle(exam.id)}>
-                    <Checkbox id={exam.id} checked={selectedExams.includes(exam.id)} onCheckedChange={() => handleExamToggle(exam.id)} />
-                    <Label htmlFor={exam.id} className="cursor-pointer font-medium select-none">{exam.label}</Label>
-                  </div>
-                ))}
-              </div>
-              {selectedExams.length === 0 && <p className="text-sm text-red-500">Vui lòng chọn ít nhất một kỳ thi.</p>}
+              {competitions === null ? (
+                <p className="text-sm text-slate-500">Đang tải danh sách kỳ thi...</p>
+              ) : competitions.length === 0 ? (
+                <p className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+                  Hiện chưa có kỳ thi nào mở đăng ký. Vui lòng quay lại sau hoặc liên hệ Ban tổ chức.
+                </p>
+              ) : (
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  {competitions.map((exam) => (
+                    // <label> bao ngoai: bam vao o tich hay vao chu deu chon dung 1 lan.
+                    <label
+                      key={exam.id}
+                      htmlFor={`competition-${exam.id}`}
+                      className="flex cursor-pointer items-start gap-3 rounded-lg border border-slate-200 bg-slate-50 p-3 transition-colors hover:border-blue-300 dark:border-slate-800 dark:bg-slate-900 dark:hover:border-cyan-700"
+                    >
+                      {/* O tich goc: Checkbox cua Radix trong <form> phat them 1 click an -> bi dao 2 lan. */}
+                      <input
+                        type="checkbox"
+                        id={`competition-${exam.id}`}
+                        className="mt-1 h-4 w-4 shrink-0 cursor-pointer accent-blue-600"
+                        checked={selectedExams.includes(exam.id)}
+                        onChange={() => handleExamToggle(exam.id)}
+                      />
+                      <span className="min-w-0">
+                        <span className="block font-semibold text-slate-900 dark:text-white">{exam.code}</span>
+                        <span className="block text-sm text-slate-600 dark:text-slate-400">{exam.name}</span>
+                        <span className="mt-1 block text-xs text-slate-500">
+                          Ngày thi {formatIsoDate(exam.exam_date)}
+                          {exam.registration_deadline ? ` · Hạn đăng ký ${formatIsoDate(exam.registration_deadline)}` : ""}
+                        </span>
+                      </span>
+                    </label>
+                  ))}
+                </div>
+              )}
+              {competitions && competitions.length > 0 && selectedExams.length === 0 ? (
+                <p className="text-sm text-red-500">Vui lòng chọn ít nhất một kỳ thi.</p>
+              ) : null}
             </div>
 
             <div className="space-y-6">
@@ -222,6 +325,21 @@ export function RegistrationPage() {
             </div>
 
             <div className="pt-6 border-t border-slate-100 dark:border-slate-800">
+              {submitError ? (
+                <p role="alert" className="mb-4 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+                  {submitError}
+                </p>
+              ) : null}
+              <input
+                type="text"
+                name="website"
+                tabIndex={-1}
+                autoComplete="off"
+                aria-hidden="true"
+                className="absolute -left-[9999px] h-0 w-0 opacity-0"
+                value={website}
+                onChange={(event) => setWebsite(event.target.value)}
+              />
               <Button 
                 type="submit" 
                 disabled={isSubmitting || selectedExams.length === 0}

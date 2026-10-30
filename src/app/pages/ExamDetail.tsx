@@ -27,6 +27,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "../components/ui/tabs"
 import { cn } from "../components/ui/utils";
 import { LiveMonitoring } from "./LiveMonitoring";
 import { ExamQualityCheckDialog } from "../components/ExamQualityCheckDialog";
+import { ExamStudentPreview } from "../components/ExamStudentPreview";
 import { apiRequest, type PaginatedResponse } from "../lib/http";
 import { getStoredTokens } from "../lib/storage";
 import { buildApiUrl } from "../lib/env";
@@ -41,6 +42,8 @@ interface ExamDetailRecord {
   mode: "exam" | "class";
   description: string;
   status: "draft" | "scheduled" | "open" | "paused" | "closed" | "archived";
+  /** Trang thai thuc te theo lich (draft|scheduled|open|paused|closed|results). */
+  lifecycle_phase?: string | null;
   duration_minutes: number;
   passing_score: number;
   max_attempts: number;
@@ -468,7 +471,7 @@ export function ExamDetail() {
             {!isClass && exam.current_version && (
               <Button variant="outline" onClick={() => setPreviewOpen(true)}>
                 <Eye className="mr-2 h-4 w-4" />
-                Preview Exam
+                {"Preview Exam"}
               </Button>
             )}
             <Link to={`/exams/${exam.id}/assign`}>
@@ -569,7 +572,7 @@ export function ExamDetail() {
         </Card>
       </div>
 
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr),320px]">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
         <Card>
           <CardContent className="p-6">
             <Tabs value={activeTab} onValueChange={(value) => updateTab(value as ExamTab)} className="space-y-6">
@@ -600,7 +603,7 @@ export function ExamDetail() {
                   <div className="rounded-lg border border-gray-200 p-4">
                     <p className="text-sm text-gray-500">Status</p>
                     <div className="mt-2">
-                      <StatusBadge status={exam.status} />
+                      <StatusBadge status={(exam.lifecycle_phase === "results" ? "closed" : exam.lifecycle_phase || exam.status) as never} />
                     </div>
                   </div>
                   <div className="rounded-lg border border-gray-200 p-4">
@@ -981,7 +984,7 @@ export function ExamDetail() {
             {!isClass && exam.current_version && (
               <Button variant="outline" className="w-full justify-start" onClick={() => setPreviewOpen(true)}>
                 <Eye className="mr-2 h-4 w-4" />
-                Preview Exam
+                {"Preview Exam"}
               </Button>
             )}
             <Link to={`/exams/${exam.id}/assign`} className="block">
@@ -1020,72 +1023,7 @@ export function ExamDetail() {
         </Card>
       </div>
 
-      <Dialog open={previewOpen} onOpenChange={setPreviewOpen}>
-        <DialogContent className="max-w-3xl max-h-[85vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>Xem trước đề thi: {exam.name}</DialogTitle>
-            <DialogDescription>
-              Xem trước cấu trúc và nội dung câu hỏi của phiên bản hiện tại (v{exam.current_version?.version_number}).
-            </DialogDescription>
-          </DialogHeader>
-
-          {exam.current_version?.items.length ? (
-            <div className="space-y-6 mt-4">
-              {exam.current_version.items.map((item) => {
-                const q = item.question;
-                const isMultipleChoice = q.question_type === "multiple_choice";
-                const isTrueFalse = q.question_type === "true_false";
-                const isEssay = q.question_type === "essay";
-
-                return (
-                  <div key={item.id} className="rounded-2xl border border-slate-200 bg-white p-5 space-y-4 shadow-sm">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <Badge variant="outline">Câu {item.sort_order}</Badge>
-                      <Badge variant="outline" className="capitalize">
-                        {q.question_type.replace(/_/g, " ")}
-                      </Badge>
-                      <Badge variant="outline" className="capitalize">
-                        {q.difficulty}
-                      </Badge>
-                      <Badge variant="outline">
-                        {item.points} điểm
-                      </Badge>
-                    </div>
-
-                    <p className="text-sm font-semibold text-slate-900">{q.question_text}</p>
-
-                    {(isMultipleChoice || isTrueFalse) && q.options && (
-                      <div className="space-y-2">
-                        {q.options.map((opt: any) => (
-                          <div
-                            key={opt.key}
-                            className="flex items-start gap-3 rounded-xl border border-slate-100 bg-slate-50 p-3 text-sm text-slate-700"
-                          >
-                            <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-slate-300 bg-white text-xs font-semibold text-slate-500 shadow-sm">
-                              {opt.key.toUpperCase()}
-                            </span>
-                            <span className="flex-1">{opt.text}</span>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-
-                    {isEssay && (
-                      <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50 p-4 text-center text-xs text-slate-400">
-                        [ Câu hỏi tự luận: Thí sinh tự nhập câu trả lời ]
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          ) : (
-            <div className="py-12 text-center text-sm text-slate-500">
-              Đề thi chưa có câu hỏi nào được cấu hình.
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
+      <ExamStudentPreview examId={exam.id} open={previewOpen} onOpenChange={setPreviewOpen} />
     </div>
   );
 }

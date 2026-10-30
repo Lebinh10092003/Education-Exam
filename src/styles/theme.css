@@ -117,6 +117,8 @@
 }
 
 @theme inline {
+  /* Be Vietnam Pro cho toan he thong; du phong font he thong co dau tieng Viet tot. */
+  --font-sans: "Be Vietnam Pro", ui-sans-serif, system-ui, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-card: var(--card);
@@ -403,21 +405,6 @@
   font-weight: 600;
 }
 
-.status-badge {
-  display: inline-flex;
-  align-items: center;
-  border-radius: 9999px;
-  background-color: rgba(16, 185, 129, 0.1);
-  color: #10b981;
-  padding: 0.125rem 0.625rem;
-  font-size: 0.75rem;
-  font-weight: 700;
-}
-
-.dark .status-badge {
-  background-color: rgba(16, 185, 129, 0.2);
-  color: #34d399;
-}
 
 /* Micro-animations and custom proctoring colors */
 @keyframes pulse-glow {

@@ -6,6 +6,7 @@ const navigation = {
     subjects: "Subjects",
     questionBank: "Question Bank",
     exams: "Exam Management",
+    competitions: "Competitions & Registrations",
     examList: "Exam List",
     liveMonitoring: "Live Monitoring",
     manualGrading: "Manual Grading",

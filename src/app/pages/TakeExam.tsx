@@ -30,6 +30,9 @@ import { buildWsUrl } from "../lib/env";
 import { apiRequest } from "../lib/http";
 import {
   captureTrackSnapshot,
+  claimStashedProctoringStreams,
+  hasStashedProctoringStreams,
+  releaseStashedProctoringStreams,
   requestProctoringStreams,
   type ProctoringCaptureResources,
 } from "../lib/proctoringCapture";
@@ -871,6 +874,28 @@ export function TakeExam() {
     }
   }, [session?.status]);
 
+  // Roi trang ma chua dung quyen da ban giao -> tat camera/man hinh.
+  useEffect(() => () => releaseStashedProctoringStreams(), []);
+
+  // Da cap quyen o buoc kiem tra: tu bat dau giam sat, khong bat thi sinh bam/cap quyen lan nua.
+  const autoBeginSessionRef = useRef<number | null>(null);
+  useEffect(() => {
+    if (
+      !session
+      || !session.enable_proctoring
+      || session.status !== "in_progress"
+      || proctoringReady
+      || isProctoringSetupPending
+      || autoBeginSessionRef.current === session.id
+      || !hasStashedProctoringStreams(examId)
+    ) {
+      return;
+    }
+    autoBeginSessionRef.current = session.id;
+    void beginProtectedExam();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [session?.id, session?.status, session?.enable_proctoring, proctoringReady, isProctoringSetupPending, examId]);
+
   const beginProtectedExam = async () => {
     if (!session || !session.enable_proctoring) {
       return;
@@ -884,7 +909,8 @@ export function TakeExam() {
       let captureResources = captureResourcesRef.current;
       if (!captureResources) {
         await cleanupProctoringResources();
-        captureResources = await requestProctoringStreams();
+        // Dung lai quyen da cap o buoc "Kiem tra he thong"; chi xin lai neu da mat.
+        captureResources = claimStashedProctoringStreams(examId) ?? (await requestProctoringStreams());
         captureResourcesRef.current = captureResources;
         setLocalPreviewStream(captureResources.webcamStream);
         liveRequestEnabledRef.current = false;

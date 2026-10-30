@@ -35,6 +35,8 @@ interface ExamRecord {
   subject: SubjectOption;
   description: string;
   status: "draft" | "scheduled" | "open" | "paused" | "closed" | "archived";
+  /** Trang thai thuc te theo lich (draft|scheduled|open|paused|closed|results). */
+  lifecycle_phase?: string | null;
   duration_minutes: number;
   passing_score: number;
   max_attempts: number;
@@ -91,6 +93,13 @@ const formatSchedule = (value: string | null, withDate = true) => {
     dateStyle: withDate ? "short" : undefined,
     timeStyle: "short",
   }).format(new Date(value));
+};
+
+// Trang thai theo lich: de "dang mo" nhung da qua gio dong -> hien "Da dong".
+const displayExamStatus = (exam: { status: string; lifecycle_phase?: string | null }) => {
+  const phase = exam.lifecycle_phase;
+  if (!phase) return exam.status as never;
+  return (phase === "results" ? "closed" : phase) as never;
 };
 
 export function ExamManagement() {
@@ -168,7 +177,7 @@ export function ExamManagement() {
     <div>
       <PageHeader
         title="Exam Management"
-        description="Create, schedule, assign, and manage exams or learning classes with live backend data."
+        description="Create, schedule, assign and manage exams or learning classes."
         action={
           <Link to="/exams/create">
             <Button>
@@ -261,7 +270,7 @@ export function ExamManagement() {
                     <div className="flex flex-wrap items-start justify-between gap-3">
                       <div className="min-w-0 flex-1">
                         <p className="font-medium text-gray-900">{exam.name}</p>
-                        <p className="mt-1 text-xs text-gray-500">Updated {formatSchedule(exam.updated_at)}</p>
+                        <p className="mt-1 text-xs text-gray-500">{`Updated ${formatSchedule(exam.updated_at)}`}</p>
                       </div>
                       <div className="flex flex-wrap justify-end gap-2">
                         <Badge
@@ -270,7 +279,7 @@ export function ExamManagement() {
                         >
                           {examModeLabels[exam.mode]}
                         </Badge>
-                        <StatusBadge status={exam.status} />
+                        <StatusBadge status={displayExamStatus(exam)} />
                       </div>
                     </div>
 
@@ -278,7 +287,7 @@ export function ExamManagement() {
                       <Badge variant="outline">{exam.subject.name}</Badge>
                       {exam.mode === "exam" ? (
                         <>
-                          <Badge variant="outline">{exam.current_version?.item_count ?? 0} questions</Badge>
+                          <Badge variant="outline">{`${exam.current_version?.item_count ?? 0} questions`}</Badge>
                           <Badge variant="outline">{exam.duration_minutes} min</Badge>
                           {exam.enable_proctoring ? <Badge variant="outline">Proctored</Badge> : null}
                         </>
@@ -432,7 +441,7 @@ export function ExamManagement() {
                         <td className="py-4 px-4">
                           <p className="font-medium text-gray-900">{exam.name}</p>
                           <p className="text-xs text-gray-500 mt-1">
-                            Updated {formatSchedule(exam.updated_at)}
+                            {`Updated ${formatSchedule(exam.updated_at)}`}
                           </p>
                         </td>
                         <td className="py-4 px-4">
@@ -444,7 +453,7 @@ export function ExamManagement() {
                           <Badge variant="outline">{exam.subject.name}</Badge>
                         </td>
                         <td className="py-4 px-4">
-                          <StatusBadge status={exam.status} />
+                          <StatusBadge status={displayExamStatus(exam)} />
                         </td>
                         <td className="py-4 px-4">
                           {exam.mode === "exam" ? (
@@ -466,9 +475,9 @@ export function ExamManagement() {
                         <td className="py-4 px-4">
                           {exam.mode === "exam" ? (
                             <div className="text-sm text-gray-700">
-                              <p>{exam.current_version?.item_count ?? 0} questions</p>
+                              <p>{`${exam.current_version?.item_count ?? 0} questions`}</p>
                               <p className="text-gray-500">
-                                {exam.duration_minutes} min • v{exam.current_version?.version_number ?? 1}
+                                {`${exam.duration_minutes} min • v${exam.current_version?.version_number ?? 1}`}
                               </p>
                             </div>
                           ) : (
@@ -513,7 +522,7 @@ export function ExamManagement() {
                                 </span>
                               </div>
                               <p className="text-xs text-gray-500">
-                                {exam.delivery_summary.in_progress_sessions} in progress
+                                {`${exam.delivery_summary.in_progress_sessions} in progress`}
                               </p>
                             </div>
                           ) : (

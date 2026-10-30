@@ -47,6 +47,13 @@ export default defineConfig({
         target: "ws://127.0.0.1:8000",
         ws: true,
       },
+      // LiveKit (camera/man hinh giam sat) di chung cong voi trang: PROCTORING_MEDIA_URL=/livekit
+      "/livekit": {
+        target: "http://127.0.0.1:7880",
+        ws: true,
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/livekit/, ""),
+      },
     },
   },
 

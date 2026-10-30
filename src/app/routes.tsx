@@ -34,6 +34,7 @@ const UserManagementRoute = lazyRoute(() => import("./pages/UserManagement"), "U
 const GroupManagementRoute = lazyRoute(() => import("./pages/GroupManagement"), "GroupManagement");
 const GroupMembersRoute = lazyRoute(() => import("./pages/GroupMembersPage"), "GroupMembersPage");
 const SubjectManagementRoute = lazyRoute(() => import("./pages/SubjectManagement"), "SubjectManagement");
+const CompetitionsManagementRoute = lazyRoute(() => import("./pages/CompetitionsManagement"), "CompetitionsManagement");
 const QuestionBankRoute = lazyRoute(() => import("./pages/QuestionBank"), "QuestionBank");
 const ExamManagementRoute = lazyRoute(() => import("./pages/ExamManagement"), "ExamManagement");
 const ExamMonitoringHubRoute = lazyRoute(() => import("./pages/ExamMonitoringHub"), "ExamMonitoringHub");
@@ -148,6 +149,7 @@ export const routeConfig = [
       { path: "groups", Component: GroupManagementRoute },
       { path: "groups/:id/members", Component: GroupMembersRoute },
       { path: "subjects", Component: SubjectManagementRoute },
+      { path: "competitions", Component: CompetitionsManagementRoute },
       { path: "question-bank", Component: QuestionBankRoute },
       { path: "exams", Component: ExamManagementRoute },
       { path: "exams/create", Component: ExamCreationWizardRoute },

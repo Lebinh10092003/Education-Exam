@@ -307,7 +307,7 @@ export function PracticeSession() {
           </div>
         </div>
 
-        <div className="grid gap-6 xl:grid-cols-[280px,minmax(0,1fr)]">
+        <div className="grid gap-6 xl:grid-cols-[280px_minmax(0,1fr)]">
           <Card className="h-fit">
             <CardHeader>
               <CardTitle>{t("session.title")}</CardTitle>

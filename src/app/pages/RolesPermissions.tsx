@@ -296,7 +296,7 @@ export function RolesPermissions() {
             />
           </div>
 
-          <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr),360px]">
+          <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_360px]">
             <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
               {rolesList.isLoading ? (
                 <Card className="xl:col-span-2">
@@ -407,7 +407,7 @@ export function RolesPermissions() {
             </DialogDescription>
           </DialogHeader>
 
-          <div className="grid gap-6 py-4 lg:grid-cols-[360px,minmax(0,1fr)]">
+          <div className="grid gap-6 py-4 lg:grid-cols-[360px_minmax(0,1fr)]">
             <div className="space-y-4">
               <div>
                 <Label htmlFor="role-name">Role Name</Label>

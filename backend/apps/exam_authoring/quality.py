@@ -18,6 +18,16 @@ from apps.question_bank.quality import normalize_question_text, validate_questio
 from .models import Exam, ExamItem
 
 
+STATUS_LABELS_VI = {
+    "draft": "Bản nháp",
+    "scheduled": "Đã lên lịch",
+    "open": "Đang mở",
+    "paused": "Tạm dừng",
+    "closed": "Đã đóng",
+    "archived": "Lưu trữ",
+}
+
+
 def _issue(level, code, message, **extra):
     return {"level": level, "code": code, "message": message, **extra}
 
@@ -161,6 +171,16 @@ def check_exam(exam: Exam):
         issues.append(_issue("warning", "window_shorter_than_duration",
                              f"Khung giờ mở đề ngắn hơn thời gian làm bài ({exam.duration_minutes} phút): "
                              "thí sinh sẽ bị cắt giờ."))
+    from django.utils import timezone
+
+    if (
+        closes_at
+        and closes_at <= timezone.now()
+        and exam.status in {Exam.Status.SCHEDULED, Exam.Status.OPEN, Exam.Status.PAUSED}
+    ):
+        issues.append(_issue("warning", "schedule_passed",
+                             f"Lịch thi đã kết thúc ({timezone.localtime(closes_at):%d/%m/%Y %H:%M}) nhưng đề vẫn ở trạng thái "
+                             f"'{STATUS_LABELS_VI.get(exam.status, exam.status)}'. Hãy đóng đề hoặc dời lịch."))
     candidate_count = _assigned_candidate_count(exam)
     if candidate_count == 0:
         issues.append(_issue("warning", "no_candidates", "Chưa phân công thí sinh nào vào đề."))

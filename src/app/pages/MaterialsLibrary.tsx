@@ -489,7 +489,7 @@ export function MaterialsLibrary() {
             </DialogDescription>
           </DialogHeader>
           {selectedMaterial ? (
-            <div className="grid gap-6 py-2 lg:grid-cols-[minmax(0,1.6fr),320px]">
+            <div className="grid gap-6 py-2 lg:grid-cols-[minmax(0,1.6fr)_320px]">
               <MaterialPreviewPanel
                 file_name={selectedMaterial.file_name}
                 file_url={selectedMaterialPreviewUrl || selectedMaterial.file_url}

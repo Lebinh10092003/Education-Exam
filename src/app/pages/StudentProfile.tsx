@@ -79,7 +79,7 @@ export function StudentProfile() {
         </div>
       ) : null}
 
-      <div className="grid gap-6 xl:grid-cols-[320px,minmax(0,1fr)]">
+      <div className="grid gap-6 xl:grid-cols-[320px_minmax(0,1fr)]">
         <Card className="border-slate-200 dark:border-slate-800 dark:bg-slate-950/70">
           <CardContent className="space-y-5 p-6">
             <div className="flex flex-col items-center text-center">

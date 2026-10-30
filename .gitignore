@@ -50,3 +50,6 @@ pnpm-debug.log*
 .vscode/
 .DS_Store
 Thumbs.db
+
+# Mat khau du lieu mau (reset_demo_data)
+backend/.demo-credentials.txt

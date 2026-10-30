@@ -118,6 +118,7 @@ INSTALLED_APPS = [
     "apps.materials",
     "apps.notifications",
     "apps.practice",
+    "apps.competitions",
 ]
 
 MIDDLEWARE = [
@@ -234,6 +235,10 @@ REST_FRAMEWORK = {
     "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
     "DEFAULT_PAGINATION_CLASS": "apps.platform_core.pagination.CustomPageNumberPagination",
     "PAGE_SIZE": 20,
+    # Chi ap dung cho view khai bao ScopedRateThrottle (vd. phieu dang ky cong khai).
+    "DEFAULT_THROTTLE_RATES": {
+        "competition_registration": "10/hour",
+    },
 }
 
 SIMPLE_JWT = {

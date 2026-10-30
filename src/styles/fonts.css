@@ -1,0 +1,11 @@
+/*
+ * Font chu: "Be Vietnam Pro" (nap trong index.html tu Google Fonts, display=swap).
+ * Khai bao --font-sans trong theme.css (@theme inline).
+ */
+html {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+  /* Dau tieng Viet chong 2 tang (a, e, o...) can khoang dong rong hon mot chut. */
+  line-height: 1.6;
+}

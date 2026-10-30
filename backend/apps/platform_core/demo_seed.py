@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import secrets
 import shutil
 from dataclasses import dataclass, field
 from datetime import date, timedelta
@@ -32,15 +33,23 @@ from apps.proctoring.services import (
 from apps.question_bank.models import Question
 from apps.question_bank.services import create_question, revise_question
 
+from apps.competitions.models import Competition, CompetitionRegistration
+
 from .audit import record_audit_event
 
-DEMO_PASSWORD = "admin123456"
+
+
+def generate_demo_password() -> str:
+    """Mat khau ngau nhien cho bo du lieu mau (khong ghi cung trong ma nguon)."""
+    return "Fermat-" + secrets.token_urlsafe(9)
+
 DEMO_MEDIA_PREFIX = "demo-seed"
 
 
 @dataclass
 class DemoSeedContext:
     now: object
+    password: str = ""
     users: dict[str, object] = field(default_factory=dict)
     schools: dict[str, School] = field(default_factory=dict)
     groups: dict[str, CandidateGroup] = field(default_factory=dict)
@@ -52,10 +61,11 @@ class DemoSeedContext:
     results: dict[str, Result] = field(default_factory=dict)
 
 
-def seed_full_demo_data():
+def seed_full_demo_data(password: str | None = None):
     _purge_demo_seed_media()
 
-    context = DemoSeedContext(now=timezone.now())
+    password = password or generate_demo_password()
+    context = DemoSeedContext(now=timezone.now(), password=password)
     _seed_users_and_roles(context)
     _seed_institutions(context)
     _seed_subjects(context)
@@ -65,14 +75,24 @@ def seed_full_demo_data():
     _seed_sessions_results_and_proctoring(context)
     _seed_extra_notifications(context)
     _seed_extra_audit(context)
+    _seed_competitions(context)
 
     return {
-        "password": DEMO_PASSWORD,
+        "password": password,
         "credentials": [
-            {"label": "Administrator", "email": "admin@example.com", "password": DEMO_PASSWORD},
-            {"label": "Examiner", "email": "examiner1@example.com", "password": DEMO_PASSWORD},
-            {"label": "Proctor", "email": "proctor1@example.com", "password": DEMO_PASSWORD},
-            {"label": "Candidate", "email": "candidate01@example.com", "password": DEMO_PASSWORD},
+            {"label": "Administrator", "email": "admin@example.com", "password": password},
+            {"label": "Examiner", "email": "examiner1@example.com", "password": password},
+            {"label": "Proctor", "email": "proctor1@example.com", "password": password},
+            {"label": "Candidate", "email": "candidate01@example.com", "password": password},
+        ],
+        "accounts": [
+            {
+                "label": ", ".join(role.name for role in user.active_roles) or "-",
+                "username": user.username,
+                "email": user.email,
+                "full_name": user.full_name,
+            }
+            for user in get_user_model().objects.order_by("id")
         ],
         "counts": {
             "users": get_user_model().objects.count(),
@@ -84,6 +104,8 @@ def seed_full_demo_data():
             "materials": Material.objects.count(),
             "results": Result.objects.count(),
             "notifications": Notification.objects.count(),
+            "competitions": Competition.objects.count(),
+            "competition_registrations": CompetitionRegistration.objects.count(),
         },
     }
 
@@ -132,7 +154,7 @@ def _create_user(
     user = user_model.objects.create_user(
         email=email,
         username=username,
-        password=DEMO_PASSWORD,
+        password=context.password,
         full_name=full_name,
         status=status,
         is_staff=is_staff,
@@ -157,8 +179,8 @@ def _seed_users_and_roles(context: DemoSeedContext):
     admin = user_model.objects.create_user(
         email="admin@example.com",
         username="admin",
-        password=DEMO_PASSWORD,
-        full_name="EduExam Administrator",
+        password=context.password,
+        full_name="Quản trị hệ thống",
         is_staff=True,
         is_superuser=True,
         status=user_model.Status.ACTIVE,
@@ -168,14 +190,14 @@ def _seed_users_and_roles(context: DemoSeedContext):
     context.users["admin"] = admin
 
     north = School.objects.create(
-        name="North Valley High School",
-        code="NVHS",
-        description="Primary demo school for grade 10 candidates.",
+        name="Trường THPT Chuyên Hà Nội - Amsterdam",
+        code="HN-AMS",
+        description="Trường mẫu cho thí sinh khối 10.",
     )
     south = School.objects.create(
-        name="South City College",
-        code="SCC",
-        description="Secondary demo school for senior candidates.",
+        name="Trường THPT Chu Văn An",
+        code="HN-CVA",
+        description="Trường mẫu cho thí sinh khối 11.",
     )
     context.schools["north"] = north
     context.schools["south"] = south
@@ -185,7 +207,7 @@ def _seed_users_and_roles(context: DemoSeedContext):
         key="examiner1",
         email="examiner1@example.com",
         username="examiner1",
-        full_name="Tran Minh Examiner",
+        full_name="Trần Minh Đức",
         role_slugs=["examiner"],
         phone_number="0901000001",
         is_staff=True,
@@ -195,7 +217,7 @@ def _seed_users_and_roles(context: DemoSeedContext):
         key="examiner2",
         email="examiner2@example.com",
         username="examiner2",
-        full_name="Nguyen Ha Examiner",
+        full_name="Nguyễn Thu Hà",
         role_slugs=["examiner"],
         phone_number="0901000002",
         is_staff=True,
@@ -205,25 +227,25 @@ def _seed_users_and_roles(context: DemoSeedContext):
         key="proctor1",
         email="proctor1@example.com",
         username="proctor1",
-        full_name="Le Tuan Proctor",
+        full_name="Lê Anh Tuấn",
         role_slugs=["proctor"],
         phone_number="0901000003",
         is_staff=True,
     )
 
     candidate_specs = [
-        ("candidate01", "candidate01@example.com", "candidate01", "Pham Gia An", north, "10A", "100000000001", date(2008, 1, 10), "active"),
-        ("candidate02", "candidate02@example.com", "candidate02", "Do Minh Chau", north, "10A", "100000000002", date(2008, 2, 11), "active"),
-        ("candidate03", "candidate03@example.com", "candidate03", "Vu Lan Chi", south, "11A", "100000000003", date(2007, 3, 12), "active"),
-        ("candidate04", "candidate04@example.com", "candidate04", "Bui Quoc Dat", south, "11A", "100000000004", date(2007, 4, 13), "active"),
-        ("candidate05", "candidate05@example.com", "candidate05", "Nguyen Ngoc Em", north, "10A", "100000000005", date(2008, 5, 14), "active"),
-        ("candidate06", "candidate06@example.com", "candidate06", "Tran Hoang Phuc", north, "10B", "100000000006", date(2008, 6, 15), "active"),
-        ("candidate07", "candidate07@example.com", "candidate07", "Le Bao Gia", north, "10B", "100000000007", date(2008, 7, 16), "active"),
-        ("candidate08", "candidate08@example.com", "candidate08", "Phan Khai Huy", north, "10B", "100000000008", date(2008, 8, 17), "active"),
-        ("candidate09", "candidate09@example.com", "candidate09", "Vo Nha Linh", south, "11A", "100000000009", date(2007, 9, 18), "active"),
-        ("candidate10", "candidate10@example.com", "candidate10", "Dang Minh Long", south, "11A", "100000000010", date(2007, 10, 19), "active"),
-        ("candidate11", "candidate11@example.com", "candidate11", "Hoang Thu Mai", south, "Retake", "100000000011", date(2007, 11, 20), "pending"),
-        ("candidate12", "candidate12@example.com", "candidate12", "Nguyen Quang Nam", north, "Retake", "100000000012", date(2007, 12, 21), "locked"),
+        ("candidate01", "candidate01@example.com", "candidate01", "Phạm Gia An", north, "10A1", "100000000001", date(2008, 1, 10), "active"),
+        ("candidate02", "candidate02@example.com", "candidate02", "Đỗ Minh Châu", north, "10A1", "100000000002", date(2008, 2, 11), "active"),
+        ("candidate03", "candidate03@example.com", "candidate03", "Vũ Lan Chi", south, "11A2", "100000000003", date(2007, 3, 12), "active"),
+        ("candidate04", "candidate04@example.com", "candidate04", "Bùi Quốc Đạt", south, "11A2", "100000000004", date(2007, 4, 13), "active"),
+        ("candidate05", "candidate05@example.com", "candidate05", "Nguyễn Ngọc Diệp", north, "10A1", "100000000005", date(2008, 5, 14), "active"),
+        ("candidate06", "candidate06@example.com", "candidate06", "Trần Hoàng Phúc", north, "10A2", "100000000006", date(2008, 6, 15), "active"),
+        ("candidate07", "candidate07@example.com", "candidate07", "Lê Bảo Ngọc", north, "10A2", "100000000007", date(2008, 7, 16), "active"),
+        ("candidate08", "candidate08@example.com", "candidate08", "Phan Khải Huy", north, "10A2", "100000000008", date(2008, 8, 17), "active"),
+        ("candidate09", "candidate09@example.com", "candidate09", "Võ Nhã Linh", south, "11A2", "100000000009", date(2007, 9, 18), "active"),
+        ("candidate10", "candidate10@example.com", "candidate10", "Đặng Minh Long", south, "11A2", "100000000010", date(2007, 10, 19), "active"),
+        ("candidate11", "candidate11@example.com", "candidate11", "Hoàng Thu Mai", south, "Thi lại", "100000000011", date(2007, 11, 20), "pending"),
+        ("candidate12", "candidate12@example.com", "candidate12", "Nguyễn Quang Nam", north, "Thi lại", "100000000012", date(2007, 12, 21), "locked"),
     ]
     for key, email, username, full_name, school, student_class, cccd, date_of_birth, status in candidate_specs:
         _create_user(
@@ -244,20 +266,20 @@ def _seed_users_and_roles(context: DemoSeedContext):
 
 def _seed_institutions(context: DemoSeedContext):
     context.groups["north_10a"] = CandidateGroup.objects.create(
-        name="North Valley - Grade 10A",
-        description="Main mathematics practice group.",
+        name="HN-Ams - Lớp 10A1",
+        description="Nhóm luyện thi Toán chính.",
     )
     context.groups["north_10b"] = CandidateGroup.objects.create(
-        name="North Valley - Grade 10B",
-        description="Secondary science group.",
+        name="HN-Ams - Lớp 10A2",
+        description="Nhóm Khoa học tự nhiên.",
     )
     context.groups["south_11a"] = CandidateGroup.objects.create(
-        name="South City - Grade 11A",
-        description="Senior literature and biology candidates.",
+        name="Chu Văn An - Lớp 11A2",
+        description="Thí sinh Ngữ văn và Sinh học.",
     )
     context.groups["retake"] = CandidateGroup.objects.create(
-        name="Cross-School Retake Group",
-        description="Shared remediation group across schools.",
+        name="Nhóm thi lại liên trường",
+        description="Nhóm ôn tập bổ sung cho thí sinh nhiều trường.",
     )
 
     memberships = {
@@ -276,10 +298,10 @@ def _seed_institutions(context: DemoSeedContext):
 
 def _seed_subjects(context: DemoSeedContext):
     subject_specs = [
-        ("math", "Mathematics", "MATH101", "Core mathematics for objective and essay delivery.", "bg-blue-600"),
-        ("physics", "Physics", "PHYS101", "Core physics concepts for scheduled quizzes.", "bg-violet-600"),
-        ("literature", "Literature", "LIT201", "Essay-heavy literature assessment content.", "bg-emerald-600"),
-        ("biology", "Biology", "BIO105", "Objective biology practice content.", "bg-rose-600"),
+        ("math", "Toán học", "TOAN10", "Toán cơ bản: trắc nghiệm và tự luận.", "bg-blue-600"),
+        ("physics", "Vật lý", "LY10", "Kiến thức Vật lý cơ bản cho các bài kiểm tra.", "bg-violet-600"),
+        ("literature", "Ngữ văn", "VAN11", "Nội dung đánh giá Ngữ văn thiên về tự luận.", "bg-emerald-600"),
+        ("biology", "Sinh học", "SINH11", "Luyện tập trắc nghiệm Sinh học.", "bg-rose-600"),
     ]
     for key, name, code, description, color in subject_specs:
         context.subjects[key] = Subject.objects.create(
@@ -299,8 +321,8 @@ def _seed_question_bank(context: DemoSeedContext):
         created_by=author,
         difficulty=Question.Difficulty.EASY,
         question_type=Question.Type.MULTIPLE_CHOICE,
-        question_text="What is the value of x in 2x + 4 = 10?",
-        tags=["algebra", "linear"],
+        question_text="Giá trị của x trong phương trình 2x + 4 = 10 là bao nhiêu?",
+        tags=["đại số", "phương trình bậc nhất"],
         options=[
             {"key": "A", "text": "2"},
             {"key": "B", "text": "3"},
@@ -312,7 +334,7 @@ def _seed_question_bank(context: DemoSeedContext):
     revise_question(
         question=context.questions["math_linear"],
         updated_by=reviewer,
-        question_text="Solve for x: 2x + 4 = 10.",
+        question_text="Giải phương trình: 2x + 4 = 10.",
         options=[
             {"key": "A", "text": "x = 2"},
             {"key": "B", "text": "x = 3"},
@@ -326,8 +348,8 @@ def _seed_question_bank(context: DemoSeedContext):
         created_by=author,
         difficulty=Question.Difficulty.MEDIUM,
         question_type=Question.Type.MULTIPLE_CHOICE,
-        question_text="Which coordinate lies on the line y = 2x + 1?",
-        tags=["algebra", "graph"],
+        question_text="Điểm nào thuộc đường thẳng y = 2x + 1?",
+        tags=["đại số", "đồ thị"],
         options=[
             {"key": "A", "text": "(1, 3)"},
             {"key": "B", "text": "(2, 2)"},
@@ -341,11 +363,11 @@ def _seed_question_bank(context: DemoSeedContext):
         created_by=author,
         difficulty=Question.Difficulty.EASY,
         question_type=Question.Type.TRUE_FALSE,
-        question_text="A triangle can have two right angles.",
-        tags=["geometry"],
+        question_text="Một tam giác có thể có hai góc vuông.",
+        tags=["hình học"],
         options=[
-            {"key": "A", "text": "False"},
-            {"key": "B", "text": "True"},
+            {"key": "A", "text": "Sai"},
+            {"key": "B", "text": "Đúng"},
         ],
         correct_option_keys=["A"],
     )
@@ -354,10 +376,10 @@ def _seed_question_bank(context: DemoSeedContext):
         created_by=author,
         difficulty=Question.Difficulty.HARD,
         question_type=Question.Type.ESSAY,
-        question_text="Explain how you would solve a system of two linear equations using elimination.",
-        tags=["algebra", "essay"],
-        essay_rubric="Mention elimination steps, equivalent equations, and verification.",
-        sample_answer="Eliminate one variable, solve, substitute back, and verify the pair.",
+        question_text="Trình bày cách giải hệ hai phương trình bậc nhất hai ẩn bằng phương pháp cộng đại số.",
+        tags=["đại số", "tự luận"],
+        essay_rubric="Nêu đủ các bước khử ẩn, biến đổi tương đương và thử lại nghiệm.",
+        sample_answer="Nhân hệ số để khử một ẩn, giải phương trình còn lại, thế ngược để tìm ẩn kia và thử lại cặp nghiệm.",
     )
 
     context.questions["physics_force"] = create_question(
@@ -365,8 +387,8 @@ def _seed_question_bank(context: DemoSeedContext):
         created_by=author,
         difficulty=Question.Difficulty.EASY,
         question_type=Question.Type.MULTIPLE_CHOICE,
-        question_text="What is the SI unit of force?",
-        tags=["mechanics"],
+        question_text="Đơn vị đo lực trong hệ SI là gì?",
+        tags=["cơ học"],
         options=[
             {"key": "A", "text": "Newton"},
             {"key": "B", "text": "Joule"},
@@ -380,11 +402,11 @@ def _seed_question_bank(context: DemoSeedContext):
         created_by=author,
         difficulty=Question.Difficulty.MEDIUM,
         question_type=Question.Type.MULTIPLE_CHOICE,
-        question_text="Velocity is a vector quantity because it has both magnitude and direction.",
-        tags=["motion"],
+        question_text="Vận tốc là đại lượng vectơ vì có cả độ lớn và hướng.",
+        tags=["chuyển động"],
         options=[
-            {"key": "A", "text": "True"},
-            {"key": "B", "text": "False"},
+            {"key": "A", "text": "Đúng"},
+            {"key": "B", "text": "Sai"},
         ],
         correct_option_keys=["A"],
     )
@@ -393,8 +415,8 @@ def _seed_question_bank(context: DemoSeedContext):
         created_by=author,
         difficulty=Question.Difficulty.MEDIUM,
         question_type=Question.Type.MULTIPLE_CHOICE,
-        question_text="Which formula calculates kinetic energy?",
-        tags=["energy"],
+        question_text="Công thức nào dùng để tính động năng?",
+        tags=["năng lượng"],
         options=[
             {"key": "A", "text": "mgh"},
             {"key": "B", "text": "1/2mv^2"},
@@ -408,11 +430,11 @@ def _seed_question_bank(context: DemoSeedContext):
         created_by=author,
         difficulty=Question.Difficulty.HARD,
         question_type=Question.Type.TRUE_FALSE,
-        question_text="Sound waves can travel through a vacuum.",
-        tags=["waves"],
+        question_text="Sóng âm có thể truyền trong chân không.",
+        tags=["sóng"],
         options=[
-            {"key": "A", "text": "False"},
-            {"key": "B", "text": "True"},
+            {"key": "A", "text": "Sai"},
+            {"key": "B", "text": "Đúng"},
         ],
         correct_option_keys=["A"],
     )
@@ -422,23 +444,23 @@ def _seed_question_bank(context: DemoSeedContext):
         created_by=author,
         difficulty=Question.Difficulty.HARD,
         question_type=Question.Type.ESSAY,
-        question_text="Analyze the narrator's point of view in the assigned short story.",
-        tags=["analysis", "essay"],
-        essay_rubric="Discuss point of view, reliability, and effect on reader interpretation.",
-        sample_answer="A strong answer identifies the narration style and its influence on understanding events.",
+        question_text="Phân tích điểm nhìn của người kể chuyện trong truyện ngắn \"Vợ nhặt\" của Kim Lân.",
+        tags=["phân tích", "tự luận"],
+        essay_rubric="Xác định ngôi kể, điểm nhìn, tác dụng đối với việc thể hiện nhân vật và cảm nhận của người đọc.",
+        sample_answer="Bài tốt chỉ ra ngôi kể thứ ba, điểm nhìn linh hoạt và tác dụng làm nổi bật khát vọng sống của nhân vật.",
     )
     context.questions["literature_theme"] = create_question(
         subject=context.subjects["literature"],
         created_by=author,
         difficulty=Question.Difficulty.MEDIUM,
         question_type=Question.Type.MULTIPLE_CHOICE,
-        question_text="Which theme best matches a coming-of-age novel?",
-        tags=["theme"],
+        question_text="Chủ đề nào phù hợp nhất với tiểu thuyết về tuổi trưởng thành?",
+        tags=["chủ đề"],
         options=[
-            {"key": "A", "text": "Industrial optimization"},
-            {"key": "B", "text": "Personal growth"},
-            {"key": "C", "text": "Planetary motion"},
-            {"key": "D", "text": "Cell division"},
+            {"key": "A", "text": "Tối ưu hóa công nghiệp"},
+            {"key": "B", "text": "Sự trưởng thành của bản thân"},
+            {"key": "C", "text": "Chuyển động của hành tinh"},
+            {"key": "D", "text": "Sự phân chia tế bào"},
         ],
         correct_option_keys=["B"],
     )
@@ -447,13 +469,13 @@ def _seed_question_bank(context: DemoSeedContext):
         created_by=author,
         difficulty=Question.Difficulty.EASY,
         question_type=Question.Type.MULTIPLE_CHOICE,
-        question_text="Alliteration repeats which sound pattern?",
-        tags=["poetry"],
+        question_text="Biện pháp điệp âm lặp lại yếu tố nào?",
+        tags=["thơ"],
         options=[
-            {"key": "A", "text": "Initial consonant sounds"},
-            {"key": "B", "text": "Sentence length"},
-            {"key": "C", "text": "Paragraph spacing"},
-            {"key": "D", "text": "Plot twists"},
+            {"key": "A", "text": "Phụ âm đầu"},
+            {"key": "B", "text": "Độ dài câu"},
+            {"key": "C", "text": "Khoảng cách đoạn"},
+            {"key": "D", "text": "Tình tiết bất ngờ"},
         ],
         correct_option_keys=["A"],
     )
@@ -462,10 +484,10 @@ def _seed_question_bank(context: DemoSeedContext):
         created_by=author,
         difficulty=Question.Difficulty.MEDIUM,
         question_type=Question.Type.ESSAY,
-        question_text="Write a short reflection on how setting influences tone.",
-        tags=["setting", "essay"],
-        essay_rubric="Connect details of setting to emotional tone with at least one example.",
-        sample_answer="A good response links environmental details to reader mood.",
+        question_text="Viết đoạn văn ngắn về ảnh hưởng của bối cảnh đến giọng điệu tác phẩm.",
+        tags=["bối cảnh", "tự luận"],
+        essay_rubric="Liên hệ chi tiết bối cảnh với giọng điệu cảm xúc, có ít nhất một dẫn chứng.",
+        sample_answer="Bài tốt chỉ ra được mối liên hệ giữa chi tiết không gian và cảm xúc của người đọc.",
     )
 
     context.questions["biology_cells"] = create_question(
@@ -473,13 +495,13 @@ def _seed_question_bank(context: DemoSeedContext):
         created_by=author,
         difficulty=Question.Difficulty.EASY,
         question_type=Question.Type.MULTIPLE_CHOICE,
-        question_text="Which organelle is known as the powerhouse of the cell?",
-        tags=["cells"],
+        question_text="Bào quan nào được ví là \"nhà máy năng lượng\" của tế bào?",
+        tags=["tế bào"],
         options=[
-            {"key": "A", "text": "Mitochondrion"},
-            {"key": "B", "text": "Ribosome"},
-            {"key": "C", "text": "Nucleus"},
-            {"key": "D", "text": "Golgi apparatus"},
+            {"key": "A", "text": "Ti thể"},
+            {"key": "B", "text": "Ribôxôm"},
+            {"key": "C", "text": "Nhân tế bào"},
+            {"key": "D", "text": "Bộ máy Gôngi"},
         ],
         correct_option_keys=["A"],
     )
@@ -488,11 +510,11 @@ def _seed_question_bank(context: DemoSeedContext):
         created_by=author,
         difficulty=Question.Difficulty.MEDIUM,
         question_type=Question.Type.MULTIPLE_CHOICE,
-        question_text="DNA stands for deoxyribonucleic acid.",
-        tags=["genetics"],
+        question_text="DNA là viết tắt của axit đêôxiribônuclêic.",
+        tags=["di truyền"],
         options=[
-            {"key": "A", "text": "True"},
-            {"key": "B", "text": "False"},
+            {"key": "A", "text": "Đúng"},
+            {"key": "B", "text": "Sai"},
         ],
         correct_option_keys=["A"],
     )
@@ -501,13 +523,13 @@ def _seed_question_bank(context: DemoSeedContext):
         created_by=author,
         difficulty=Question.Difficulty.MEDIUM,
         question_type=Question.Type.MULTIPLE_CHOICE,
-        question_text="Which relationship is an example of mutualism?",
-        tags=["ecology"],
+        question_text="Mối quan hệ nào là quan hệ cộng sinh?",
+        tags=["sinh thái"],
         options=[
-            {"key": "A", "text": "Tick and dog"},
-            {"key": "B", "text": "Bee and flowering plant"},
-            {"key": "C", "text": "Lion and zebra"},
-            {"key": "D", "text": "Mold on bread"},
+            {"key": "A", "text": "Ve và chó"},
+            {"key": "B", "text": "Ong và cây có hoa"},
+            {"key": "C", "text": "Sư tử và ngựa vằn"},
+            {"key": "D", "text": "Nấm mốc trên bánh mì"},
         ],
         correct_option_keys=["B"],
     )
@@ -516,11 +538,11 @@ def _seed_question_bank(context: DemoSeedContext):
         created_by=author,
         difficulty=Question.Difficulty.HARD,
         question_type=Question.Type.TRUE_FALSE,
-        question_text="Cellular respiration occurs only in animal cells.",
-        tags=["respiration"],
+        question_text="Hô hấp tế bào chỉ diễn ra ở tế bào động vật.",
+        tags=["hô hấp"],
         options=[
-            {"key": "A", "text": "False"},
-            {"key": "B", "text": "True"},
+            {"key": "A", "text": "Sai"},
+            {"key": "B", "text": "Đúng"},
         ],
         correct_option_keys=["A"],
     )
@@ -529,10 +551,10 @@ def _seed_exams(context: DemoSeedContext):
     examiner1 = context.users["examiner1"]
 
     context.exams["math_open"] = create_exam(
-        name="Mathematics Mock Exam",
+        name="Thi thử Toán lớp 10",
         subject=context.subjects["math"],
         created_by=examiner1,
-        description="Live demo exam with proctoring and manual grading.",
+        description="Đề thi thử có giám sát và chấm tự luận.",
         status=Exam.Status.OPEN,
         duration_minutes=75,
         passing_score=60,
@@ -558,10 +580,10 @@ def _seed_exams(context: DemoSeedContext):
     )
 
     context.exams["literature_open"] = create_exam(
-        name="Literature Essay Assessment",
+        name="Kiểm tra Ngữ văn (tự luận)",
         subject=context.subjects["literature"],
         created_by=examiner1,
-        description="Essay-focused assessment for manual grading review.",
+        description="Bài kiểm tra tự luận, giáo viên chấm tay.",
         status=Exam.Status.OPEN,
         duration_minutes=60,
         passing_score=65,
@@ -579,10 +601,10 @@ def _seed_exams(context: DemoSeedContext):
     )
 
     context.exams["physics_scheduled"] = create_exam(
-        name="Physics Readiness Quiz",
+        name="Kiểm tra 15 phút Vật lý",
         subject=context.subjects["physics"],
         created_by=examiner1,
-        description="Scheduled future quiz for unstarted candidate views.",
+        description="Bài kiểm tra đã lên lịch, chưa đến giờ thi.",
         status=Exam.Status.SCHEDULED,
         duration_minutes=45,
         passing_score=50,
@@ -602,10 +624,10 @@ def _seed_exams(context: DemoSeedContext):
     )
 
     context.exams["biology_closed"] = create_exam(
-        name="Biology Practice Review",
+        name="Ôn tập Sinh học",
         subject=context.subjects["biology"],
         created_by=examiner1,
-        description="Objective exam used for auto-published candidate results.",
+        description="Đề trắc nghiệm, công bố kết quả tự động.",
         status=Exam.Status.OPEN,
         duration_minutes=40,
         passing_score=70,
@@ -624,11 +646,11 @@ def _seed_exams(context: DemoSeedContext):
     )
 
     context.exams["physics_class"] = create_exam(
-        name="Physics Learning Class",
+        name="Lớp học Vật lý",
         mode=Exam.Mode.CLASS,
         subject=context.subjects["physics"],
         created_by=examiner1,
-        description="Draft learning container that unlocks subject materials and practice access.",
+        description="Lớp học mở quyền xem tài liệu và luyện tập môn Vật lý.",
         status=Exam.Status.DRAFT,
         shuffle_questions=False,
         show_results_immediately=False,
@@ -638,7 +660,7 @@ def _seed_exams(context: DemoSeedContext):
 
 
 def _create_material(context: DemoSeedContext, *, key: str, title: str, description: str, subject_key: str, uploaded_by_key: str, file_name: str):
-    content = f"{title}\n\n{description}\nGenerated at {context.now.isoformat()}.\n".encode("utf-8")
+    content = f"{title}\n\n{description}\nTạo lúc {context.now.isoformat()}.\n".encode("utf-8")
     material = Material(
         title=title,
         description=description,
@@ -663,56 +685,56 @@ def _seed_materials(context: DemoSeedContext):
     _create_material(
         context,
         key="math_sheet",
-        title="Math Formula Sheet",
-        description="Quick reference for algebra and geometry formulas.",
+        title="Bảng công thức Toán",
+        description="Tra cứu nhanh công thức đại số và hình học.",
         subject_key="math",
         uploaded_by_key="examiner1",
-        file_name="math-formula-sheet.txt",
+        file_name="bang-cong-thuc-toan.txt",
     )
     _create_material(
         context,
         key="math_samples",
-        title="Math Worked Examples",
-        description="Sample worked solutions for linear equations.",
+        title="Bài giải mẫu Toán",
+        description="Lời giải mẫu các bài phương trình bậc nhất.",
         subject_key="math",
         uploaded_by_key="examiner2",
-        file_name="math-worked-examples.txt",
+        file_name="bai-giai-mau-toan.txt",
     )
     _create_material(
         context,
         key="physics_notes",
-        title="Physics Revision Notes",
-        description="Mechanics and energy revision notes for the scheduled quiz.",
+        title="Đề cương ôn tập Vật lý",
+        description="Ôn tập cơ học và năng lượng cho bài kiểm tra sắp tới.",
         subject_key="physics",
         uploaded_by_key="examiner1",
-        file_name="physics-revision-notes.txt",
+        file_name="de-cuong-vat-ly.txt",
     )
     _create_material(
         context,
         key="literature_rubric",
-        title="Literature Essay Rubric",
-        description="Criteria for the literature essay assessment.",
+        title="Tiêu chí chấm bài Ngữ văn",
+        description="Thang điểm và tiêu chí chấm bài tự luận Ngữ văn.",
         subject_key="literature",
         uploaded_by_key="examiner2",
-        file_name="literature-essay-rubric.txt",
+        file_name="tieu-chi-cham-van.txt",
     )
     _create_material(
         context,
         key="biology_flashcards",
-        title="Biology Flashcards",
-        description="Cell biology and ecology flashcards for quick review.",
+        title="Thẻ ghi nhớ Sinh học",
+        description="Thẻ ôn nhanh tế bào học và sinh thái học.",
         subject_key="biology",
         uploaded_by_key="examiner1",
-        file_name="biology-flashcards.txt",
+        file_name="the-ghi-nho-sinh-hoc.txt",
     )
     _create_material(
         context,
         key="candidate_handbook",
-        title="Candidate Exam Handbook",
-        description="General instructions for all demo candidates before the exam.",
+        title="Cẩm nang dự thi cho thí sinh",
+        description="Hướng dẫn chung cho thí sinh trước khi vào thi.",
         subject_key="math",
         uploaded_by_key="admin",
-        file_name="candidate-exam-handbook.txt",
+        file_name="cam-nang-du-thi.txt",
     )
 
 
@@ -763,7 +785,7 @@ def _seed_sessions_results_and_proctoring(context: DemoSeedContext):
     _save_answers_for_session(
         math_submission_session,
         objective_mode="correct",
-        essay_text="I would eliminate one variable, solve the reduced equation, then substitute back and verify the pair.",
+        essay_text="Em nhân hai vế để khử ẩn y, giải phương trình còn lại tìm x, rồi thế ngược tìm y và thử lại cặp nghiệm.",
     )
     create_autosave_snapshot(session=math_submission_session, payload={"step": "before-submit"})
     submit_session(session=math_submission_session, submitted_by=candidate1)
@@ -772,7 +794,7 @@ def _seed_sessions_results_and_proctoring(context: DemoSeedContext):
             task=task,
             grader=examiner1,
             score_awarded=task.max_points,
-            feedback="Clear explanation and valid elimination steps.",
+            feedback="Trình bày rõ ràng, các bước khử ẩn chính xác.",
         )
     math_submission_session.refresh_from_db()
     context.sessions["math_submitted"] = math_submission_session
@@ -782,7 +804,7 @@ def _seed_sessions_results_and_proctoring(context: DemoSeedContext):
     _save_answers_for_session(
         math_in_progress_session,
         objective_mode="correct",
-        essay_text="Started drafting an elimination response.",
+        essay_text="Em đang viết dở phần trình bày phương pháp cộng.",
         mark_first_for_review=True,
     )
     create_autosave_snapshot(session=math_in_progress_session, payload={"checkpoint": "halfway"})
@@ -811,17 +833,17 @@ def _seed_sessions_results_and_proctoring(context: DemoSeedContext):
         session=math_in_progress_session,
         event_type="tab_switch",
         severity="warning",
-        metadata={"message": "Candidate switched away from the exam tab once."},
+        metadata={"message": "Thí sinh rời khỏi tab bài thi một lần."},
         reported_by=candidate2,
     )
     critical_event = record_proctor_event(
         session=math_in_progress_session,
         event_type="fullscreen_exit",
         severity="critical",
-        metadata={"message": "Candidate exited fullscreen during a protected exam."},
+        metadata={"message": "Thí sinh thoát chế độ toàn màn hình khi đang thi có giám sát."},
         reported_by=candidate2,
     )
-    evidence_file = ContentFile(b"demo evidence snapshot")
+    evidence_file = ContentFile("Ảnh minh chứng mẫu".encode("utf-8"))
     evidence_file.name = f"{DEMO_MEDIA_PREFIX}/proctoring/fullscreen-exit-note.txt"
     create_proctor_evidence(
         session=math_in_progress_session,
@@ -837,7 +859,7 @@ def _seed_sessions_results_and_proctoring(context: DemoSeedContext):
             case=warning_case,
             reviewer=proctor1,
             decision="dismissed",
-            notes="Single tab switch acknowledged during connectivity check.",
+            notes="Chuyển tab một lần khi kiểm tra kết nối, đã xác nhận không vi phạm.",
         )
     context.sessions["math_in_progress"] = math_in_progress_session
 
@@ -845,7 +867,7 @@ def _seed_sessions_results_and_proctoring(context: DemoSeedContext):
     _save_answers_for_session(
         literature_pending_session,
         objective_mode="correct",
-        essay_text="The first-person narration limits outside knowledge and increases emotional closeness.",
+        essay_text="Truyện kể ở ngôi thứ ba nhưng điểm nhìn thường đặt vào nhân vật Tràng, giúp người đọc cảm nhận rõ niềm khát khao hạnh phúc.",
     )
     submit_session(session=literature_pending_session, submitted_by=candidate3)
     literature_pending_session.refresh_from_db()
@@ -868,8 +890,8 @@ def _seed_sessions_results_and_proctoring(context: DemoSeedContext):
 def _seed_extra_notifications(context: DemoSeedContext):
     create_notification(
         recipient=context.users["candidate04"],
-        title="Published result available",
-        message='Your result for "Biology Practice Review" is now available.',
+        title="Đã có kết quả thi",
+        message='Kết quả bài "Ôn tập Sinh học" của bạn đã được công bố.',
         category=Notification.Category.RESULT,
         priority=Notification.Priority.MEDIUM,
         action_url="/candidate/results",
@@ -877,8 +899,8 @@ def _seed_extra_notifications(context: DemoSeedContext):
     )
     create_notification(
         recipient=context.users["candidate02"],
-        title="Resume your active exam",
-        message='You still have time remaining for "Mathematics Mock Exam".',
+        title="Tiếp tục bài thi đang làm",
+        message='Bạn vẫn còn thời gian làm bài "Thi thử Toán lớp 10".',
         category=Notification.Category.EXAM,
         priority=Notification.Priority.HIGH,
         action_url="/candidate/practice",
@@ -886,8 +908,8 @@ def _seed_extra_notifications(context: DemoSeedContext):
     )
     create_notification(
         recipient=context.users["admin"],
-        title="Demo environment ready",
-        message="The end-to-end local demo dataset has been rebuilt successfully.",
+        title="Dữ liệu mẫu đã sẵn sàng",
+        message="Bộ dữ liệu mẫu đã được tạo lại thành công.",
         category=Notification.Category.SYSTEM,
         priority=Notification.Priority.LOW,
         action_url="/notifications",
@@ -902,7 +924,7 @@ def _seed_extra_audit(context: DemoSeedContext):
         actor=admin,
         action="user.login",
         category="authentication",
-        description="Administrator signed in after demo data reset.",
+        description="Quản trị viên đăng nhập sau khi tạo lại dữ liệu mẫu.",
         metadata={"seeded": True},
     )
     record_audit_event(
@@ -910,13 +932,69 @@ def _seed_extra_audit(context: DemoSeedContext):
         action="user.locked",
         category="security",
         severity="warning",
-        description=f'Locked user "{candidate12.email}".',
+        description=f'Đã khoá tài khoản "{candidate12.email}".',
         metadata={"target_user_id": candidate12.id, "target_email": candidate12.email},
     )
     record_audit_event(
         actor=admin,
         action="role.updated",
         category="security",
-        description='Updated role "Examiner" demo assignments.',
+        description='Cập nhật phân quyền mẫu cho vai trò "Examiner".',
         metadata={"role_slug": "examiner", "seeded": True},
     )
+
+
+# Cuoc thi Olympiad: lenh flush xoa ca du lieu do migration tao, nen tao lai o day.
+CYCLE_3_COMPETITIONS = [
+    ("Olympic Quốc tế về Toán học", "IMO", date(2026, 5, 31)),
+    ("Olympic Quốc tế về Lập trình", "ICO", date(2026, 5, 30)),
+    ("Olympic Quốc tế về Khởi nghiệp & Đổi mới sáng tạo", "SCO IEIO", date(2026, 5, 30)),
+    ("Olympic Quốc tế về Kiến thức Tài chính", "SCO IFKO", date(2026, 5, 30)),
+    ("Olympic Quốc tế về Tiếng Anh", "SCO IEO", date(2026, 6, 7)),
+    ("Olympic Quốc tế về Khoa học", "ISO", date(2026, 6, 7)),
+]
+
+
+def _seed_competitions(context: DemoSeedContext):
+    for order, (name, code, exam_date) in enumerate(CYCLE_3_COMPETITIONS, start=10):
+        Competition.objects.create(name=name, code=code, cycle="3", exam_date=exam_date, sort_order=order)
+
+    # Chu ky 4: ngay tinh tu hom nay de luon co cuoc thi dang mo dang ky khi thu nghiem.
+    today = timezone.localdate(context.now)
+    imo = Competition.objects.create(
+        name="Olympic Quốc tế về Toán học",
+        code="IMO",
+        cycle="4 (thử nghiệm)",
+        exam_date=today + timedelta(days=60),
+        registration_deadline=today + timedelta(days=30),
+        sort_order=1,
+    )
+    ico = Competition.objects.create(
+        name="Olympic Quốc tế về Lập trình",
+        code="ICO",
+        cycle="4 (thử nghiệm)",
+        exam_date=today + timedelta(days=45),
+        registration_deadline=today + timedelta(days=5),
+        sort_order=2,
+    )
+
+    registrations = [
+        ("Trần Minh Khang", date(2012, 3, 14), "Khối 8", "THCS Giảng Võ", "8A1", "001212000101", "khang.ph@example.com", "0912000101", [imo], "new"),
+        ("Lê Phương Anh", date(2011, 9, 2), "Khối 9", "THCS Cầu Giấy", "9A3", "001211000102", "phuonganh.ph@example.com", "0912000102", [imo, ico], "confirmed"),
+    ]
+    for full_name, dob, grade, school, class_name, cccd, email, phone, competitions, status in registrations:
+        registration = CompetitionRegistration.objects.create(
+            full_name=full_name,
+            date_of_birth=dob,
+            grade=grade,
+            school=school,
+            class_name=class_name,
+            cccd=cccd,
+            address="1 Phố Giảng Võ",
+            ward="Phường Giảng Võ",
+            city="Hà Nội",
+            email=email,
+            guardian_phone=phone,
+            status=status,
+        )
+        registration.competitions.set(competitions)

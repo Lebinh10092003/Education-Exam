@@ -20,6 +20,7 @@ import {
   UsersRound,
   X,
   type LucideIcon,
+  Trophy,
 } from "lucide-react";
 
 import { useAuth } from "../../auth/useAuth";
@@ -37,6 +38,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "../ui/dropdown-menu";
+import { BrandLogo } from "../BrandLogo";
 
 type NavLocation = {
   pathname: string;
@@ -90,6 +92,7 @@ const navEntries: NavEntry[] = [
   { type: "item", icon: UsersRound, labelKey: "admin.groups", path: "/groups" },
   { type: "item", icon: BookOpen, labelKey: "admin.subjects", path: "/subjects" },
   { type: "item", icon: MessageSquareText, labelKey: "admin.questionBank", path: "/question-bank" },
+  { type: "item", icon: Trophy, labelKey: "admin.competitions", path: "/competitions" },
   {
     type: "group",
     icon: FileCheck,
@@ -320,11 +323,8 @@ export function AdminLayout() {
         }`}
       >
         <div className="flex h-16 items-center justify-between border-b border-gray-200 px-4 dark:border-white/[0.08]">
-          <Link to="/dashboard" className="flex items-center gap-2">
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-600">
-              <span className="text-lg font-bold text-white">E</span>
-            </div>
-            <span className="text-xl font-bold text-gray-800 dark:text-slate-100">EduExam</span>
+          <Link to="/dashboard" className="flex min-w-0 items-center">
+            <BrandLogo size="sm" subtitle="EduExam" />
           </Link>
           <button
             type="button"
@@ -348,16 +348,13 @@ export function AdminLayout() {
       >
         <div className="flex h-16 items-center justify-between border-b border-gray-200 px-6 dark:border-white/[0.08]">
           {!sidebarCollapsed ? (
-            <Link to="/dashboard" className="flex items-center gap-2">
-              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-600">
-                <span className="text-lg font-bold text-white">E</span>
-              </div>
-              <span className="text-xl font-bold text-gray-800 dark:text-slate-100">EduExam</span>
+            <Link to="/dashboard" className="flex min-w-0 items-center">
+              <BrandLogo size="sm" subtitle="EduExam" />
             </Link>
           ) : (
-            <div className="mx-auto flex h-8 w-8 items-center justify-center rounded-lg bg-blue-600">
-              <span className="text-lg font-bold text-white">E</span>
-            </div>
+            <Link to="/dashboard" className="mx-auto">
+              <BrandLogo variant="mark" size="sm" />
+            </Link>
           )}
         </div>
 

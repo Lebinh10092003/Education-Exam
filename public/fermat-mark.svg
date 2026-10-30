@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="FermatTech">
+  <rect width="64" height="64" rx="14" fill="#ffffff"/>
+  <!-- Canh trai -->
+  <polygon points="13,55 27,24 33,28 22,55" fill="#46a4ce"/>
+  <!-- Thanh noi giua -->
+  <polygon points="27,24 37,22 38,27 33,28" fill="#0b89b3"/>
+  <!-- Canh phai -->
+  <polygon points="36,8 55,54 46,54 33,20" fill="#48a5ce"/>
+  <!-- Thanh chan mau navy -->
+  <polygon points="33,44 41,44 56,57 47,57" fill="#193460"/>
+</svg>

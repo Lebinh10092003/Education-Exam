@@ -123,6 +123,8 @@ const landing = {
       cycle: "Chu kỳ {{num}}",
       status: {
         upcoming: "Sắp diễn ra",
+        ongoing: "Đang diễn ra",
+        ended: "Đã kết thúc",
       },
     },
     cards: {
@@ -260,6 +262,23 @@ const landing = {
     pass: "Đạt",
     fail: "Chưa đạt",
     tableTitle: "Kết quả tra cứu được công bố",
+  },
+  cta: {
+    registerNow: "Đăng ký ngay",
+    actionHeader: "Đăng ký",
+    closed: "Đã đóng đăng ký",
+    viewResults: "Tra cứu kết quả",
+    deadline: "Hạn đăng ký {{date}}",
+    daysLeft: "Còn {{count}} ngày",
+    lastDay: "Hạn cuối hôm nay",
+    heroOpen: "Đang mở đăng ký {{code}}",
+    lookupLink: "Đã dự thi? Tra cứu kết quả",
+    journeyCta: "Bắt đầu đăng ký",
+    journeyNote: "Chỉ một biểu mẫu, không cần tạo tài khoản.",
+    bandTitle: "Sẵn sàng cho kỳ thi tiếp theo?",
+    bandSubtitle: "Đăng ký sớm để nhận hướng dẫn, tài liệu ôn tập và lịch thi qua email.",
+    bandOpen: "{{count}} cuộc thi đang mở đăng ký",
+    bandSecondary: "Nhắn Zalo tư vấn",
   },
 };
 

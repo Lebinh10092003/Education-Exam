@@ -9,6 +9,8 @@ interface StatCardProps {
   trend?: {
     value: string;
     isPositive: boolean;
+    /** neutral: chi la thong tin (khong phai xu huong tang/giam) -> chu xam, khong mui ten. */
+    tone?: "positive" | "negative" | "neutral";
   };
   iconBgColor?: string;
   iconColor?: string;
@@ -32,10 +34,18 @@ export function StatCard({
             {trend ? (
               <p
                 className={`mt-2 text-sm ${
-                  trend.isPositive ? "text-green-600 dark:text-green-300" : "text-red-600 dark:text-red-300"
+                  (trend.tone ?? (trend.isPositive ? "positive" : "negative")) === "neutral"
+                    ? "text-muted-foreground"
+                    : trend.isPositive
+                      ? "text-green-600 dark:text-green-300"
+                      : "text-red-600 dark:text-red-300"
                 }`}
               >
-                <span aria-hidden="true">{trend.isPositive ? "\u2191" : "\u2193"}</span>{" "}
+                {trend.tone === "neutral" ? null : (
+                  <>
+                    <span aria-hidden="true">{trend.isPositive ? "\u2191" : "\u2193"}</span>{" "}
+                  </>
+                )}
                 <span>{trend.value}</span>
               </p>
             ) : null}

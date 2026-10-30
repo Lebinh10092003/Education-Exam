@@ -221,60 +221,60 @@ export function CandidateDashboard() {
         />
       )}
 
-      <div className="mb-6 grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-4">
+      <div className="mb-6 grid grid-cols-2 gap-3 sm:gap-6 xl:grid-cols-4">
         <Card className="glass-panel transition-all duration-300 hover:shadow-md hover:-translate-y-0.5">
-          <CardHeader className="pb-3">
-            <CardTitle className="flex items-center gap-2 text-base">
+          <CardHeader className="p-4 pb-2 sm:p-6 sm:pb-3">
+            <CardTitle className="flex items-start gap-2 text-sm leading-snug sm:items-center sm:text-base">
               <FileCheck className="h-4 w-4 text-blue-600" />
               Assigned Exams
             </CardTitle>
           </CardHeader>
-          <CardContent>
-            <p className="text-3xl font-bold text-gray-900 dark:text-white">{overview?.stats.assigned_exam_count ?? 0}</p>
-            <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">Visible from your current assignments</p>
+          <CardContent className="p-4 pt-0 sm:p-6 sm:pt-0">
+            <p className="text-2xl font-bold sm:text-3xl text-gray-900 dark:text-white">{overview?.stats.assigned_exam_count ?? 0}</p>
+            <p className="mt-1 text-xs text-gray-600 sm:text-sm dark:text-gray-400">Visible from your current assignments</p>
           </CardContent>
         </Card>
         <Card className="glass-panel transition-all duration-300 hover:shadow-md hover:-translate-y-0.5">
-          <CardHeader className="pb-3">
-            <CardTitle className="flex items-center gap-2 text-base">
+          <CardHeader className="p-4 pb-2 sm:p-6 sm:pb-3">
+            <CardTitle className="flex items-start gap-2 text-sm leading-snug sm:items-center sm:text-base">
               <CalendarDays className="h-4 w-4 text-green-600" />
               Upcoming Windows
             </CardTitle>
           </CardHeader>
-          <CardContent>
-            <p className="text-3xl font-bold text-gray-900 dark:text-white">{overview?.stats.upcoming_exam_count ?? 0}</p>
-            <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">Exam windows still available</p>
+          <CardContent className="p-4 pt-0 sm:p-6 sm:pt-0">
+            <p className="text-2xl font-bold sm:text-3xl text-gray-900 dark:text-white">{overview?.stats.upcoming_exam_count ?? 0}</p>
+            <p className="mt-1 text-xs text-gray-600 sm:text-sm dark:text-gray-400">Exam windows still available</p>
           </CardContent>
         </Card>
         <Card className="glass-panel transition-all duration-300 hover:shadow-md hover:-translate-y-0.5">
-          <CardHeader className="pb-3">
-            <CardTitle className="flex items-center gap-2 text-base">
+          <CardHeader className="p-4 pb-2 sm:p-6 sm:pb-3">
+            <CardTitle className="flex items-start gap-2 text-sm leading-snug sm:items-center sm:text-base">
               <Award className="h-4 w-4 text-purple-600" />
               Published Results
             </CardTitle>
           </CardHeader>
-          <CardContent>
-            <p className="text-3xl font-bold text-gray-900 dark:text-white">{overview?.stats.published_result_count ?? 0}</p>
-            <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
-              Average {formatNumber(overview?.stats.average_percentage ?? 0)}%
+          <CardContent className="p-4 pt-0 sm:p-6 sm:pt-0">
+            <p className="text-2xl font-bold sm:text-3xl text-gray-900 dark:text-white">{overview?.stats.published_result_count ?? 0}</p>
+            <p className="mt-1 text-xs text-gray-600 sm:text-sm dark:text-gray-400">
+              {`Average ${formatNumber(overview?.stats.average_percentage ?? 0)}%`}
             </p>
           </CardContent>
         </Card>
         <Card className="glass-panel transition-all duration-300 hover:shadow-md hover:-translate-y-0.5">
-          <CardHeader className="pb-3">
-            <CardTitle className="flex items-center gap-2 text-base">
+          <CardHeader className="p-4 pb-2 sm:p-6 sm:pb-3">
+            <CardTitle className="flex items-start gap-2 text-sm leading-snug sm:items-center sm:text-base">
               <BookOpen className="h-4 w-4 text-orange-600" />
               Active Materials
             </CardTitle>
           </CardHeader>
-          <CardContent>
-            <p className="text-3xl font-bold text-gray-900 dark:text-white">{overview?.stats.active_material_count ?? 0}</p>
-            <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">Latest references ready to open</p>
+          <CardContent className="p-4 pt-0 sm:p-6 sm:pt-0">
+            <p className="text-2xl font-bold sm:text-3xl text-gray-900 dark:text-white">{overview?.stats.active_material_count ?? 0}</p>
+            <p className="mt-1 text-xs text-gray-600 sm:text-sm dark:text-gray-400">Latest references ready to open</p>
           </CardContent>
         </Card>
       </div>
 
-      <div className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1.5fr),minmax(0,1fr)]">
+      <div className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)]">
         <Card className="glass-panel">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
@@ -339,7 +339,7 @@ export function CandidateDashboard() {
                 );
               })
             ) : (
-              <div className="py-10 text-center text-sm text-gray-500">No assigned exams available right now.</div>
+              <div className="py-10 text-center text-sm text-gray-500">No upcoming exams right now.</div>
             )}
           </CardContent>
         </Card>
@@ -386,7 +386,7 @@ export function CandidateDashboard() {
               )}
 
               <Button variant="outline" asChild className="w-full">
-                <Link to="/candidate/results">Open Results</Link>
+                <Link to="/candidate/results">View results</Link>
               </Button>
             </CardContent>
           </Card>

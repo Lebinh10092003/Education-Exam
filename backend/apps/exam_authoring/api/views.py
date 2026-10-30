@@ -1,4 +1,4 @@
-from django.db.models import Count, Exists, OuterRef, Q
+from django.db.models import Count, Exists, F, OuterRef, Q
 from drf_spectacular.utils import extend_schema
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
@@ -9,6 +9,7 @@ from rest_framework.response import Response
 from apps.identity.permissions import HasAPIPermissionCode
 from apps.institutions.models import CandidateGroup
 
+from ..lifecycle import PHASE_RANKS, annotate_exam_phase, order_exams_by_schedule
 from ..models import Exam, ExamAssignment
 from ..services import build_exam_assignment_summary, clone_exam, import_students_to_exam, sync_exam_assignments
 from .serializers import (
@@ -60,8 +61,15 @@ class ExamViewSet(viewsets.ModelViewSet):
         if search:
             queryset = queryset.filter(Q(name__icontains=search) | Q(subject__name__icontains=search))
 
+        queryset = annotate_exam_phase(queryset)
+
+        # Loc theo trang thai thuc te theo lich (vd. de "dang mo" nhung qua gio dong -> "da ket thuc").
         status_filter = self.request.query_params.get("status")
-        if status_filter:
+        if status_filter == Exam.Status.ARCHIVED:
+            queryset = queryset.filter(status=status_filter)
+        elif status_filter in PHASE_RANKS:
+            queryset = queryset.filter(phase_rank=PHASE_RANKS[status_filter])
+        elif status_filter:
             queryset = queryset.filter(status=status_filter)
 
         mode_filter = self.request.query_params.get("mode")
@@ -72,6 +80,16 @@ class ExamViewSet(viewsets.ModelViewSet):
         if subject_id:
             queryset = queryset.filter(subject_id=subject_id)
 
+        ordering = self.request.query_params.get("ordering") or "schedule"
+        if ordering == "schedule":
+            queryset = order_exams_by_schedule(queryset)
+        elif ordering in {"opens_at", "-opens_at"}:
+            field = F("schedule_window__opens_at")
+            queryset = queryset.order_by(
+                field.asc(nulls_last=True) if ordering == "opens_at" else field.desc(nulls_last=True), "-id"
+            )
+        elif ordering in {"created_at", "-created_at", "name", "-name"}:
+            queryset = queryset.order_by(ordering, "-id")
         return queryset.distinct()
 
     def get_serializer_class(self):
@@ -98,6 +116,59 @@ class ExamViewSet(viewsets.ModelViewSet):
         exam = serializer.save()
         output = ExamReadSerializer(exam, context=self.get_serializer_context())
         return Response(output.data)
+
+    @action(detail=True, methods=["get"], url_path="preview")
+    def preview(self, request, pk=None):
+        """
+        Xem truoc de nhu thi sinh lam bai (kem dap an/barem de nguoi ra de soat).
+        Chi danh cho quyen exams.view - KHONG dung cho phia thi sinh.
+        """
+        exam = self.get_object()
+        version = exam.current_version
+        items = []
+        if version is not None:
+            for item in (
+                version.items.select_related(
+                    "question_revision", "question_revision__question", "question_revision__answer_key"
+                )
+                .prefetch_related("question_revision__options")
+                .order_by("sort_order")
+            ):
+                revision = item.question_revision
+                answer_key = getattr(revision, "answer_key", None)
+                items.append(
+                    {
+                        "id": item.id,
+                        "source": item.source,
+                        "sort_order": item.sort_order,
+                        "points": str(item.points),
+                        "question_id": revision.question_id,
+                        "question_type": revision.question.question_type,
+                        "difficulty": revision.question.difficulty,
+                        "question_text": revision.question_text,
+                        "options": [
+                            {"key": option.key, "text": option.text}
+                            for option in sorted(revision.options.all(), key=lambda option: (option.sort_order, option.key))
+                        ],
+                        "correct_option_keys": list(getattr(answer_key, "correct_option_keys", []) or []),
+                        "essay_rubric": getattr(answer_key, "essay_rubric", "") if answer_key else "",
+                        "sample_answer": getattr(answer_key, "sample_answer", "") if answer_key else "",
+                    }
+                )
+        return Response(
+            {
+                "exam": {
+                    "id": exam.id,
+                    "name": exam.name,
+                    "subject": exam.subject.name,
+                    "duration_minutes": exam.duration_minutes,
+                    "enable_proctoring": exam.enable_proctoring,
+                    "shuffle_questions": exam.shuffle_questions,
+                },
+                "has_random_rules": bool(version and version.random_rules.exists()),
+                "items": items,
+            }
+        )
 
     @action(detail=True, methods=["get"], url_path="quality-check")
     def quality_check(self, request, pk=None):

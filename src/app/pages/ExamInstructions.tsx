@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocation, useNavigate, useParams } from "react-router";
 import { useTranslation } from "react-i18next";
 import {
@@ -24,6 +24,13 @@ import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card"
 import { Checkbox } from "../components/ui/checkbox";
 import { useAsyncList } from "../hooks/useAsyncList";
 import { apiRequest, type PaginatedResponse } from "../lib/http";
+import {
+  buildProctoringResources,
+  releaseStashedProctoringStreams,
+  requestScreenStream,
+  requestWebcamStream,
+  stashProctoringStreams,
+} from "../lib/proctoringCapture";
 import {
   type CandidateAssignedExam,
   canLaunchExam,
@@ -79,8 +86,26 @@ export function ExamInstructions() {
     network: "pending",
   });
 
+  // Quyen camera/man hinh cap o buoc kiem tra duoc giu lai va ban giao cho trang lam bai.
+  const startingExamRef = useRef(false);
+  useEffect(
+    () => () => {
+      if (!startingExamRef.current) {
+        releaseStashedProctoringStreams();
+      }
+    },
+    [],
+  );
+
   const runSystemCheck = async () => {
     if (!exam) return;
+    releaseStashedProctoringStreams();
+    let webcamStream: MediaStream | null = null;
+    let screenStream: MediaStream | null = null;
+    const stopCheckStreams = () => {
+      webcamStream?.getTracks().forEach((track) => track.stop());
+      screenStream?.getTracks().forEach((track) => track.stop());
+    };
 
     setAutoCheckState({
       status: "running",
@@ -121,7 +146,9 @@ export function ExamInstructions() {
     let cameraPass = true;
     if (exam.enable_proctoring) {
       try {
-        const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+        // Xin luon ca micro: trang lam bai can ca hai, khoi hoi lai.
+        const stream = await requestWebcamStream();
+        webcamStream = stream;
         const video = document.createElement("video");
         video.srcObject = stream;
         video.muted = true;
@@ -137,8 +164,8 @@ export function ExamInstructions() {
         const ctx = canvas.getContext("2d");
         ctx?.drawImage(video, 0, 0, 160, 120);
         const blob = await new Promise<Blob | null>((r) => canvas.toBlob(r, "image/jpeg", 0.5));
-        stream.getTracks().forEach((t) => t.stop());
-        cameraPass = blob !== null && blob.size > 0;
+        video.srcObject = null;
+        cameraPass = blob !== null && blob.size > 0 && stream.getAudioTracks().length > 0;
       } catch {
         cameraPass = false;
       }
@@ -151,6 +178,7 @@ export function ExamInstructions() {
     }));
 
     if (!cameraPass) {
+      stopCheckStreams();
       setAutoCheckState(prev => ({ ...prev, status: "fail" }));
       return;
     }
@@ -159,17 +187,10 @@ export function ExamInstructions() {
     let screenPass = true;
     if (exam.enable_proctoring) {
       try {
-        const stream = await navigator.mediaDevices.getDisplayMedia({
-          video: {
-            displaySurface: "monitor",
-          },
-          audio: false,
-          selfBrowserSurface: "exclude",
-          systemAudio: "exclude",
-        } as any);
+        const stream = await requestScreenStream();
+        screenStream = stream;
         const track = stream.getVideoTracks()[0];
         screenPass = !!track && track.readyState !== "ended";
-        stream.getTracks().forEach((t) => t.stop());
       } catch {
         screenPass = false;
       }
@@ -182,6 +203,7 @@ export function ExamInstructions() {
     }));
 
     if (!screenPass) {
+      stopCheckStreams();
       setAutoCheckState(prev => ({ ...prev, status: "fail" }));
       return;
     }
@@ -210,6 +232,7 @@ export function ExamInstructions() {
     }));
 
     if (!workerPass) {
+      stopCheckStreams();
       setAutoCheckState(prev => ({ ...prev, status: "fail" }));
       return;
     }
@@ -226,6 +249,15 @@ export function ExamInstructions() {
     }
 
     const allPass = dbPass && cameraPass && screenPass && workerPass && networkPass;
+    if (allPass && webcamStream && screenStream) {
+      try {
+        stashProctoringStreams(exam.id, buildProctoringResources(webcamStream, screenStream));
+      } catch {
+        stopCheckStreams();
+      }
+    } else {
+      stopCheckStreams();
+    }
     setAutoCheckState(prev => ({
       ...prev,
       network: networkPass ? "pass" : "fail",
@@ -298,7 +330,7 @@ export function ExamInstructions() {
         </div>
       ) : null}
 
-      <div className="grid gap-6 xl:grid-cols-[minmax(0,1.25fr),380px]">
+      <div className="grid gap-6 xl:grid-cols-[minmax(0,1.25fr)_380px]">
         <Card className="border-slate-200">
           <CardHeader>
             <div className="flex flex-wrap items-center gap-2">
@@ -590,7 +622,14 @@ export function ExamInstructions() {
               className="w-full"
               size="lg"
               disabled={!canLaunchExam(exam) || !allChecked}
-              onClick={() => navigate(`/candidate/exam/${exam.id}`)}
+              onClick={() => {
+                startingExamRef.current = true;
+                // Bat toan man hinh ngay trong cu bam nay (trinh duyet chi cho phep khi nguoi dung bam).
+                if (exam.enable_proctoring && document.fullscreenEnabled && !document.fullscreenElement) {
+                  void document.documentElement.requestFullscreen?.().catch(() => undefined);
+                }
+                navigate(`/candidate/exam/${exam.id}`);
+              }}
             >
               {availability === "resume" ? t("examInstructions.resumeExam") : t("examInstructions.startExam")}
             </Button>

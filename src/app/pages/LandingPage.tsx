@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link } from "react-router";
 import { useTranslation } from "react-i18next";
 import { useTheme } from "next-themes";
@@ -11,11 +11,15 @@ import {
   BrainCircuit,
   CalendarDays,
   CheckCircle,
+  Clock,
   ChevronDown,
   Code2,
   ExternalLink,
+  Flame,
   Languages,
   Mail,
+  Menu,
+  MessageCircle,
   Moon,
   Network,
   Phone,
@@ -31,6 +35,19 @@ import { Button } from "../components/ui/button";
 import { Card, CardContent } from "../components/ui/card";
 import { Input } from "../components/ui/input";
 import { Label } from "../components/ui/label";
+import { COMPETITION_STATUS_STYLES } from "../lib/competitionStatus";
+import {
+  daysUntil,
+  fetchPublicCompetitions,
+  formatIsoDate,
+  pickNextOpenCompetition,
+  type PublicCompetition,
+} from "../lib/competitions";
+import { BrandLogo } from "../components/BrandLogo";
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "../components/ui/sheet";
+import { ImageWithFallback } from "../components/figma/ImageWithFallback";
+
+
 
 const SCO_URL = "https://www.schoolconnectonline.com/olympiad/vietnam.aspx";
 const AYSBC_URL = "https://asiaysbc.com/";
@@ -180,17 +197,17 @@ function SectionHeading({
   );
 }
 
+const headerNavItems = [
+  { id: "competitions", labelKey: "nav.competitions" },
+  { id: "partners", labelKey: "nav.partners" },
+  { id: "journey", labelKey: "nav.journey" },
+  { id: "result-lookup", labelKey: "lookup.title" },
+  { id: "support", labelKey: "nav.support" },
+] as const;
+
 function BrandMark() {
   return (
-    <div className="flex items-center gap-3">
-      <img src="/fermat-logo.png" alt="FermatTech" className="h-10 w-10 object-contain rounded-lg" />
-      <div className="leading-tight">
-        <p className="text-base font-bold text-slate-950 dark:text-white">FermatTech</p>
-        <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500 dark:text-slate-400">
-          Competitions
-        </p>
-      </div>
-    </div>
+    <BrandLogo />
   );
 }
 
@@ -209,6 +226,26 @@ interface PublicResultRecord {
 export function LandingPage() {
   const { t } = useTranslation("landing");
   const { theme, setTheme } = useTheme();
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  // Bang "Cac cuoc thi noi bat" lay tu he thong (quan tri vien them/sua o trang Cuoc thi & dang ky).
+  const [competitions, setCompetitions] = useState<PublicCompetition[] | null>(null);
+  const [competitionsError, setCompetitionsError] = useState(false);
+  useEffect(() => {
+    let cancelled = false;
+    fetchPublicCompetitions()
+      .then((items) => {
+        if (!cancelled) setCompetitions(items);
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setCompetitions([]);
+          setCompetitionsError(true);
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
   const { isAuthenticated, profile } = useAuth();
   const [faqOpen, setFaqOpen] = useState<Record<number, boolean>>({ 1: true });
 
@@ -250,6 +287,66 @@ export function LandingPage() {
 
   const portalPath = profile ? getDefaultRouteForProfile(profile) : "/login";
 
+  // CTA dang ky: link chon san cuoc thi, nhac han dang ky.
+  const openCompetitions = (competitions ?? []).filter((item) => item.accepts_registration);
+  const nextOpen = pickNextOpenCompetition(competitions ?? []);
+  const registerHref = (exam?: PublicCompetition | null) => (exam ? `/register?competition=${exam.id}` : "/register");
+  const deadlineInfo = (exam: PublicCompetition) => {
+    if (!exam.accepts_registration || !exam.registration_deadline) return null;
+    const days = daysUntil(exam.registration_deadline);
+    if (days === null || days < 0) return null;
+    return {
+      label: days === 0 ? t("cta.lastDay") : t("cta.daysLeft", { count: days }),
+      urgent: days <= 7,
+    };
+  };
+  const nextOpenDeadline = nextOpen ? deadlineInfo(nextOpen) : null;
+  const renderCompetitionAction = (exam: PublicCompetition, fullWidth = false) => {
+    if (exam.accepts_registration) {
+      return (
+        <Button
+          asChild
+          size="sm"
+          className={`rounded-lg bg-blue-600 font-semibold text-white shadow-sm hover:bg-blue-700 ${fullWidth ? "h-11 w-full text-base" : ""}`}
+        >
+          <Link to={registerHref(exam)} aria-label={`${t("cta.registerNow")} ${exam.code}`}>
+            {t("cta.registerNow")}
+            <ArrowRight className="ml-1.5 h-4 w-4" />
+          </Link>
+        </Button>
+      );
+    }
+    if (exam.status === "ended") {
+      return (
+        <Button
+          size="sm"
+          variant="outline"
+          className={`rounded-lg font-semibold ${fullWidth ? "h-11 w-full" : ""}`}
+          onClick={() => scrollToId("result-lookup")}
+        >
+          {t("cta.viewResults")}
+        </Button>
+      );
+    }
+    return <span className="text-xs font-medium text-slate-400">{t("cta.closed")}</span>;
+  };
+  const renderDeadline = (exam: PublicCompetition, withDate: boolean) => {
+    const info = deadlineInfo(exam);
+    if (!info) return null;
+    return (
+      <span
+        className={`inline-flex items-center gap-1 text-xs font-medium ${
+          info.urgent ? "text-red-600 dark:text-red-400" : "text-slate-500 dark:text-slate-400"
+        }`}
+      >
+        <Clock className="h-3 w-3" />
+        {withDate
+          ? `${info.label} · ${t("cta.deadline", { date: formatIsoDate(exam.registration_deadline) })}`
+          : info.label}
+      </span>
+    );
+  };
+
   const scrollToId = (id: string) => {
     const element = document.getElementById(id);
     if (element) {
@@ -264,26 +361,21 @@ export function LandingPage() {
     >
       <header className="sticky top-0 z-40 border-b border-slate-200 bg-white/95 backdrop-blur dark:border-slate-800 dark:bg-slate-950/90">
         <div className="mx-auto flex h-16 max-w-7xl items-center justify-between gap-4 px-4 sm:px-6 lg:px-8">
-          <Link to="/" aria-label="FermatTech homepage">
+          <Link to="/" aria-label="FermatTech homepage" className="shrink-0">
             <BrandMark />
           </Link>
 
-          <nav className="hidden items-center gap-8 text-xs font-bold uppercase tracking-widest text-slate-500 md:flex dark:text-slate-400">
-            <button className="hover:text-slate-950 dark:hover:text-white transition-colors" onClick={() => scrollToId("competitions")}>
-              {t("nav.competitions")}
-            </button>
-            <button className="hover:text-slate-950 dark:hover:text-white transition-colors" onClick={() => scrollToId("partners")}>
-              {t("nav.partners")}
-            </button>
-            <button className="hover:text-slate-950 dark:hover:text-white transition-colors" onClick={() => scrollToId("journey")}>
-              {t("nav.journey")}
-            </button>
-            <button className="hover:text-slate-950 dark:hover:text-white transition-colors" onClick={() => scrollToId("result-lookup")}>
-              {t("lookup.title")}
-            </button>
-            <button className="hover:text-slate-950 dark:hover:text-white transition-colors" onClick={() => scrollToId("support")}>
-              {t("nav.support")}
-            </button>
+          <nav className="mx-auto hidden items-center gap-1 whitespace-nowrap text-sm font-semibold text-slate-600 xl:flex dark:text-slate-300">
+            {headerNavItems.map((item) => (
+              <button
+                key={item.id}
+                type="button"
+                className="rounded-lg px-3 py-2 transition-colors hover:bg-slate-100 hover:text-slate-950 dark:hover:bg-slate-800 dark:hover:text-white"
+                onClick={() => scrollToId(item.id)}
+              >
+                {t(item.labelKey)}
+              </button>
+            ))}
           </nav>
 
           <div className="flex shrink-0 items-center gap-2">
@@ -300,9 +392,9 @@ export function LandingPage() {
             </Button>
             <Button
               asChild
-              className="hidden rounded-xl bg-gradient-to-r from-blue-600 to-cyan-500 px-6 text-white hover:from-blue-700 hover:to-cyan-600 shadow-md shadow-blue-500/20 sm:inline-flex transition-all duration-300 text-xs font-bold uppercase tracking-widest border-0"
+              className="hidden rounded-xl border-0 bg-gradient-to-r from-blue-600 to-cyan-500 px-5 text-sm font-semibold text-white shadow-md shadow-blue-500/20 transition-all duration-300 hover:from-blue-700 hover:to-cyan-600 sm:inline-flex"
             >
-              <Link to="/register">
+              <Link to={registerHref(nextOpen)}>
                 {t("hero.ctaRegister")}
               </Link>
             </Button>
@@ -311,6 +403,52 @@ export function LandingPage() {
                 {isAuthenticated ? t("nav.portal") : t("nav.login")}
               </Link>
             </Button>
+            <Sheet open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>
+              <SheetTrigger asChild>
+                <Button
+                  variant="outline"
+                  size="icon"
+                  className="h-9 w-9 rounded-lg border-slate-200 xl:hidden dark:border-slate-800"
+                  aria-label="Mở menu"
+                >
+                  <Menu className="h-5 w-5" />
+                </Button>
+              </SheetTrigger>
+              <SheetContent side="right" className="w-[300px] p-0 sm:w-[340px]">
+                <SheetHeader className="border-b border-slate-200 p-5 dark:border-slate-800">
+                  <SheetTitle asChild>
+                    <div>
+                      <BrandLogo size="sm" />
+                    </div>
+                  </SheetTitle>
+                </SheetHeader>
+                <nav className="flex flex-col gap-1 p-3">
+                  {headerNavItems.map((item) => (
+                    <button
+                      key={item.id}
+                      type="button"
+                      className="rounded-lg px-4 py-3 text-left text-base font-medium text-slate-700 transition-colors hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-800"
+                      onClick={() => {
+                        setMobileMenuOpen(false);
+                        window.setTimeout(() => scrollToId(item.id), 150);
+                      }}
+                    >
+                      {t(item.labelKey)}
+                    </button>
+                  ))}
+                </nav>
+                <div className="mt-auto grid gap-2 border-t border-slate-200 p-5 dark:border-slate-800">
+                  <Button asChild className="rounded-xl bg-gradient-to-r from-blue-600 to-cyan-500 text-white">
+                    <Link to={registerHref(nextOpen)}>{t("hero.ctaRegister")}</Link>
+                  </Button>
+                  <Button asChild variant="outline" className="rounded-xl">
+                    <Link to={isAuthenticated ? portalPath : "/login"}>
+                      {isAuthenticated ? t("nav.portal") : t("nav.login")}
+                    </Link>
+                  </Button>
+                </div>
+              </SheetContent>
+            </Sheet>
           </div>
         </div>
       </header>
@@ -354,27 +492,56 @@ export function LandingPage() {
                 {t("hero.subtitle")}
               </p>
 
-              <div className="mt-10 flex flex-col gap-4 sm:flex-row justify-center lg:justify-start">
-                <Button asChild size="lg" className="rounded-xl bg-gradient-to-r from-blue-600 to-cyan-500 px-8 text-white hover:from-blue-700 hover:to-cyan-600 shadow-lg shadow-blue-500/25 transition-all duration-300 text-sm font-bold uppercase tracking-widest h-14 border-0 w-full sm:w-auto">
-                  <Link to="/register">
+              {nextOpen ? (
+                <Link
+                  to={registerHref(nextOpen)}
+                  className="mt-8 inline-flex max-w-full items-center gap-2 rounded-full border border-amber-200 bg-amber-50 px-4 py-2 text-sm font-semibold text-amber-900 shadow-sm transition-colors hover:bg-amber-100 dark:border-amber-900/60 dark:bg-amber-950/40 dark:text-amber-200"
+                >
+                  <Flame className="h-4 w-4 shrink-0 text-amber-600" />
+                  <span className="truncate">{t("cta.heroOpen", { code: nextOpen.code })}</span>
+                  {nextOpenDeadline ? (
+                    <span className="shrink-0 rounded-full bg-white px-2 py-0.5 text-xs font-bold text-amber-700 dark:bg-amber-900/60 dark:text-amber-100">
+                      {nextOpenDeadline.label}
+                    </span>
+                  ) : null}
+                  <ArrowRight className="h-4 w-4 shrink-0" />
+                </Link>
+              ) : null}
+
+              <div className="mt-8 flex flex-col justify-center gap-3 sm:flex-row lg:justify-start">
+                <Button
+                  asChild
+                  size="lg"
+                  className="group h-14 w-full rounded-xl border-0 bg-gradient-to-r from-blue-600 to-cyan-500 px-8 text-base font-semibold text-white shadow-lg shadow-blue-500/25 transition-all duration-300 hover:-translate-y-0.5 hover:from-blue-700 hover:to-cyan-600 hover:shadow-xl sm:w-auto"
+                >
+                  <Link to={registerHref(nextOpen)}>
                     {t("hero.ctaRegister")}
+                    <ArrowRight className="ml-2 h-5 w-5 transition-transform group-hover:translate-x-1" />
                   </Link>
                 </Button>
                 <Button
                   size="lg"
                   variant="outline"
-                  className="rounded-xl border border-slate-300 bg-white/60 backdrop-blur-sm px-8 text-slate-700 hover:bg-slate-100 transition-all duration-300 text-sm font-bold uppercase tracking-widest h-14 dark:border-slate-700 dark:bg-slate-900/50 dark:text-slate-200 dark:hover:bg-slate-800 w-full sm:w-auto"
+                  className="h-14 w-full rounded-xl border border-slate-300 bg-white/70 px-8 text-base font-semibold text-slate-700 backdrop-blur-sm transition-all duration-300 hover:bg-slate-100 sm:w-auto dark:border-slate-700 dark:bg-slate-900/50 dark:text-slate-200 dark:hover:bg-slate-800"
                   onClick={() => scrollToId("competitions")}
                 >
+                  <CalendarDays className="mr-2 h-5 w-5" />
                   {t("hero.ctaExplore")}
                 </Button>
               </div>
+              <button
+                type="button"
+                onClick={() => scrollToId("result-lookup")}
+                className="mt-5 text-sm font-semibold text-blue-700 underline-offset-4 hover:underline dark:text-cyan-400"
+              >
+                {t("cta.lookupLink")} →
+              </button>
             </div>
 
             <div className="flex-1 w-full max-w-lg lg:max-w-none relative">
               <div className="absolute -inset-4 bg-gradient-to-r from-blue-500 to-cyan-400 rounded-3xl opacity-20 blur-2xl animate-pulse dark:opacity-30"></div>
               <div className="relative rounded-2xl overflow-hidden border border-white/40 shadow-2xl bg-white dark:border-slate-800 dark:bg-slate-900 aspect-[4/3] sm:aspect-[16/10] lg:aspect-[4/3]">
-                <img src="https://images.unsplash.com/photo-1522202176988-66273c2fd55f?auto=format&fit=crop&q=80&w=1200" alt="Students learning" className="w-full h-full object-cover" />
+                <ImageWithFallback src="https://images.unsplash.com/photo-1522202176988-66273c2fd55f?auto=format&fit=crop&q=80&w=1200" alt="Học sinh học tập" loading="lazy" decoding="async" className="w-full h-full object-cover bg-slate-100" />
                 <div className="absolute inset-0 bg-gradient-to-t from-slate-900/40 to-transparent"></div>
               </div>
             </div>
@@ -395,7 +562,7 @@ export function LandingPage() {
                   >
                     <div>
                       <div className="flex items-center gap-4 border-b border-slate-100 pb-4 dark:border-slate-800">
-                        <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-xl bg-white p-2 border border-slate-200 shadow-sm">
+                        <div className="flex h-14 w-28 shrink-0 items-center justify-center rounded-xl bg-white px-3 py-2 border border-slate-200 shadow-sm">
                           <img src={partner.logo} alt={partner.initials} className="h-full w-full object-contain" />
                         </div>
                         <div>
@@ -447,7 +614,7 @@ export function LandingPage() {
                     <div className="aspect-[16/9] w-full overflow-hidden bg-slate-100 dark:bg-slate-800 relative">
                       {category.image && (
                         <>
-                          <img src={category.image} alt={category.key} className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-110" />
+                          <ImageWithFallback src={category.image} alt={t(`categories.${category.key}.title`)} loading="lazy" decoding="async" className="h-full w-full object-cover bg-slate-100 transition-transform duration-700 group-hover:scale-110" />
                           <div className="absolute inset-0 bg-gradient-to-t from-blue-900/60 via-blue-900/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
                         </>
                       )}
@@ -480,29 +647,38 @@ export function LandingPage() {
           <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
             <SectionHeading title={t("competitions.title")} subtitle={t("competitions.subtitle")} />
             
-            <div className="mt-10 overflow-x-auto rounded-lg border border-slate-200 dark:border-slate-800 shadow-sm bg-white dark:bg-slate-900">
+            <div className="mt-10 hidden overflow-x-auto rounded-lg border border-slate-200 bg-white shadow-sm md:block dark:border-slate-800 dark:bg-slate-900">
               <table className="table table-bordered table-hover w-full border-collapse text-left text-sm">
                 <thead className="bg-slate-50 text-xs font-bold uppercase tracking-wider text-slate-700 dark:bg-slate-800/50 dark:text-slate-200 border-b border-slate-200 dark:border-slate-800">
                   <tr>
-                    <th className="px-6 py-4 font-bold" width="46%">{t("competitions.table.headers.olympiad")}</th>
-                    <th className="px-6 py-4 font-bold text-center" width="18%">{t("competitions.table.headers.cycle")}</th>
-                    <th className="px-6 py-4 font-bold text-center" width="22%">{t("competitions.table.headers.date")}</th>
-                    <th className="px-6 py-4 font-bold text-center" width="14%">{t("competitions.table.headers.status")}</th>
+                    <th className="px-6 py-4 font-bold">{t("competitions.table.headers.olympiad")}</th>
+                    <th className="px-4 py-4 text-center font-bold">{t("competitions.table.headers.cycle")}</th>
+                    <th className="px-4 py-4 text-center font-bold">{t("competitions.table.headers.date")}</th>
+                    <th className="px-4 py-4 text-center font-bold">{t("competitions.table.headers.status")}</th>
+                    <th className="px-6 py-4 text-right font-bold">{t("cta.actionHeader")}</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-200 dark:divide-slate-800">
-                  {[
-                    { key: "imo", code: "IMO", cycle: "3", date: "31/05/2026", status: "upcoming" },
-                    { key: "ico", code: "ICO", cycle: "3", date: "30/05/2026", status: "upcoming" },
-                    { key: "ieio", code: "SCO IEIO", cycle: "3", date: "30/05/2026", status: "upcoming" },
-                    { key: "ifko", code: "SCO IFKO", cycle: "3", date: "30/05/2026", status: "upcoming" },
-                    { key: "ieo", code: "SCO IEO", cycle: "3", date: "07/06/2026", status: "upcoming" },
-                    { key: "iso", code: "ISO", cycle: "3", date: "07/06/2026", status: "upcoming" },
-                  ].map((exam) => (
-                    <tr key={exam.key} className="hover:bg-slate-50 dark:hover:bg-slate-800/30">
+                  {competitions === null ? (
+                    <tr>
+                      <td colSpan={5} className="px-6 py-10 text-center text-sm text-slate-500">
+                        Đang tải lịch thi...
+                      </td>
+                    </tr>
+                  ) : competitions.length === 0 ? (
+                    <tr>
+                      <td colSpan={5} className="px-6 py-10 text-center text-sm text-slate-500">
+                        {competitionsError
+                          ? "Chưa tải được lịch thi, vui lòng thử lại sau."
+                          : "Lịch thi chu kỳ mới sẽ được cập nhật sớm."}
+                      </td>
+                    </tr>
+                  ) : null}
+                  {(competitions ?? []).map((exam) => (
+                    <tr key={exam.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/30">
                       <td className="px-6 py-4 whitespace-nowrap">
                         <span className="exam-name font-semibold text-slate-900 dark:text-white block">
-                          {t(`competitions.table.exams.${exam.key}.name`)}
+                          {exam.name}
                         </span>
                         <span className="exam-code text-xs text-slate-500 dark:text-slate-400 block mt-1">
                           {exam.code}
@@ -510,23 +686,70 @@ export function LandingPage() {
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-center">
                         <span className="cycle-badge inline-flex items-center rounded-full bg-blue-50 px-2.5 py-0.5 text-xs font-medium text-blue-700 dark:bg-blue-900/30 dark:text-blue-300">
-                          {t("competitions.table.cycle", { num: exam.cycle })}
+                          {exam.cycle ? t("competitions.table.cycle", { num: exam.cycle }) : "—"}
                         </span>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-center">
                         <span className="date-badge inline-flex items-center rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-semibold text-slate-800 dark:bg-slate-800 dark:text-slate-200">
-                          {exam.date}
+                          {formatIsoDate(exam.exam_date)}
                         </span>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-center">
-                        <span className="status-badge inline-flex items-center rounded-full bg-emerald-50 px-2.5 py-0.5 text-xs font-bold text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-300">
+                        <span
+                          className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-bold ${COMPETITION_STATUS_STYLES[exam.status]}`}
+                        >
                           {t(`competitions.table.status.${exam.status}`)}
                         </span>
+                      </td>
+                      <td className="px-6 py-4 text-right whitespace-nowrap">
+                        <div className="flex flex-col items-end gap-1">
+                          {renderCompetitionAction(exam)}
+                          {renderDeadline(exam, true)}
+                        </div>
                       </td>
                     </tr>
                   ))}
                 </tbody>
               </table>
+            </div>
+
+            {/* Dien thoai: the thay cho bang, nut dang ky de bam */}
+            <div className="mt-8 grid gap-3 md:hidden">
+              {competitions === null ? (
+                <p className="py-6 text-center text-sm text-slate-500">Đang tải lịch thi...</p>
+              ) : competitions.length === 0 ? (
+                <p className="py-6 text-center text-sm text-slate-500">
+                  {competitionsError ? "Chưa tải được lịch thi, vui lòng thử lại sau." : "Lịch thi chu kỳ mới sẽ được cập nhật sớm."}
+                </p>
+              ) : null}
+              {(competitions ?? []).map((exam) => (
+                <div
+                  key={exam.id}
+                  className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900"
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="font-semibold leading-snug text-slate-900 dark:text-white">{exam.name}</p>
+                      <p className="mt-1 text-xs text-slate-500">
+                        {exam.cycle ? `${exam.code} · ${t("competitions.table.cycle", { num: exam.cycle })}` : exam.code}
+                      </p>
+                    </div>
+                    <span
+                      className={`shrink-0 rounded-full px-2.5 py-0.5 text-xs font-bold ${COMPETITION_STATUS_STYLES[exam.status]}`}
+                    >
+                      {t(`competitions.table.status.${exam.status}`)}
+                    </span>
+                  </div>
+                  <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-slate-600 dark:text-slate-300">
+                    <span className="inline-flex items-center gap-1">
+                      <CalendarDays className="h-3.5 w-3.5" />
+                      {`${t("competitions.table.headers.date")}: ${formatIsoDate(exam.exam_date)}`}
+                    </span>
+                    {renderDeadline(exam, false)}
+                  </div>
+                  <div className="mt-4">{renderCompetitionAction(exam, true)}</div>
+                </div>
+              ))}
             </div>
           </div>
         </section>
@@ -547,6 +770,19 @@ export function LandingPage() {
                   </div>
                 </div>
               ))}
+            </div>
+            <div className="mt-14 flex flex-col items-center gap-2 text-center">
+              <Button
+                asChild
+                size="lg"
+                className="h-12 rounded-xl bg-blue-600 px-8 text-base font-semibold text-white shadow-md hover:bg-blue-700"
+              >
+                <Link to={registerHref(nextOpen)}>
+                  {t("cta.journeyCta")}
+                  <ArrowRight className="ml-2 h-5 w-5" />
+                </Link>
+              </Button>
+              <p className="text-sm text-slate-500 dark:text-slate-400">{t("cta.journeyNote")}</p>
             </div>
           </div>
         </section>
@@ -589,7 +825,7 @@ export function LandingPage() {
                   rel="noreferrer"
                   className="rounded-xl bg-white/10 border border-white/20 p-5 text-sm font-bold text-white hover:bg-white hover:text-blue-600 shadow-sm backdrop-blur-sm transition-all flex flex-col items-center text-center group"
                 >
-                  <img src="/fermat-logo.png" className="mb-4 h-6 w-6 object-contain group-hover:brightness-100 transition-all" alt="FermatTech" />
+                  <MessageCircle className="mb-4 h-6 w-6 text-white group-hover:text-blue-600" />
                   {t("support.zalo")}
                 </a>
                 <a
@@ -811,9 +1047,57 @@ export function LandingPage() {
             </div>
           </div>
         </section>
+        <section className="px-4 py-16 sm:px-6 lg:px-8">
+          <div className="relative mx-auto max-w-6xl overflow-hidden rounded-3xl bg-gradient-to-br from-blue-700 via-blue-600 to-cyan-500 px-6 py-12 text-center shadow-2xl shadow-blue-500/20 sm:px-12">
+            <div className="pointer-events-none absolute -right-16 -top-16 h-56 w-56 rounded-full bg-white/10 blur-3xl" />
+            <div className="relative">
+              {openCompetitions.length > 0 ? (
+                <p className="mb-4 inline-flex items-center gap-2 rounded-full bg-white/15 px-4 py-1.5 text-sm font-semibold text-white">
+                  <Flame className="h-4 w-4" />
+                  {t("cta.bandOpen", { count: openCompetitions.length })}
+                </p>
+              ) : null}
+              <h2 className="text-3xl font-extrabold tracking-tight text-white sm:text-4xl">{t("cta.bandTitle")}</h2>
+              <p className="mx-auto mt-4 max-w-2xl text-base text-blue-50 sm:text-lg">{t("cta.bandSubtitle")}</p>
+              <div className="mt-8 flex flex-col justify-center gap-3 sm:flex-row">
+                <Button
+                  asChild
+                  size="lg"
+                  className="h-14 rounded-xl bg-white px-8 text-base font-bold text-blue-700 shadow-lg hover:bg-blue-50"
+                >
+                  <Link to={registerHref(nextOpen)}>
+                    {t("hero.ctaRegister")}
+                    <ArrowRight className="ml-2 h-5 w-5" />
+                  </Link>
+                </Button>
+                <Button
+                  asChild
+                  size="lg"
+                  variant="outline"
+                  className="h-14 rounded-xl border-white/50 bg-transparent px-8 text-base font-semibold text-white hover:bg-white/10 hover:text-white"
+                >
+                  <a href={ZALO_URL} target="_blank" rel="noreferrer">
+                    <MessageCircle className="mr-2 h-5 w-5" />
+                    {t("cta.bandSecondary")}
+                  </a>
+                </Button>
+              </div>
+            </div>
+          </div>
+        </section>
       </main>
 
-      <footer className="border-t border-slate-200 bg-white py-10 dark:border-slate-800 dark:bg-slate-950">
+      {/* Dien thoai: nut dang ky luon trong tam tay */}
+      <div className="fixed inset-x-0 bottom-0 z-30 border-t border-slate-200 bg-white/95 p-3 backdrop-blur sm:hidden dark:border-slate-800 dark:bg-slate-950/95">
+        <Button asChild className="h-12 w-full rounded-xl bg-gradient-to-r from-blue-600 to-cyan-500 text-base font-semibold text-white">
+          <Link to={registerHref(nextOpen)}>
+            {nextOpen ? t("cta.heroOpen", { code: nextOpen.code }) : t("hero.ctaRegister")}
+            <ArrowRight className="ml-2 h-5 w-5" />
+          </Link>
+        </Button>
+      </div>
+
+      <footer className="border-t border-slate-200 bg-white pt-10 pb-24 sm:pb-10 dark:border-slate-800 dark:bg-slate-950">
         <div className="mx-auto flex max-w-7xl flex-col gap-6 px-4 sm:px-6 md:flex-row md:items-center md:justify-between lg:px-8">
           <BrandMark />
           <div className="flex flex-wrap gap-4 text-sm font-semibold text-slate-600 dark:text-slate-300">

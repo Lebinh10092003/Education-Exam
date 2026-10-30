@@ -44,7 +44,7 @@ describe("proctoringMedia", () => {
         },
         {} as MediaStreamTrack,
       ),
-    ).rejects.toThrow(/docker compose up -d livekit/i);
+    ).rejects.toThrow(/Không kết nối được máy chủ camera giám sát/);
   });
 
   it("surfaces the same local setup hint when the peer connection cannot be established", async () => {
@@ -63,6 +63,6 @@ describe("proctoringMedia", () => {
           expires_at: "2026-03-23T00:00:00Z",
         },
       ),
-    ).rejects.toThrow(/docker compose up -d livekit/i);
+    ).rejects.toThrow(/Không kết nối được máy chủ camera giám sát/);
   });
 });

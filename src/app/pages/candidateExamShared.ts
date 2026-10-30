@@ -81,11 +81,22 @@ export const formatExamDateTime = (value: string | null, locale = "en") => {
     return copy.notScheduled;
   }
 
+  const date = new Date(value);
+  if (normalizeExamLocale(locale).startsWith("vi")) {
+    // Kieu quen thuoc voi nguoi Viet: 13/07/2026 11:18 (Intl mac dinh dat gio truoc ngay).
+    return `${formatVietnameseDate(date)} ${formatClock(date)}`;
+  }
   return new Intl.DateTimeFormat(normalizeExamLocale(locale), {
     dateStyle: "medium",
     timeStyle: "short",
-  }).format(new Date(value));
+  }).format(date);
 };
+
+const pad2 = (value: number) => String(value).padStart(2, "0");
+const formatVietnameseDate = (date: Date) => `${pad2(date.getDate())}/${pad2(date.getMonth() + 1)}/${date.getFullYear()}`;
+const formatClock = (date: Date) => `${pad2(date.getHours())}:${pad2(date.getMinutes())}`;
+const isSameDay = (a: Date, b: Date) =>
+  a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
 
 export const formatExamSchedule = (opensAt: string | null, closesAt: string | null, locale = "en") => {
   const copy = getCandidateExamCopy(locale);
@@ -93,7 +104,12 @@ export const formatExamSchedule = (opensAt: string | null, closesAt: string | nu
     return copy.noScheduleWindow;
   }
   if (opensAt && closesAt) {
-    return `${formatExamDateTime(opensAt, locale)} -> ${formatExamDateTime(closesAt, locale)}`;
+    const opens = new Date(opensAt);
+    const closes = new Date(closesAt);
+    if (normalizeExamLocale(locale).startsWith("vi") && isSameDay(opens, closes)) {
+      return `${formatVietnameseDate(opens)}, ${formatClock(opens)} – ${formatClock(closes)}`;
+    }
+    return `${formatExamDateTime(opensAt, locale)} – ${formatExamDateTime(closesAt, locale)}`;
   }
   return opensAt
     ? `${copy.opens} ${formatExamDateTime(opensAt, locale)}`

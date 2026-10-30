@@ -48,6 +48,9 @@ vi.mock("../lib/notify", () => ({
 }));
 
 vi.mock("../lib/proctoringCapture", () => ({
+  claimStashedProctoringStreams: () => null,
+  hasStashedProctoringStreams: () => false,
+  releaseStashedProctoringStreams: () => undefined,
   requestProctoringStreams: (...args: unknown[]) => mockRequestProctoringStreams(...args),
   captureTrackSnapshot: (...args: unknown[]) => mockCaptureTrackSnapshot(...args),
 }));

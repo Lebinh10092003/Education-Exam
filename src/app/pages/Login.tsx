@@ -22,6 +22,7 @@ import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import { Label } from "../components/ui/label";
 import { Checkbox } from "../components/ui/checkbox";
+import { BrandLogo } from "../components/BrandLogo";
 
 const SUPPORT_ZALO_URL = "https://zalo.me/fermattech";
 const SUPPORT_PHONE = "0969 627 162";
@@ -81,19 +82,13 @@ export function Login() {
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-950 dark:bg-slate-950 dark:text-slate-100 relative overflow-hidden flex flex-col justify-between">
-      <div className="absolute inset-0 z-0 pointer-events-none opacity-30 dark:opacity-10 bg-no-repeat bg-cover bg-center" style={{ backgroundImage: 'url("/login-bg.png")' }} />
+      <div className="absolute inset-0 z-0 pointer-events-none opacity-30 dark:opacity-10 bg-no-repeat bg-cover bg-center" style={{ backgroundImage: 'url("/login-bg.webp")' }} />
       <div className="absolute inset-0 bg-gradient-to-b from-white/95 via-white/80 to-white/95 dark:from-slate-950/95 dark:via-slate-950/85 dark:to-slate-950/95 z-0 pointer-events-none" />
 
       <header className="relative z-10 border-b border-slate-200 bg-white/90 backdrop-blur-md dark:border-slate-800 dark:bg-slate-950/80">
         <div className="mx-auto flex h-16 max-w-7xl items-center justify-between gap-4 px-4 sm:px-6 lg:px-8">
-          <Link to="/" className="flex items-center gap-3">
-            <img src="/fermat-logo.png" alt="FermatTech" className="h-10 w-10 object-contain rounded-lg" />
-            <div>
-              <p className="font-bold leading-none text-slate-950 dark:text-white">FermatTech</p>
-              <p className="mt-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
-                Candidate portal
-              </p>
-            </div>
+          <Link to="/" className="flex items-center">
+            <BrandLogo subtitle={t("candidate.portal", { ns: "navigation" })} subtitleClassName="hidden sm:inline" />
           </Link>
           <div className="flex items-center gap-2">
             <LanguageSwitcher />
@@ -126,7 +121,7 @@ export function Login() {
                 key={partner.name}
                 className="rounded-lg border border-slate-200 bg-white/80 backdrop-blur-sm p-4 shadow-sm dark:border-slate-800/80 dark:bg-slate-900/50 flex flex-col items-start transition duration-200 hover:-translate-y-0.5 hover:shadow-md"
               >
-                <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-white p-1 border border-slate-200">
+                <div className="flex h-11 w-24 items-center justify-center rounded-lg bg-white px-2 py-1.5 border border-slate-200">
                   <img src={partner.logo} alt={partner.initials} className="h-full w-full object-contain" />
                 </div>
                 <p className="mt-3 text-sm font-bold leading-5 text-slate-900 dark:text-white">{partner.name}</p>
@@ -136,7 +131,7 @@ export function Login() {
 
           <div className="mt-8 rounded-lg border border-blue-200 bg-blue-50/70 backdrop-blur-sm p-6 dark:border-blue-900/60 dark:bg-blue-950/20">
             <div className="flex items-center gap-3">
-              <img src="/fermat-logo.png" className="h-6 w-6 object-contain" alt="FermatTech" />
+              <img src="/fermat-logo.png" className="h-8 w-auto object-contain" alt="FermatTech" />
               <h2 className="text-lg font-black uppercase tracking-wide text-slate-950 dark:text-white">
                 LIÊN HỆ HỖ TRỢ
               </h2>
@@ -173,7 +168,8 @@ export function Login() {
           </div>
         </section>
 
-        <section className="flex items-center justify-center">
+        {/* Dien thoai: o dang nhap len dau, khong phai cuon qua phan gioi thieu. */}
+        <section className="order-first flex items-center justify-center lg:order-none">
           <Card className="w-full max-w-md rounded-lg border-slate-200 bg-white/85 backdrop-blur-md shadow-xl dark:border-slate-800/80 dark:bg-slate-900/70">
             <CardHeader className="pb-5 text-center">
               <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-lg bg-blue-700 text-white shadow-sm">

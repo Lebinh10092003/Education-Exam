@@ -10,7 +10,9 @@ from rest_framework import generics
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
+from apps.exam_authoring.lifecycle import resolve_exam_phase
 from apps.exam_authoring.models import Exam
+from apps.platform_core.i18n import t
 from apps.exam_authoring.services import build_exam_assignment_summary
 from apps.exam_delivery.models import ExamSession
 from apps.identity.models import User
@@ -151,19 +153,21 @@ def _format_exam_time_left(exam):
         days = int(delta.total_seconds() // 86400)
         hours = int((delta.total_seconds() % 86400) // 3600)
         if days > 0:
-            return f"Starts in {days}d"
+            return t(vi=f"Mở sau {days} ngày", en=f"Starts in {days}d")
         if hours > 0:
-            return f"Starts in {hours}h"
-        return "Starts soon"
+            return t(vi=f"Mở sau {hours} giờ", en=f"Starts in {hours}h")
+        return t(vi="Sắp mở", en="Starts soon")
 
     if schedule_window.closes_at and schedule_window.closes_at > now:
         delta = schedule_window.closes_at - now
         hours = int(delta.total_seconds() // 3600)
         minutes = int((delta.total_seconds() % 3600) // 60)
-        return f"{hours}h {minutes}m left"
+        if hours >= 48:
+            return t(vi=f"Còn {hours // 24} ngày", en=f"{hours // 24}d left")
+        return t(vi=f"Còn {hours} giờ {minutes} phút", en=f"{hours}h {minutes}m left")
 
     if schedule_window.closes_at and schedule_window.closes_at <= now:
-        return "Ended"
+        return t(vi="Đã kết thúc", en="Ended")
 
     return "-"
 
@@ -232,7 +236,8 @@ class DashboardOverviewView(generics.GenericAPIView):
                     "id": exam.id,
                     "name": exam.name,
                     "subject": exam.subject.name,
-                    "status": exam.status,
+                    # Trang thai thuc te theo lich (de "dang mo" nhung qua gio dong -> "closed").
+                    "status": "closed" if resolve_exam_phase(exam) == "results" else resolve_exam_phase(exam),
                     "candidates": assignment_summary["total_candidates"],
                     "completed": getattr(exam, "completed_count", 0),
                     "time_left": _format_exam_time_left(exam),

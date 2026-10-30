@@ -106,7 +106,7 @@ export function ResultDetail() {
         </div>
       ) : null}
 
-      <div className="grid gap-6 xl:grid-cols-[minmax(0,1.35fr),360px]">
+      <div className="grid gap-6 xl:grid-cols-[minmax(0,1.35fr)_360px]">
         <div className="space-y-6">
           <Card className="border-blue-200 bg-[linear-gradient(135deg,#eff6ff_0%,#ffffff_100%)]">
             <CardContent className="p-6 sm:p-8">

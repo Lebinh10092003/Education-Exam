@@ -33,6 +33,7 @@ import {
   DropdownMenuTrigger,
 } from "../ui/dropdown-menu";
 import { cn } from "../ui/utils";
+import { BrandLogo } from "../BrandLogo";
 
 type CandidateNavItem = {
   path: string;
@@ -69,8 +70,9 @@ const findActiveLabelKey = (pathname: string) => {
     return "candidate.dashboard";
   }
 
+  // "/candidate" (Tong quan) chi khop khi trung khit, neu khong moi trang con deu bi nhan la Tong quan.
   const matchedPrimary = primaryNavItems.find(
-    (item) => pathname === item.path || pathname.startsWith(`${item.path}/`),
+    (item) => pathname === item.path || (item.path !== "/candidate" && pathname.startsWith(`${item.path}/`)),
   );
   if (matchedPrimary) {
     return matchedPrimary.labelKey;
@@ -188,16 +190,8 @@ export function CandidateLayout() {
         }`}
       >
         <div className="flex h-16 items-center justify-between border-b border-slate-200 px-4 dark:border-white/[0.08]">
-          <Link to="/candidate" className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-blue-600 shadow-sm">
-              <span className="text-lg font-bold text-white">E</span>
-            </div>
-            <div>
-              <p className="text-base font-semibold text-slate-950 dark:text-slate-100">EduExam</p>
-              <p className="text-[11px] uppercase tracking-[0.22em] text-slate-500 dark:text-slate-400">
-                {t("candidate.portal", { ns: "navigation" })}
-              </p>
-            </div>
+          <Link to="/candidate" className="flex min-w-0 items-center">
+            <BrandLogo size="sm" subtitle={t("candidate.portal", { ns: "navigation" })} />
           </Link>
           <button
             type="button"
@@ -233,16 +227,8 @@ export function CandidateLayout() {
         className="hidden w-72 shrink-0 border-r border-slate-200 bg-white dark:border-white/[0.08] dark:bg-[var(--shell-panel)] lg:flex lg:flex-col"
       >
         <div className="border-b border-slate-200 px-6 py-5 dark:border-white/[0.08]">
-          <Link to="/candidate" className="flex items-center gap-3">
-            <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-blue-600 shadow-sm">
-              <span className="text-lg font-bold text-white">E</span>
-            </div>
-            <div>
-              <p className="text-lg font-semibold text-slate-950 dark:text-slate-100">EduExam</p>
-              <p className="text-[11px] uppercase tracking-[0.24em] text-slate-500 dark:text-slate-400">
-                {t("candidate.portal", { ns: "navigation" })}
-              </p>
-            </div>
+          <Link to="/candidate" className="flex min-w-0 items-center">
+            <BrandLogo subtitle={t("candidate.portal", { ns: "navigation" })} />
           </Link>
           {schoolName ? (
             <Badge variant="outline" className="mt-4 rounded-full border-blue-200 bg-blue-50 text-blue-700 dark:border-blue-400/30 dark:bg-blue-500/12 dark:text-blue-200">

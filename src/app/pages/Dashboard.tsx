@@ -73,7 +73,7 @@ export function Dashboard() {
     <div>
       <PageHeader
         title="Dashboard"
-        description="Live operational summary pulled from the Django API."
+        description="Key figures for exams, candidates and live monitoring."
       />
 
       {dashboard.error && (
@@ -90,6 +90,8 @@ export function Dashboard() {
           trend={{
             value: `${data?.alerts.length ?? 0} monitoring alerts`,
             isPositive: (data?.alerts.length ?? 0) === 0,
+            // Chi bao do khi co canh bao that; 0 canh bao chi la thong tin.
+            tone: (data?.alerts.length ?? 0) > 0 ? "negative" : "neutral",
           }}
           iconBgColor="bg-blue-100"
           iconColor="text-blue-600"
@@ -101,6 +103,7 @@ export function Dashboard() {
           trend={{
             value: `${data?.recent_exams.length ?? 0} recent exams loaded`,
             isPositive: true,
+            tone: "neutral",
           }}
           iconBgColor="bg-green-100"
           iconColor="text-green-600"
@@ -110,8 +113,9 @@ export function Dashboard() {
           value={data?.question_bank_count ?? "..."}
           icon={BookOpen}
           trend={{
-            value: "Synced with backend",
+            value: "Questions available for exams",
             isPositive: true,
+            tone: "neutral",
           }}
           iconBgColor="bg-purple-100"
           iconColor="text-purple-600"
@@ -123,6 +127,7 @@ export function Dashboard() {
           trend={{
             value: `${data?.activity.at(-1)?.candidates ?? 0} candidates this month`,
             isPositive: true,
+            tone: "neutral",
           }}
           iconBgColor="bg-orange-100"
           iconColor="text-orange-600"
@@ -139,7 +144,7 @@ export function Dashboard() {
           </CardHeader>
           <CardContent>
             <ResponsiveContainer width="100%" height={300}>
-              <AreaChart data={data?.activity ?? []}>
+              <AreaChart data={data?.activity ?? []} margin={{ top: 8, right: 24, left: 0, bottom: 0 }}>
                 <defs>
                   <linearGradient id="dashboardExams" x1="0" y1="0" x2="0" y2="1">
                     <stop offset="5%" stopColor="#2563eb" stopOpacity={0.25} />
@@ -151,7 +156,7 @@ export function Dashboard() {
                   </linearGradient>
                 </defs>
                 <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-                <XAxis dataKey="month" stroke="#6b7280" />
+                <XAxis dataKey="month" stroke="#6b7280" tick={{ fontSize: 12 }} padding={{ left: 8, right: 8 }} />
                 <YAxis stroke="#6b7280" />
                 <Tooltip />
                 <Area

@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
-import { AlertCircle, AlertTriangle, CheckCircle2, Info, RefreshCw } from "lucide-react";
+import { AlertCircle, AlertTriangle, CheckCircle2, Eye, Info, RefreshCw } from "lucide-react";
 
 import { apiRequest } from "../lib/http";
+import { ExamStudentPreview } from "./ExamStudentPreview";
 import { Badge } from "./ui/badge";
 import { Button } from "./ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "./ui/dialog";
@@ -61,6 +62,7 @@ export function ExamQualityCheckDialog({ examId, open, onOpenChange }: Props) {
   const [report, setReport] = useState<ExamQualityReport | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [previewOpen, setPreviewOpen] = useState(false);
 
   const runCheck = async () => {
     setIsLoading(true);
@@ -186,7 +188,11 @@ export function ExamQualityCheckDialog({ examId, open, onOpenChange }: Props) {
               <p className="text-sm text-slate-600">Không phát hiện vấn đề nào.</p>
             )}
 
-            <div className="flex justify-end">
+            <div className="flex flex-wrap justify-end gap-2">
+              <Button variant="outline" onClick={() => setPreviewOpen(true)}>
+                <Eye className="mr-2 h-4 w-4" />
+                Xem trước như thí sinh
+              </Button>
               <Button variant="outline" onClick={() => void runCheck()} disabled={isLoading}>
                 <RefreshCw className={cn("mr-2 h-4 w-4", isLoading && "animate-spin")} />
                 Kiểm tra lại
@@ -195,6 +201,7 @@ export function ExamQualityCheckDialog({ examId, open, onOpenChange }: Props) {
           </div>
         ) : null}
       </DialogContent>
+      <ExamStudentPreview examId={examId} open={previewOpen} onOpenChange={setPreviewOpen} />
     </Dialog>
   );
 }

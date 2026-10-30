@@ -342,13 +342,13 @@ export function DisciplinaryExamSheet() {
         </div>
       ) : null}
 
-      <div className="mb-6 grid gap-6 xl:grid-cols-[minmax(0,1.5fr),420px]">
+      <div className="mb-6 grid gap-6 xl:grid-cols-[minmax(0,1.5fr)_420px]">
         <Card>
           <CardHeader>
             <CardTitle>{t("discipline.sheet.bulkTitle")}</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="grid gap-4 md:grid-cols-[220px,1fr] md:items-end">
+            <div className="grid gap-4 md:grid-cols-[220px_1fr] md:items-end">
               <div>
                 <label className="mb-1 block text-xs uppercase tracking-wide text-gray-500">
                   {t("discipline.sheet.bulkPenaltyLabel")}

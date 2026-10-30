@@ -99,7 +99,8 @@ describe("student exam flows", () => {
     Object.defineProperty(navigator, 'mediaDevices', {
       value: {
         getUserMedia: () => Promise.resolve({
-          getVideoTracks: () => [{ stop: () => {} }],
+          getVideoTracks: () => [{ stop: () => {}, readyState: 'live' }],
+          getAudioTracks: () => [{ stop: () => {}, readyState: 'live' }],
           getTracks: () => [{ stop: () => {} }]
         }),
         getDisplayMedia: () => Promise.resolve({

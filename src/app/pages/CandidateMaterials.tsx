@@ -150,7 +150,7 @@ export function CandidateMaterials() {
         </div>
       ) : null}
 
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-[280px,minmax(0,1fr)]">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-[280px_minmax(0,1fr)]">
         <div className="space-y-6">
           <Card>
             <CardHeader>

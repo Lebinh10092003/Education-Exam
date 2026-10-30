@@ -1,4 +1,5 @@
 import pytest
+from django.utils import timezone
 from django.core.management import call_command
 
 
@@ -21,7 +22,7 @@ def test_reset_demo_data_command_rebuilds_full_dataset(settings, tmp_path):
 
     Subject.objects.create(name="Junk Subject", code="JUNK")
 
-    call_command("reset_demo_data", verbosity=0)
+    call_command("reset_demo_data", "--password", "Test-Pass-123", "--no-credentials-file", verbosity=0)
 
     user_model = get_user_model()
 
@@ -48,3 +49,17 @@ def test_reset_demo_data_command_rebuilds_full_dataset(settings, tmp_path):
     assert AuditEvent.objects.count() >= 8
     assert ProctorEvent.objects.count() == 2
     assert ViolationCase.objects.count() == 2
+
+    from apps.competitions.models import Competition, CompetitionRegistration
+
+    # Cuoc thi bi flush xoa phai duoc tao lai, co it nhat 1 cuoc thi dang mo dang ky.
+    assert Competition.objects.filter(cycle="3").count() == 6
+    assert any(item.accepts_registration_on(timezone.localdate()) for item in Competition.objects.all())
+    assert CompetitionRegistration.objects.count() == 2
+
+    # Du lieu tieng Viet va mat khau theo tham so (khong con mat khau ghi cung).
+    admin = user_model.objects.get(email="admin@example.com")
+    assert admin.check_password("Test-Pass-123")
+    assert not admin.check_password("admin123456")
+    assert user_model.objects.get(username="candidate01").full_name == "Phạm Gia An"
+    assert Subject.objects.filter(name="Toán học").exists()

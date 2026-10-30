@@ -52,8 +52,21 @@ export interface ProctorEvidenceResponse {
 
 export type ConnectedMediaRoom = Room;
 
+/**
+ * Cho phep cau hinh duong dan tuong doi (vd. "/livekit"): trinh duyet tu ghep voi ten mien dang mo,
+ * nen camera/man hinh di chung duong voi trang web (tunnel, reverse proxy) thay vi 127.0.0.1.
+ */
+export const resolveMediaServerUrl = (serverUrl: string, location: Pick<Location, "protocol" | "host"> = window.location) => {
+  if (!serverUrl.startsWith("/")) {
+    return serverUrl;
+  }
+  const scheme = location.protocol === "https:" ? "wss" : "ws";
+  return `${scheme}://${location.host}${serverUrl}`;
+};
+
 const buildLocalMediaServerHint = (serverUrl: string) =>
-  `Unable to connect to the local LiveKit media server at ${serverUrl}. Start it with: cd backend; docker compose up -d livekit`;
+  `Không kết nối được máy chủ camera giám sát (LiveKit) tại ${resolveMediaServerUrl(serverUrl)}. `
+  + "Vui lòng tải lại trang hoặc báo quản trị viên kiểm tra dịch vụ LiveKit.";
 
 const normalizeMediaConnectionError = (error: unknown, payload: MediaTokenPayload) => {
   const message = error instanceof Error ? error.message : String(error ?? "Unknown media connection error.");
@@ -187,7 +200,7 @@ export async function connectCandidatePublisher(
 ) {
   const room = new Room({ adaptiveStream: false, dynacast: false });
   try {
-    await room.connect(payload.server_url, payload.access_token, {
+    await room.connect(resolveMediaServerUrl(payload.server_url), payload.access_token, {
       autoSubscribe: false,
     });
     await room.localParticipant.publishTrack(webcamTrack, {
@@ -203,7 +216,7 @@ export async function connectCandidatePublisher(
 export async function connectViewerRoom(payload: MediaTokenPayload) {
   const room = new Room({ adaptiveStream: false, dynacast: false });
   try {
-    await room.connect(payload.server_url, payload.access_token, {
+    await room.connect(resolveMediaServerUrl(payload.server_url), payload.access_token, {
       autoSubscribe: true,
     });
     return room;

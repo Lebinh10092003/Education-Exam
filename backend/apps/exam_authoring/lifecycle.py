@@ -1,3 +1,4 @@
+from django.db.models import Case, F, IntegerField, Q, When
 from django.utils import timezone
 from rest_framework.exceptions import ValidationError
 
@@ -80,3 +81,46 @@ def assert_session_allows_interaction(session, now=None, *, allow_submit=False, 
     if allow_submit and phase == "open":
         return _now(now)
     raise ValidationError(t(vi="Bài thi này đã kết thúc.", en="This exam has already ended."))
+
+
+# Thu tu hien thi theo trang thai thuc te (giong resolve_exam_phase, gop "results" vao "closed").
+PHASE_RANKS = {"open": 0, "paused": 1, "scheduled": 2, "draft": 3, "closed": 4}
+
+
+def annotate_exam_phase(queryset, now=None):
+    """Them phase_rank (trang thai thuc te theo lich) + moc thoi gian de sap xep/loc o CSDL."""
+    current_time = _now(now)
+    ended = Q(schedule_window__closes_at__isnull=False, schedule_window__closes_at__lte=current_time)
+    started = Q(schedule_window__opens_at__isnull=True) | Q(schedule_window__opens_at__lte=current_time)
+    phase_rank = Case(
+        When(status=Exam.Status.DRAFT, then=PHASE_RANKS["draft"]),
+        When(status__in=[Exam.Status.ARCHIVED, Exam.Status.CLOSED], then=PHASE_RANKS["closed"]),
+        When(ended, then=PHASE_RANKS["closed"]),
+        When(status=Exam.Status.PAUSED, then=PHASE_RANKS["paused"]),
+        When(status=Exam.Status.OPEN, then=PHASE_RANKS["open"]),
+        When(Q(status=Exam.Status.SCHEDULED) & started, then=PHASE_RANKS["open"]),
+        default=PHASE_RANKS["scheduled"],
+        output_field=IntegerField(),
+    )
+    return queryset.annotate(phase_rank=phase_rank)
+
+
+def order_exams_by_schedule(queryset):
+    """Dang mo (sap dong truoc) -> tam dung -> sap dien ra (sap mo truoc) -> nhap -> da ket thuc (moi nhat truoc)."""
+    return queryset.annotate(
+        upcoming_time=Case(
+            When(phase_rank=PHASE_RANKS["open"], then=F("schedule_window__closes_at")),
+            When(phase_rank__in=[PHASE_RANKS["paused"], PHASE_RANKS["scheduled"]], then=F("schedule_window__opens_at")),
+            default=None,
+        ),
+        past_time=Case(
+            When(phase_rank=PHASE_RANKS["closed"], then=F("schedule_window__closes_at")),
+            default=None,
+        ),
+    ).order_by(
+        "phase_rank",
+        F("upcoming_time").asc(nulls_last=True),
+        F("past_time").desc(nulls_last=True),
+        "-updated_at",
+        "-id",
+    )

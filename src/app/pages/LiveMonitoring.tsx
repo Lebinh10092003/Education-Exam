@@ -1104,7 +1104,7 @@ export function LiveMonitoring({ examId: examIdProp, embedded = false }: LiveMon
             <Card><CardContent className="p-6"><div className="flex items-center justify-between"><div><p className="mb-1 text-sm text-slate-600">Average Progress</p><p className="text-3xl font-bold text-slate-900">{data?.average_progress ?? 0}%</p></div><div className="rounded-2xl bg-purple-100 p-4 text-purple-600"><CheckCircle2 className="h-6 w-6" /></div></div></CardContent></Card>
           </div>
 
-          <div className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1.1fr),minmax(340px,0.9fr)]">
+          <div className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1.1fr)_minmax(340px,0.9fr)]">
             <Card>
               <CardHeader className="flex flex-row items-center justify-between">
                 <CardTitle className="flex items-center gap-2"><AlertTriangle className="h-5 w-5 text-orange-600" />Recent Live Alerts</CardTitle>
@@ -1157,7 +1157,7 @@ export function LiveMonitoring({ examId: examIdProp, embedded = false }: LiveMon
           <Card>
             <CardHeader><CardTitle>Live Alerts</CardTitle></CardHeader>
             <CardContent className="space-y-6">
-              <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr),220px]">
+              <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_220px]">
                 <div className="relative"><Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" /><Input aria-label="Search live alerts" className="pl-10" placeholder="Search by candidate, event, or message" value={alertSearch} onChange={(event) => setAlertSearch(event.target.value)} /></div>
                 <Select value={alertSeverity} onValueChange={setAlertSeverity}><SelectTrigger><SelectValue placeholder="All severities" /></SelectTrigger><SelectContent><SelectItem value="all">All severities</SelectItem><SelectItem value="warning">Warning</SelectItem><SelectItem value="critical">Critical</SelectItem></SelectContent></Select>
               </div>
@@ -1185,7 +1185,7 @@ export function LiveMonitoring({ examId: examIdProp, embedded = false }: LiveMon
           <Card>
             <CardHeader><CardTitle>Candidate Status</CardTitle></CardHeader>
             <CardContent className="space-y-6">
-              <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr),180px,180px,180px]">
+              <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_180px_180px_180px]">
                 <div className="relative"><Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" /><Input aria-label="Search candidates" className="pl-10" placeholder="Search candidate name or email" value={candidateSearch} onChange={(event) => setCandidateSearch(event.target.value)} /></div>
                 <Select value={candidateStatusFilter} onValueChange={setCandidateStatusFilter}><SelectTrigger><SelectValue placeholder="All statuses" /></SelectTrigger><SelectContent><SelectItem value="all">All statuses</SelectItem><SelectItem value="not_started">Not started</SelectItem><SelectItem value="in_progress">In progress</SelectItem><SelectItem value="submitted">Submitted</SelectItem></SelectContent></Select>
                 <Select value={candidateConnectionFilter} onValueChange={setCandidateConnectionFilter}><SelectTrigger><SelectValue placeholder="All connections" /></SelectTrigger><SelectContent>{CANDIDATE_CONNECTION_FILTER_OPTIONS.map((option) => <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>)}</SelectContent></Select>
@@ -1211,7 +1211,7 @@ export function LiveMonitoring({ examId: examIdProp, embedded = false }: LiveMon
                 </table>
               </div>
 
-              <div className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1fr),340px]">
+              <div className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1fr)_340px]">
                 <PaginationControls label="Candidates" page={paginatedCandidates.page} totalPages={paginatedCandidates.totalPages} totalItems={paginatedCandidates.totalItems} pageSize={CANDIDATES_PAGE_SIZE} onPageChange={setCandidatePage} />
                 <Card className="border-slate-200">
                   <CardHeader><CardTitle className="flex items-center gap-2"><Video className="h-5 w-5 text-sky-600" />Selected Webcam</CardTitle></CardHeader>
@@ -1242,7 +1242,7 @@ export function LiveMonitoring({ examId: examIdProp, embedded = false }: LiveMon
               <Button onClick={() => void exportHistory()}><Download className="mr-2 h-4 w-4" />Export Excel</Button>
             </CardHeader>
             <CardContent className="space-y-6">
-              <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr),180px,180px]">
+              <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_180px_180px]">
                 <div className="relative"><Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" /><Input aria-label="Search violation history" className="pl-10" placeholder="Search candidate, title, or summary" value={historySearch} onChange={(event) => setHistoryFilter("historySearch", event.target.value)} /></div>
                 <Select value={historyStatus} onValueChange={(value) => setHistoryFilter("historyStatus", value)}><SelectTrigger><SelectValue placeholder="All statuses" /></SelectTrigger><SelectContent><SelectItem value="all">All statuses</SelectItem><SelectItem value="open">Open</SelectItem><SelectItem value="resolved">Resolved</SelectItem><SelectItem value="dismissed">Dismissed</SelectItem></SelectContent></Select>
                 <Select value={historySeverity} onValueChange={(value) => setHistoryFilter("historySeverity", value)}><SelectTrigger><SelectValue placeholder="All severities" /></SelectTrigger><SelectContent><SelectItem value="all">All severities</SelectItem><SelectItem value="warning">Warning</SelectItem><SelectItem value="critical">Critical</SelectItem></SelectContent></Select>

@@ -6,6 +6,7 @@ const navigation = {
     subjects: "Môn học",
     questionBank: "Ngân hàng câu hỏi",
     exams: "Quản lý kỳ thi",
+    competitions: "Cuộc thi & đăng ký",
     examList: "Danh sách kỳ thi",
     liveMonitoring: "Giám sát trực tiếp",
     manualGrading: "Chấm tự luận",

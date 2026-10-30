@@ -1,0 +1,27 @@
+{
+  "mcpServers": {
+    "codegraph": {
+      "type": "stdio",
+      "command": "codegraph",
+      "args": [
+        "serve",
+        "--mcp"
+      ]
+    },
+    "eduexam": {
+      "type": "stdio",
+      "command": "mcp-server/.venv/Scripts/python.exe",
+      "args": [
+        "-m",
+        "eduexam_mcp"
+      ],
+      "env": {
+        "EDUEXAM_API_URL": "${EDUEXAM_API_URL:-http://127.0.0.1:8000}",
+        "EDUEXAM_IDENTIFIER": "${EDUEXAM_IDENTIFIER:-}",
+        "EDUEXAM_PASSWORD": "${EDUEXAM_PASSWORD:-}",
+        "EDUEXAM_MCP_MODE": "${EDUEXAM_MCP_MODE:-full}",
+        "EDUEXAM_EXPORT_DIR": "${EDUEXAM_EXPORT_DIR:-}"
+      }
+    }
+  }
+}

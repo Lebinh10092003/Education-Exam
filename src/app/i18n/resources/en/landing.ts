@@ -123,6 +123,8 @@ const landing = {
       cycle: "Cycle {{num}}",
       status: {
         upcoming: "Upcoming",
+        ongoing: "Ongoing",
+        ended: "Ended",
       },
     },
     cards: {
@@ -260,6 +262,23 @@ const landing = {
     pass: "Passed",
     fail: "Failed",
     tableTitle: "Published Exam Results",
+  },
+  cta: {
+    registerNow: "Register now",
+    actionHeader: "Register",
+    closed: "Registration closed",
+    viewResults: "Look up results",
+    deadline: "Deadline {{date}}",
+    daysLeft: "{{count}} days left",
+    lastDay: "Last day today",
+    heroOpen: "Registration open: {{code}}",
+    lookupLink: "Already took the exam? Look up results",
+    journeyCta: "Start registration",
+    journeyNote: "One simple form, no account needed.",
+    bandTitle: "Ready for the next competition?",
+    bandSubtitle: "Register early to receive instructions, preparation materials and the exam schedule by email.",
+    bandOpen: "{{count}} competitions open for registration",
+    bandSecondary: "Chat on Zalo",
   },
 };
 

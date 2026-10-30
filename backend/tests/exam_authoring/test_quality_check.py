@@ -100,3 +100,37 @@ def test_quality_check_passes_for_clean_exam(subject, admin_user, candidate_user
     assert report["summary"]["errors"] == 0
     assert report["stats"]["question_count"] == 3
     assert report["stats"]["assigned_candidates"] == 1
+
+
+@pytest.mark.django_db
+def test_quality_check_warns_when_schedule_already_passed(subject, admin_user):
+    from apps.exam_authoring.quality import check_exam
+
+    question = _question(subject, admin_user, "Câu cũ")
+    now = timezone.now()
+    exam = _exam(
+        subject, admin_user, manual_question_ids=[question.id], status="scheduled",
+        opening_at=now - timedelta(days=3), closing_at=now - timedelta(days=2),
+    )
+
+    codes = {issue["code"] for issue in check_exam(exam)["issues"]}
+
+    assert "schedule_passed" in codes
+
+
+@pytest.mark.django_db
+def test_preview_returns_questions_with_answer_keys_for_staff_only(api_client, admin_token, subject, admin_user, candidate_user):
+    from rest_framework_simplejwt.tokens import RefreshToken
+
+    question = _question(subject, admin_user, "1 + 1 = ?", correct_option_keys=["A"])
+    exam = _exam(subject, admin_user, manual_question_ids=[question.id])
+
+    api_client.credentials(HTTP_AUTHORIZATION=f"Bearer {admin_token}")
+    data = api_client.get(f"/api/v1/exams/{exam.id}/preview/").json()
+    assert data["exam"]["duration_minutes"] == 45
+    assert data["items"][0]["question_text"] == "1 + 1 = ?"
+    assert data["items"][0]["correct_option_keys"] == ["A"]
+    assert [option["key"] for option in data["items"][0]["options"]] == ["A", "B"]
+
+    api_client.credentials(HTTP_AUTHORIZATION=f"Bearer {RefreshToken.for_user(candidate_user).access_token}")
+    assert api_client.get(f"/api/v1/exams/{exam.id}/preview/").status_code in {403, 404}

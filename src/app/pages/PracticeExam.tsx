@@ -155,7 +155,7 @@ export function PracticeExam() {
         </Card>
       </div>
 
-      <div className="grid gap-6 xl:grid-cols-[minmax(0,1.15fr),380px]">
+      <div className="grid gap-6 xl:grid-cols-[minmax(0,1.15fr)_380px]">
         <section className="space-y-6">
           <div className="flex items-center gap-2">
             <Sparkles className="h-5 w-5 text-blue-600" />
