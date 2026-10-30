@@ -17,6 +17,7 @@ from apps.exam_authoring.services import build_exam_assignment_summary
 from apps.exam_delivery.models import ExamSession
 from apps.identity.models import User
 from apps.identity.permissions import HasAPIPermissionCode
+from apps.platform_core.health import collect_components, is_healthy
 from apps.platform_core.models import AuditEvent
 from apps.proctoring.models import ProctorEvent
 from apps.question_bank.models import Question
@@ -46,15 +47,10 @@ class ReadinessView(generics.GenericAPIView):
     serializer_class = ReadinessSerializer
 
     def get(self, request):
-        components = {
-            "database": "configured" if settings.DATABASES.get("default") else "missing",
-            "redis": "configured" if getattr(settings, "REDIS_URL", None) else "missing",
-            "storage": "object-storage"
-            if getattr(settings, "USE_S3_STORAGE", False)
-            else "filesystem",
-        }
-        serializer = self.get_serializer({"status": "ok", "components": components})
-        return Response(serializer.data)
+        components = collect_components()
+        healthy = is_healthy(components)
+        serializer = self.get_serializer({"status": "ok" if healthy else "error", "components": components})
+        return Response(serializer.data, status=200 if healthy else 503)
 
 
 class AuditEventFilterMixin:

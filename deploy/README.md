@@ -24,6 +24,42 @@ By default the script expects the existing reverse proxy container and mounted C
 
 Override those environment variables before running the script if the VPS reverse proxy layout changes.
 
+## Vận hành an toàn (làm 1 lần sau khi cập nhật lên bản này)
+
+1. Bổ sung `deploy/.env.production` theo `deploy/.env.production.example`. Tối thiểu cần:
+   - **SMTP** (`EMAIL_BACKEND`, `EMAIL_HOST`, `EMAIL_PORT`, `EMAIL_HOST_USER`, `EMAIL_HOST_PASSWORD`, `EMAIL_USE_TLS`). Thiếu thì email quên mật khẩu không gửi được; `update.sh` sẽ in cảnh báo `eduexam.W001`.
+   - **Kênh cảnh báo**: `ALERT_TELEGRAM_BOT_TOKEN` + `ALERT_TELEGRAM_CHAT_ID` (hoặc `ALERT_WEBHOOK_URL`).
+   - Tuỳ chọn: `SENTRY_DSN` để gom lỗi ứng dụng.
+2. Bật TURN cho LiveKit: thêm khối `turn:` từ `livekit.prod.yaml.example` vào `deploy/livekit.yaml`, rồi `ufw allow 3478/udp`.
+3. Cài lịch tự động (root): `bash deploy/install-cron.sh`
+   - 02:15 hằng đêm: `backup.sh` dump PostgreSQL + nén media vào `/opt/backups/khaothi` (giữ 14 ngày) và đẩy lên R2 `backups/` (giữ 30 ngày).
+   - Mỗi 2 phút: `healthwatch.sh` kiểm tra container, `/api/v1/health/ready/` (DB, Redis, Celery beat/worker), dung lượng đĩa, tuổi bản sao lưu; tự khởi động lại container lỗi và gửi cảnh báo khi trạng thái thay đổi.
+4. Chạy thử: `bash deploy/backup.sh` rồi `bash deploy/healthwatch.sh`.
+
+### Các lệnh thường dùng
+
+| Việc | Lệnh |
+|---|---|
+| Cập nhật | `bash deploy/update.sh` — từ chối chạy khi còn thí sinh đang làm bài; ép bằng `FORCE_DEPLOY=1` |
+| Quay về bản trước | `bash deploy/rollback.sh` (không đảo migration; khi cần thì khôi phục DB từ bản dump `update.sh` tạo trước khi migrate) |
+| Sao lưu ngay | `bash deploy/backup.sh` (`--db-only` chỉ DB) |
+| Khôi phục DB | `CONFIRM=yes bash deploy/restore.sh /opt/backups/khaothi/db/<file>.dump` |
+| Có ai đang thi? | `docker exec khaothi-backend python manage.py active_exam_sessions` |
+| Sức khoẻ | `curl https://khaothi.fermat.vn/api/v1/health/ready/` (HTTP 503 khi có thành phần lỗi) |
+
+`update.sh` giờ: kiểm tra ca thi và dung lượng đĩa → `git pull` → dump DB → giữ image cũ ở tag `:previous` → build lần lượt từng image (worker/beat dùng chung image backend) → migrate → khởi động → kiểm tra live/ready. Lỗi giữa chừng sẽ gửi cảnh báo kèm gợi ý rollback.
+
+### TURN/TLS cho webcam (thí sinh ở mạng trường/công ty chặn UDP)
+
+```bash
+bash deploy/setup-turn.sh            # bật: TURN UDP 3478 + TURN/TLS 5349, relay UDP 30000-30049
+bash deploy/setup-turn.sh --disable  # tắt
+```
+
+Script chép chứng chỉ `khaothi.fermat.vn` từ Caddy, kiểm tra chứng chỉ khớp khoá, ghi khối `turn:` vào `deploy/livekit.yaml`, bật `LIVEKIT_TURN_ENABLED=1` (nạp `docker-compose.turn.yml`) rồi khởi động lại LiveKit. Nếu LiveKit không chạy ổn định, script tự khôi phục cấu hình cũ. Script từ chối chạy khi còn thí sinh đang thi (`FORCE=1` để ép), vì khởi động lại LiveKit sẽ ngắt webcam vài giây. Cron 03:30 (`--renew`) tự chép lại chứng chỉ khi Caddy gia hạn và gửi cảnh báo nếu thất bại.
+
+**Không** tự thêm khối `turn:` bằng tay: thiếu file chứng chỉ thì LiveKit dừng hẳn và toàn bộ webcam mất theo. Nếu nhà cung cấp VPS có firewall riêng, mở 3478/udp, 5349/tcp, 30000-30049/udp. TURN/TLS chạy trên 5349, không phải 443 (Caddy đang giữ 443); mạng chỉ mở 443 vẫn cần thêm IP thứ hai.
+
 ## Tinh chỉnh tải (VPS 4 GB)
 
 Các biến dưới đây đặt trong `deploy/.env.production`; bỏ trống thì dùng giá trị mặc định.

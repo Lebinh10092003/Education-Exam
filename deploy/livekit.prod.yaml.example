@@ -6,5 +6,8 @@ rtc:
   use_external_ip: false
   node_ip: 103.142.27.69
 
+# TURN/TLS: KHONG them khoi turn: bang tay. Chay `bash deploy/setup-turn.sh`; script tu chep
+# chung chi tu Caddy, ghi khoi turn:, mo cong va tu khoi phuc neu LiveKit khong khoi dong duoc.
+
 keys:
   replace-with-livekit-api-key: replace-with-livekit-api-secret

@@ -70,6 +70,24 @@ env = environ.Env(
     PROCTORING_EVIDENCE_S3_REGION=(str, "auto"),
     PROCTORING_EVIDENCE_URL_EXPIRE_SECONDS=(int, 3600),
     PROCTORING_EVIDENCE_UPLOAD_URL_EXPIRE_SECONDS=(int, 300),
+    EMAIL_HOST=(str, "localhost"),
+    EMAIL_PORT=(int, 25),
+    EMAIL_HOST_USER=(str, ""),
+    EMAIL_HOST_PASSWORD=(str, ""),
+    EMAIL_USE_TLS=(bool, False),
+    EMAIL_USE_SSL=(bool, False),
+    EMAIL_TIMEOUT=(int, 10),
+    LOG_LEVEL=(str, "INFO"),
+    SENTRY_DSN=(str, ""),
+    SENTRY_ENVIRONMENT=(str, "production"),
+    SENTRY_TRACES_SAMPLE_RATE=(float, 0.0),
+    SECURE_HSTS_SECONDS=(int, 0),
+    AUTH_LOGIN_IP_THROTTLE_RATE=(str, "300/min"),
+    AUTH_LOGIN_ACCOUNT_THROTTLE_RATE=(str, "10/min"),
+    AUTH_PASSWORD_RESET_IP_THROTTLE_RATE=(str, "30/hour"),
+    AUTH_PASSWORD_RESET_EMAIL_THROTTLE_RATE=(str, "5/hour"),
+    SCHEDULER_HEARTBEAT_INTERVAL_SECONDS=(int, 60),
+    SCHEDULER_HEARTBEAT_MAX_AGE_SECONDS=(int, 300),
 )
 
 environ.Env.read_env(BASE_DIR / ".env")
@@ -186,6 +204,14 @@ MEDIA_URL = "/media/"
 MEDIA_ROOT = BASE_DIR / "media"
 EMAIL_BACKEND = env("EMAIL_BACKEND")
 DEFAULT_FROM_EMAIL = env("DEFAULT_FROM_EMAIL")
+# SMTP (dung khi EMAIL_BACKEND=django.core.mail.backends.smtp.EmailBackend).
+EMAIL_HOST = env("EMAIL_HOST")
+EMAIL_PORT = env.int("EMAIL_PORT")
+EMAIL_HOST_USER = env("EMAIL_HOST_USER")
+EMAIL_HOST_PASSWORD = env("EMAIL_HOST_PASSWORD")
+EMAIL_USE_TLS = env.bool("EMAIL_USE_TLS")
+EMAIL_USE_SSL = env.bool("EMAIL_USE_SSL")
+EMAIL_TIMEOUT = env.int("EMAIL_TIMEOUT")
 FRONTEND_BASE_URL = env("FRONTEND_BASE_URL")
 PROCTORING_MEDIA_PROVIDER = env("PROCTORING_MEDIA_PROVIDER")
 PROCTORING_MEDIA_URL = env("PROCTORING_MEDIA_URL")
@@ -220,6 +246,55 @@ EXAM_SUBMISSION_GRACE_SECONDS = env.int("EXAM_SUBMISSION_GRACE_SECONDS")
 EXAM_ANSWER_SYNC_TOLERANCE_SECONDS = env.int("EXAM_ANSWER_SYNC_TOLERANCE_SECONDS")
 EXAM_OVERDUE_FINALIZE_INTERVAL_SECONDS = env.int("EXAM_OVERDUE_FINALIZE_INTERVAL_SECONDS")
 
+# Gioi han tan suat dang nhap / quen mat khau (de trong = tat). Ca phong thi dung chung IP
+# nen gioi han theo IP de rong; gioi han chat tinh theo tai khoan + IP.
+AUTH_LOGIN_IP_THROTTLE_RATE = env("AUTH_LOGIN_IP_THROTTLE_RATE")
+AUTH_LOGIN_ACCOUNT_THROTTLE_RATE = env("AUTH_LOGIN_ACCOUNT_THROTTLE_RATE")
+AUTH_PASSWORD_RESET_IP_THROTTLE_RATE = env("AUTH_PASSWORD_RESET_IP_THROTTLE_RATE")
+AUTH_PASSWORD_RESET_EMAIL_THROTTLE_RATE = env("AUTH_PASSWORD_RESET_EMAIL_THROTTLE_RATE")
+
+# Celery beat ghi nhip tim moi N giay (qua worker); /health/ready/ bao loi neu nhip cu hon MAX_AGE (0 = bo qua).
+SCHEDULER_HEARTBEAT_INTERVAL_SECONDS = env.int("SCHEDULER_HEARTBEAT_INTERVAL_SECONDS")
+SCHEDULER_HEARTBEAT_MAX_AGE_SECONDS = env.int("SCHEDULER_HEARTBEAT_MAX_AGE_SECONDS")
+
+# Chay sau reverse proxy HTTPS (Caddy): tin X-Forwarded-Proto, cookie chi gui qua HTTPS.
+if not DEBUG:
+    SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+    SESSION_COOKIE_SECURE = True
+    CSRF_COOKIE_SECURE = True
+    SECURE_CONTENT_TYPE_NOSNIFF = True
+    SECURE_REFERRER_POLICY = "same-origin"
+    SECURE_HSTS_SECONDS = env.int("SECURE_HSTS_SECONDS")
+
+LOGGING = {
+    "version": 1,
+    "disable_existing_loggers": False,
+    "formatters": {
+        "default": {"format": "%(asctime)s %(levelname)s %(name)s: %(message)s"},
+    },
+    "handlers": {
+        "console": {"class": "logging.StreamHandler", "formatter": "default"},
+    },
+    "root": {"handlers": ["console"], "level": env("LOG_LEVEL").upper()},
+    "loggers": {
+        "django.request": {"handlers": ["console"], "level": "WARNING", "propagate": False},
+    },
+}
+
+SENTRY_DSN = env("SENTRY_DSN")
+if SENTRY_DSN:
+    try:
+        import sentry_sdk
+    except ImportError:  # pragma: no cover - chi xay ra khi image cu chua cai sentry-sdk
+        sentry_sdk = None
+    if sentry_sdk is not None:
+        sentry_sdk.init(
+            dsn=SENTRY_DSN,
+            environment=env("SENTRY_ENVIRONMENT"),
+            traces_sample_rate=env.float("SENTRY_TRACES_SAMPLE_RATE"),
+            send_default_pii=False,
+        )
+
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 AUTH_USER_MODEL = "identity.User"
 
@@ -235,6 +310,9 @@ REST_FRAMEWORK = {
     "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
     "DEFAULT_PAGINATION_CLASS": "apps.platform_core.pagination.CustomPageNumberPagination",
     "PAGE_SIZE": 20,
+    # Sau dung 1 reverse proxy (Caddy): lay IP cuoi trong X-Forwarded-For, khong tin gia tri client tu gui
+    # (dung cho gioi han dang nhap theo IP).
+    "NUM_PROXIES": 1,
     # Chi ap dung cho view khai bao ScopedRateThrottle (vd. phieu dang ky cong khai).
     "DEFAULT_THROTTLE_RATES": {
         "competition_registration": "10/hour",
@@ -294,6 +372,10 @@ CELERY_BEAT_SCHEDULE = {
     "cleanup-expired-practice-details": {
         "task": "apps.practice.tasks.cleanup_expired_practice_details_task",
         "schedule": PRACTICE_DETAILS_CLEANUP_INTERVAL_SECONDS,
+    },
+    "scheduler-heartbeat": {
+        "task": "apps.platform_core.tasks.record_scheduler_heartbeat_task",
+        "schedule": SCHEDULER_HEARTBEAT_INTERVAL_SECONDS,
     },
 }
 

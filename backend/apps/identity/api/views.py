@@ -15,6 +15,12 @@ from apps.identity.services import (
     reset_password_with_token,
     import_users_from_csv,
 )
+from apps.identity.throttles import (
+    LoginAccountThrottle,
+    LoginIPThrottle,
+    PasswordResetEmailThrottle,
+    PasswordResetIPThrottle,
+)
 from apps.identity.utils import is_student_self_service_locked
 from apps.platform_core.audit import record_audit_event
 from apps.platform_core.i18n import t
@@ -36,6 +42,7 @@ from .serializers import (
 
 class LoginView(TokenObtainPairView):
     serializer_class = EduExamTokenObtainPairSerializer
+    throttle_classes = [LoginIPThrottle, LoginAccountThrottle]
 
     def post(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
@@ -105,6 +112,7 @@ class ForgotPasswordView(APIView):
     authentication_classes = []
     permission_classes = [AllowAny]
     serializer_class = ForgotPasswordSerializer
+    throttle_classes = [PasswordResetIPThrottle, PasswordResetEmailThrottle]
 
     @extend_schema(request=ForgotPasswordSerializer, responses={202: None})
     def post(self, request):
@@ -126,6 +134,7 @@ class ResetPasswordView(APIView):
     authentication_classes = []
     permission_classes = [AllowAny]
     serializer_class = ResetPasswordSerializer
+    throttle_classes = [PasswordResetIPThrottle]
 
     @extend_schema(request=ResetPasswordSerializer, responses={200: None})
     def post(self, request):

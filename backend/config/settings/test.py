@@ -47,3 +47,10 @@ PROCTORING_SKIP_RESOURCE_CHECK = True
 # Cache test dung chung giua cac test va id sqlite co the lap lai -> tat gop vi pham mac dinh.
 PROCTORING_VIOLATION_COOLDOWN_SECONDS = 0
 EXAM_RANDOM_POOL_CACHE_TTL_SECONDS = 0
+# Khong co Celery beat trong test -> khong kiem tra nhip tim scheduler.
+SCHEDULER_HEARTBEAT_MAX_AGE_SECONDS = 0
+# Tat gioi han dang nhap trong test chung; test rieng bat lai bang override_settings.
+AUTH_LOGIN_IP_THROTTLE_RATE = None
+AUTH_LOGIN_ACCOUNT_THROTTLE_RATE = None
+AUTH_PASSWORD_RESET_IP_THROTTLE_RATE = None
+AUTH_PASSWORD_RESET_EMAIL_THROTTLE_RATE = None

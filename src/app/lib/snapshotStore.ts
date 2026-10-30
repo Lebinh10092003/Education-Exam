@@ -41,7 +41,8 @@ export interface SnapshotEntry {
 
 export interface ExamDraftEntry {
   sessionId: number;
-  answers: Record<string, { selected_option_keys: string[]; answer_text: string }>;
+  // Payload tung cau (co the chi gom mot phan truong, vd. chi is_marked_for_review).
+  answers: Record<string, { selected_option_keys?: string[]; answer_text?: string; is_marked_for_review?: boolean }>;
   version: number;
   timestamp: number;
   checksum?: string;

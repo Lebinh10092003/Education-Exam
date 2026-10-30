@@ -53,3 +53,9 @@ Thumbs.db
 
 # Mat khau du lieu mau (reset_demo_data)
 backend/.demo-credentials.txt
+
+# Lich su deploy tren VPS
+deploy/.deploy-history
+deploy/turn-certs/
+deploy/livekit.yaml.backup.*
+deploy/caddy/Caddyfile.backup.*

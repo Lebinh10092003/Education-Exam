@@ -1,11 +1,14 @@
 #!/usr/bin/env bash
+# Cap nhat production. Cac buoc: kiem tra ca thi dang dien ra -> git pull -> sao luu DB ->
+# giu image cu (:previous) -> build tung image -> migrate -> khoi dong -> kiem tra.
+# Bien: FORCE_DEPLOY=1 (bo qua chan ca thi), SKIP_BACKUP=1, DEPLOY_MIN_FREE_GB (mac dinh 3).
 set -euo pipefail
-ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-COMPOSE=(docker compose -p khaothi --env-file "$ROOT_DIR/deploy/.env.production" -f "$ROOT_DIR/deploy/docker-compose.prod.yml")
-DOMAIN="${DOMAIN:-khaothi.fermat.vn}"
+source "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
 CADDY_CONTAINER="${CADDY_CONTAINER:-examedu-caddy}"
 CADDYFILE_PATH="${CADDYFILE_PATH:-/opt/khaothi.fermat.vn/deploy/caddy/Caddyfile}"
 CADDY_CONFIG_IN_CONTAINER="${CADDY_CONFIG_IN_CONTAINER:-/etc/caddy/Caddyfile}"
+LOCK_FILE=/var/tmp/khaothi-deploy.lock
+MIN_FREE_GB="${DEPLOY_MIN_FREE_GB:-3}"
 
 sync_caddy_config() {
     if [[ ! -f "$CADDYFILE_PATH" ]]; then
@@ -109,19 +112,97 @@ verify_production() {
     fi
 
     curl -fsSIL --max-redirs 5 "https://$DOMAIN/" >/dev/null
-    curl -fsS "https://$DOMAIN/api/v1/health/live/" >/dev/null
-    curl -fsS "https://$DOMAIN/mcp/healthz" >/dev/null
+    curl -fsS --retry 6 --retry-delay 5 --retry-all-errors "https://$DOMAIN/api/v1/health/live/" >/dev/null
+    curl -fsS --retry 6 --retry-delay 5 --retry-all-errors "https://$DOMAIN/mcp/healthz" >/dev/null
+    # Ready kiem tra DB/Redis/Celery that; chi canh bao vi nhip tim beat can toi 1 phut sau khoi dong.
+    if ! curl -fsS --retry 6 --retry-delay 10 --retry-all-errors "https://$DOMAIN/api/v1/health/ready/"; then
+        echo
+        echo "CANH BAO: /api/v1/health/ready/ chua on. Kiem tra: docker logs khaothi-worker / khaothi-beat"
+    fi
+    echo
 }
 
-cd "$ROOT_DIR"
+guard_active_exams() {
+    if [[ "${FORCE_DEPLOY:-0}" == "1" ]] || ! container_running khaothi-backend; then
+        return
+    fi
+    local active
+    active="$(docker exec khaothi-backend python manage.py active_exam_sessions 2>/dev/null | tail -n1 || echo "?")"
+    if [[ "$active" == "?" ]]; then
+        log "Khong dem duoc phien thi (ban backend cu chua co lenh active_exam_sessions) - tiep tuc."
+        return
+    fi
+    if [[ "$active" != "0" ]]; then
+        log "DUNG: dang co $active thi sinh lam bai. Deploy se lam gian doan ket noi cua ho."
+        log "Doi het ca thi roi chay lai, hoac FORCE_DEPLOY=1 bash deploy/update.sh neu bat buoc."
+        exit 1
+    fi
+}
 
-git pull --ff-only
+check_disk() {
+    local free_gb
+    free_gb="$(df -P --block-size=1G / | awk 'NR==2 {print $4}')"
+    if (( free_gb < MIN_FREE_GB )); then
+        log "DUNG: chi con ${free_gb} GB trong (can >= ${MIN_FREE_GB} GB de build). Thu: docker system prune"
+        exit 1
+    fi
+}
 
-"${COMPOSE[@]}" up -d postgres pgbouncer redis livekit
-"${COMPOSE[@]}" build backend worker beat frontend mcp
-"${COMPOSE[@]}" run --rm backend python manage.py migrate
-"${COMPOSE[@]}" up -d
-"${COMPOSE[@]}" up -d --force-recreate --no-deps frontend
-sync_caddy_config
-verify_production
-"${COMPOSE[@]}" ps
+keep_previous_images() {
+    local image
+    for image in "${APP_IMAGES[@]}"; do
+        if docker image inspect "$image:current" >/dev/null 2>&1; then
+            docker tag "$image:current" "$image:previous"
+        fi
+    done
+}
+
+on_failure() {
+    local line="$1"
+    send_alert "Deploy THAT BAI o dong $line. Neu he thong hong: bash deploy/rollback.sh"
+}
+
+# Gom vao ham: bash doc het truoc khi chay, nen git pull sua file nay giua chung khong gay loi.
+main() {
+    cd "$ROOT_DIR"
+    [[ -f "$ENV_FILE" ]] || { echo "Thieu $ENV_FILE (xem deploy/.env.production.example)."; exit 1; }
+
+    guard_active_exams
+    check_disk
+
+    touch "$LOCK_FILE"
+    trap 'rm -f "$LOCK_FILE"' EXIT
+    trap 'on_failure $LINENO' ERR
+
+    git pull --ff-only
+    REVISION="$(git rev-parse --short HEAD)"
+    log "Deploy revision $REVISION"
+
+    "${COMPOSE[@]}" up -d postgres pgbouncer redis livekit
+
+    if [[ "${SKIP_BACKUP:-0}" != "1" ]]; then
+        log "Sao luu DB truoc khi migrate..."
+        bash "$ROOT_DIR/deploy/backup.sh" --db-only
+    fi
+
+    keep_previous_images
+    # Build lan luot (khong song song) de tranh het RAM tren VPS 4 GB.
+    for service in backend frontend mcp; do
+        log "Build $service..."
+        "${COMPOSE[@]}" build "$service"
+    done
+
+    "${COMPOSE[@]}" run --rm backend python manage.py migrate --noinput
+    "${COMPOSE[@]}" run --rm backend python manage.py check --tag eduexam_ops || true
+    "${COMPOSE[@]}" up -d --no-build
+    "${COMPOSE[@]}" up -d --no-build --force-recreate --no-deps frontend
+    sync_caddy_config
+    verify_production
+    "${COMPOSE[@]}" ps
+
+    echo "$(date '+%Y-%m-%d %H:%M:%S') $REVISION" >> "$ROOT_DIR/deploy/.deploy-history"
+    docker image prune -f >/dev/null
+    log "Xong. Neu can quay lai ban truoc: bash deploy/rollback.sh"
+}
+
+main "$@"; exit

@@ -1,0 +1,12 @@
+# Bo sung cho LiveKit khi bat TURN (UDP 3478 + TLS 5349). Chi duoc nap khi
+# LIVEKIT_TURN_ENABLED=1 trong deploy/.env.production (do deploy/setup-turn.sh dat).
+# Khong bat bang tay: thieu file chung chi thi LiveKit dung han -> mat toan bo webcam.
+services:
+  livekit:
+    ports:
+      - "3478:3478/udp"
+      - "5349:5349/tcp"
+      # Dai cong relay cua TURN; giu nho vi moi cong la 1 tien trinh docker-proxy.
+      - "30000-30049:30000-30049/udp"
+    volumes:
+      - ./turn-certs:/etc/livekit-certs:ro

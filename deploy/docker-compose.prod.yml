@@ -69,6 +69,8 @@ services:
       retries: 10
 
   backend:
+    # Image gan tag de rollback: update.sh doi tag cu thanh :previous truoc khi build (xem deploy/rollback.sh).
+    image: khaothi-backend:current
     build:
       context: ..
       dockerfile: backend/Dockerfile
@@ -94,6 +96,30 @@ services:
       SIMPLE_JWT_UPDATE_LAST_LOGIN: ${SIMPLE_JWT_UPDATE_LAST_LOGIN:-True}
       EMAIL_BACKEND: ${EMAIL_BACKEND:-django.core.mail.backends.console.EmailBackend}
       DEFAULT_FROM_EMAIL: ${DEFAULT_FROM_EMAIL:-no-reply@khaothi.fermat.vn}
+      EMAIL_HOST: ${EMAIL_HOST:-localhost}
+      EMAIL_PORT: ${EMAIL_PORT:-25}
+      EMAIL_HOST_USER: ${EMAIL_HOST_USER:-}
+      EMAIL_HOST_PASSWORD: ${EMAIL_HOST_PASSWORD:-}
+      EMAIL_USE_TLS: ${EMAIL_USE_TLS:-False}
+      EMAIL_USE_SSL: ${EMAIL_USE_SSL:-False}
+      EMAIL_TIMEOUT: ${EMAIL_TIMEOUT:-10}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      SENTRY_DSN: ${SENTRY_DSN:-}
+      SENTRY_ENVIRONMENT: ${SENTRY_ENVIRONMENT:-production}
+      SENTRY_TRACES_SAMPLE_RATE: ${SENTRY_TRACES_SAMPLE_RATE:-0}
+      SECURE_HSTS_SECONDS: ${SECURE_HSTS_SECONDS:-0}
+      AUTH_LOGIN_IP_THROTTLE_RATE: ${AUTH_LOGIN_IP_THROTTLE_RATE:-300/min}
+      AUTH_LOGIN_ACCOUNT_THROTTLE_RATE: ${AUTH_LOGIN_ACCOUNT_THROTTLE_RATE:-10/min}
+      AUTH_PASSWORD_RESET_IP_THROTTLE_RATE: ${AUTH_PASSWORD_RESET_IP_THROTTLE_RATE:-30/hour}
+      AUTH_PASSWORD_RESET_EMAIL_THROTTLE_RATE: ${AUTH_PASSWORD_RESET_EMAIL_THROTTLE_RATE:-5/hour}
+      SCHEDULER_HEARTBEAT_INTERVAL_SECONDS: ${SCHEDULER_HEARTBEAT_INTERVAL_SECONDS:-60}
+      SCHEDULER_HEARTBEAT_MAX_AGE_SECONDS: ${SCHEDULER_HEARTBEAT_MAX_AGE_SECONDS:-300}
+      # Sao luu len R2 (deploy/backup.sh). De trong = dung chung bucket/khoa cua anh vi pham, thu muc backups/.
+      BACKUP_S3_BUCKET: ${BACKUP_S3_BUCKET:-}
+      BACKUP_S3_ENDPOINT_URL: ${BACKUP_S3_ENDPOINT_URL:-}
+      BACKUP_S3_ACCESS_KEY_ID: ${BACKUP_S3_ACCESS_KEY_ID:-}
+      BACKUP_S3_SECRET_ACCESS_KEY: ${BACKUP_S3_SECRET_ACCESS_KEY:-}
+      BACKUP_S3_PREFIX: ${BACKUP_S3_PREFIX:-backups}
       FRONTEND_BASE_URL: ${FRONTEND_BASE_URL:-https://khaothi.fermat.vn}
       PROCTORING_MEDIA_PROVIDER: livekit
       PROCTORING_MEDIA_URL: ${PROCTORING_MEDIA_URL:-wss://khaothi.fermat.vn}
@@ -166,13 +192,18 @@ services:
       retries: 5
 
   worker:
-    build:
-      context: ..
-      dockerfile: backend/Dockerfile
+    # Dung chung image backend (chi build 1 lan, do ton RAM tren VPS).
+    image: khaothi-backend:current
     container_name: khaothi-worker
     restart: unless-stopped
     environment: *backend_environment
     command: celery -A config worker --loglevel=info --concurrency=${CELERY_WORKER_CONCURRENCY:-2}
+    healthcheck:
+      test: ["CMD-SHELL", "celery -A config inspect ping -d celery@$$HOSTNAME --timeout 10 >/dev/null"]
+      interval: 60s
+      timeout: 30s
+      retries: 3
+      start_period: 60s
     volumes:
       - backend_media:/app/backend/media
     depends_on:
@@ -182,13 +213,18 @@ services:
         condition: service_healthy
 
   beat:
-    build:
-      context: ..
-      dockerfile: backend/Dockerfile
+    image: khaothi-backend:current
     container_name: khaothi-beat
     restart: unless-stopped
     environment: *backend_environment
     command: celery -A config beat --loglevel=info
+    # Nhip tim do beat lap lich va worker thuc thi -> loi khi mot trong hai ngung.
+    healthcheck:
+      test: ["CMD", "python", "manage.py", "check_scheduler_heartbeat"]
+      interval: 60s
+      timeout: 30s
+      retries: 3
+      start_period: 180s
     volumes:
       - backend_media:/app/backend/media
     depends_on:
@@ -198,6 +234,7 @@ services:
         condition: service_healthy
 
   frontend:
+    image: khaothi-frontend:current
     build:
       context: ..
       dockerfile: deploy/frontend.Dockerfile
@@ -220,6 +257,7 @@ services:
       retries: 5
 
   mcp:
+    image: khaothi-mcp:current
     # MCP cho tro ly AI tai https://khaothi.fermat.vn/mcp. Khong chua tai khoan/mat khau:
     # nguoi dung gui ma truy cap ca nhan (tao trong trang Ho so) kem moi request.
     build:
@@ -246,7 +284,8 @@ services:
       retries: 5
 
   livekit:
-    image: livekit/livekit-server:latest
+    # Ghim phien ban: "latest" co the doi hanh vi bat ngo moi lan pull.
+    image: livekit/livekit-server:${LIVEKIT_VERSION:-v1.13.10}
     container_name: khaothi-livekit
     restart: unless-stopped
     command: --config /etc/livekit.yaml
@@ -255,6 +294,7 @@ services:
     ports:
       - "7881:7881/tcp"
       - "7882:7882/udp"
+    # TURN/TLS: KHONG them cong o day, dung deploy/setup-turn.sh (nap docker-compose.turn.yml).
     networks:
       - caddy
 

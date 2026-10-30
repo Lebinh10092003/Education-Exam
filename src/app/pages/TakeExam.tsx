@@ -1,35 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Link, useNavigate, useParams } from "react-router";
+import { useParams } from "react-router";
 import { useTranslation } from "react-i18next";
+
+import { apiRequest } from "../lib/http";
 import { notify } from "../lib/notify";
 import {
-  AlertTriangle,
-  CheckCircle2,
-  ChevronLeft,
-  ChevronRight,
-  Clock,
-  Eye,
-  EyeOff,
-  Flag,
-  Wifi,
-  Download,
-  Copy,
-  RefreshCw,
-  AlertCircle,
-} from "lucide-react";
-
-import { Button } from "../components/ui/button";
-import { Card, CardContent } from "../components/ui/card";
-import { MathText } from "../components/MathText";
-import { RadioGroup, RadioGroupItem } from "../components/ui/radio-group";
-import { Label } from "../components/ui/label";
-import { Badge } from "../components/ui/badge";
-import { Textarea } from "../components/ui/textarea";
-import { cn } from "../components/ui/utils";
-import { buildWsUrl } from "../lib/env";
-import { apiRequest } from "../lib/http";
-import {
-  captureTrackSnapshot,
   claimStashedProctoringStreams,
   hasStashedProctoringStreams,
   releaseStashedProctoringStreams,
@@ -42,315 +17,67 @@ import {
   recordProctoringEvent,
   reportMediaStatus,
   requestPublishToken,
-  uploadProctorEvidence,
   type ConnectedMediaRoom,
   type ProctorEventResponse,
 } from "../lib/proctoringMedia";
+import { backupFileName, buildBackupJson, buildBackupText, downloadJsonFile } from "./take-exam/backup";
 import {
-  clearSessionSnapshots,
-  compressSnapshotForUpload,
-  getTopViolationSnapshots,
-  saveSnapshotLocally,
-  saveExamDraft,
-  getExamDraft,
-  clearExamDraft,
-  deleteSnapshot,
-} from "../lib/snapshotStore";
-import { getStoredTokens } from "../lib/storage";
+  BackupRecoveryModal,
+  FullscreenExitOverlay,
+  SubmitConfirmDialog,
+  TimeUpDialog,
+} from "./take-exam/Dialogs";
+import {
+  captureViolationEvidence as captureEvidenceLocally,
+  uploadPendingSnapshots as uploadEvidenceSnapshots,
+} from "./take-exam/evidence";
+import { ExamHeader, SyncErrorBanner, ViolationNoticeBanner } from "./take-exam/ExamHeader";
+import { useExamShortcuts, useExamTimer } from "./take-exam/hooks";
+import {
+  countPendingSync,
+  mergeLocalDraftAnswers,
+  removeFromLocalDraft,
+  saveToLocalDraft,
+  syncLocalDraftQueue,
+} from "./take-exam/localDraft";
+import { QuestionNavigator } from "./take-exam/QuestionNavigator";
+import { QuestionPanel } from "./take-exam/QuestionPanel";
+import { useLiveControlSocket } from "./take-exam/useLiveControlSocket";
+import {
+  LoadingScreen,
+  ProctoringSetupScreen,
+  SubmittedScreen,
+  UnavailableScreen,
+} from "./take-exam/StatusScreens";
+import type {
+  AnswerPayload,
+  AutosaveResponse,
+  CandidateSession,
+  ConnectionStatus,
+  SessionAnswerResponse,
+  SessionQuestion,
+  SubmissionSummary,
+  ViolationNotice,
+} from "./take-exam/types";
+import {
+  applySubmission,
+  assignPreviewStream,
+  AUTOSAVE_INTERVAL_MS,
+  ESSAY_AUTOSAVE_DELAY_MS,
+  getCandidateConnectionStatus,
+  getEvidenceUploadDelayMs,
+  getNavigatorConnectionInfo,
+  HEARTBEAT_INTERVAL_MS,
+  VIOLATION_COOLDOWN_MS,
+} from "./take-exam/utils";
 
-interface SessionQuestion {
-  id: number;
-  sort_order: number;
-  points: string;
-  question_text: string;
-  question_type: string;
-  difficulty: string;
-  options: Array<{
-    key: string;
-    text: string;
-    sort_order: number;
-  }>;
-  selected_option_keys: string[];
-  answer_text: string;
-  is_answered: boolean;
-  is_marked_for_review: boolean;
-}
-
-interface CandidateSession {
-  id: number;
-  exam_id: number;
-  exam_name: string;
-  subject: {
-    id: number;
-    name: string;
-    code: string;
-    color: string;
-  };
-  status: string;
-  attempt_number: number;
-  started_at: string;
-  expires_at: string;
-  submission_deadline?: string;
-  submission_grace_seconds?: number;
-  is_late?: boolean;
-  submitted_at: string | null;
-  show_results_immediately: boolean;
-  enable_proctoring: boolean;
-  remaining_seconds: number;
-  objective_score: string;
-  max_score: string;
-  manual_grading_required: boolean;
-  answered_count: number;
-  marked_count: number;
-  total_questions: number;
-  questions: SessionQuestion[];
-}
-
-interface SessionAnswerResponse {
-  session_question: number;
-  selected_option_keys: string[];
-  answer_text: string;
-  is_answered: boolean;
-  is_marked_for_review: boolean;
-  updated_at: string;
-}
-
-interface AutosaveResponse {
-  id: number | null;
-  answered_count: number;
-  marked_count: number;
-  payload: Record<string, unknown>;
-  created_at: string;
-}
-
-interface SubmissionSummary {
-  id: number;
-  status: string;
-  submitted_at: string;
-  objective_score: string;
-  max_score: string;
-  manual_grading_required: boolean;
-  is_late?: boolean;
-}
-
-type ConnectionStatus = "stable" | "offline" | "unstable";
-type ViolationNotice = {
-  severity: "warning" | "critical";
-  message: string;
-  occurredAt: string;
-};
-
-type NavigatorConnectionInfo = {
-  effectiveType?: string;
-  rtt?: number;
-};
-
-const HEARTBEAT_INTERVAL_MS = 60_000;
-const AUTOSAVE_INTERVAL_MS = 120_000;
-const ESSAY_AUTOSAVE_DELAY_MS = 25_000;
-const DEGRADED_CONNECTION_RTT_MS = 1_500;
-// Cung loai vi pham lap lai trong khoang nay chi gui 1 lan (backend cung gop tuong tu).
-const VIOLATION_COOLDOWN_MS = 5_000;
-// Rai thoi diem upload anh bang chung sau khi nop bai de tranh don tai luc het gio.
-const EVIDENCE_UPLOAD_MIN_DELAY_MS = 2_000;
-const EVIDENCE_UPLOAD_MAX_DELAY_MS = 15_000;
-
-const getEvidenceUploadDelayMs = () =>
-  EVIDENCE_UPLOAD_MIN_DELAY_MS +
-  Math.floor(Math.random() * (EVIDENCE_UPLOAD_MAX_DELAY_MS - EVIDENCE_UPLOAD_MIN_DELAY_MS));
-
-const formatTime = (seconds: number) => {
-  const clampedSeconds = Math.max(0, seconds);
-  const hours = Math.floor(clampedSeconds / 3600);
-  const minutes = Math.floor((clampedSeconds % 3600) / 60);
-  const secs = clampedSeconds % 60;
-  return `${hours}:${minutes.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`;
-};
-
-const normalizeCandidateLocale = (locale: string) => (locale.toLowerCase().startsWith("vi") ? "vi-VN" : "en-GB");
-
-const formatDateTime = (value: string, locale: string) =>
-  new Intl.DateTimeFormat(normalizeCandidateLocale(locale), {
-    dateStyle: "medium",
-    timeStyle: "short",
-  }).format(new Date(value));
-
-const assignPreviewStream = (
-  element: (HTMLVideoElement & { srcObject?: MediaStream | null }) | null,
-  stream: MediaStream | null,
-) => {
-  if (!element) {
-    return;
-  }
-  element.srcObject = stream;
-};
-
-const getNavigatorConnectionInfo = () =>
-  (navigator as Navigator & { connection?: NavigatorConnectionInfo }).connection;
-
-const getCandidateConnectionStatus = (failedHeartbeatCount: number): ConnectionStatus => {
-  if (!navigator.onLine) {
-    return "offline";
-  }
-
-  if (failedHeartbeatCount > 0) {
-    return "unstable";
-  }
-
-  const connectionInfo = getNavigatorConnectionInfo();
-  if (
-    connectionInfo?.effectiveType === "slow-2g"
-    || connectionInfo?.effectiveType === "2g"
-    || (typeof connectionInfo?.rtt === "number" && connectionInfo.rtt >= DEGRADED_CONNECTION_RTT_MS)
-  ) {
-    return "unstable";
-  }
-
-  return "stable";
-};
-
-const parseLiveRequestEnabled = (value: boolean | string | undefined) =>
-  value === true || value === "1" || value === "true";
-
-const saveToLocalDraft = async (sessionId: number, questionId: number, payload: any) => {
-  try {
-    const draft = await getExamDraft(sessionId) ?? {
-      sessionId,
-      answers: {},
-      version: 0,
-      timestamp: Date.now(),
-    };
-    draft.answers[String(questionId)] = payload;
-    draft.version += 1;
-    draft.timestamp = Date.now();
-    await saveExamDraft(draft);
-  } catch (err) {
-    console.error("Failed to save answer to IndexedDB, falling back to LocalStorage", err);
-    try {
-      const key = `eduexam_pending_sync_${sessionId}`;
-      const dataStr = localStorage.getItem(key);
-      const pending = dataStr ? JSON.parse(dataStr) : {};
-      pending[questionId] = {
-        payload,
-        timestamp: Date.now()
-      };
-      localStorage.setItem(key, JSON.stringify(pending));
-    } catch (localErr) {
-      console.error("Failed to save answer to local storage", localErr);
-    }
-  }
-};
-
-const removeFromLocalDraft = async (sessionId: number, questionId: number) => {
-  try {
-    const draft = await getExamDraft(sessionId);
-    if (draft && draft.answers[String(questionId)]) {
-      delete draft.answers[String(questionId)];
-      if (Object.keys(draft.answers).length === 0) {
-        await clearExamDraft(sessionId);
-      } else {
-        draft.version += 1;
-        draft.timestamp = Date.now();
-        await saveExamDraft(draft);
-      }
-    }
-  } catch (err) {
-    console.error("Failed to remove answer from IndexedDB", err);
-  }
-  
-  try {
-    const key = `eduexam_pending_sync_${sessionId}`;
-    const dataStr = localStorage.getItem(key);
-    if (dataStr) {
-      const pending = JSON.parse(dataStr);
-      delete pending[questionId];
-      if (Object.keys(pending).length === 0) {
-        localStorage.removeItem(key);
-      } else {
-        localStorage.setItem(key, JSON.stringify(pending));
-      }
-    }
-  } catch (err) {
-    console.error("Failed to remove answer from local storage", err);
-  }
-};
-
-const countPendingSync = async (sessionId: number): Promise<number> => {
-  let count = 0;
-  try {
-    const draft = await getExamDraft(sessionId);
-    if (draft && draft.answers) {
-      count += Object.keys(draft.answers).length;
-    }
-  } catch (err) {
-    console.error("Failed to count draft answers", err);
-  }
-  try {
-    const key = `eduexam_pending_sync_${sessionId}`;
-    const dataStr = localStorage.getItem(key);
-    if (dataStr) {
-      const pending = JSON.parse(dataStr);
-      count += Object.keys(pending).length;
-    }
-  } catch (err) {
-    console.error("Failed to count fallback answers", err);
-  }
-  return count;
-};
-
-const syncLocalDraftQueue = async (sessionId: number, onProgress?: () => void) => {
-  try {
-    const draft = await getExamDraft(sessionId);
-    if (draft && draft.answers) {
-      const questionIds = Object.keys(draft.answers);
-      for (const questionId of questionIds) {
-        const payload = draft.answers[questionId];
-        try {
-          await apiRequest(`/api/v1/exam-sessions/${sessionId}/answers/${questionId}/`, {
-            method: "PUT",
-            body: payload,
-          });
-          await removeFromLocalDraft(sessionId, Number(questionId));
-          onProgress?.();
-        } catch (err) {
-          break;
-        }
-      }
-    }
-  } catch (err) {
-    console.error("Failed to sync IndexedDB drafts queue", err);
-  }
-
-  try {
-    const key = `eduexam_pending_sync_${sessionId}`;
-    const dataStr = localStorage.getItem(key);
-    if (dataStr) {
-      const pending = JSON.parse(dataStr);
-      const questionIds = Object.keys(pending);
-      for (const questionId of questionIds) {
-        const { payload } = pending[questionId];
-        try {
-          await apiRequest(`/api/v1/exam-sessions/${sessionId}/answers/${questionId}/`, {
-            method: "PUT",
-            body: payload,
-          });
-          await removeFromLocalDraft(sessionId, Number(questionId));
-          onProgress?.();
-        } catch (err) {
-          break;
-        }
-      }
-    }
-  } catch (err) {
-    console.error("Failed to sync local storage fallback queue", err);
-  }
-};
-
-
+/**
+ * Trang lam bai thi cua thi sinh: dieu phoi phien thi, luu bai (co hang doi ngoai tuyen),
+ * giam sat (webcam/man hinh/toan man hinh) va nop bai. Giao dien nam trong ./take-exam/.
+ */
 export function TakeExam() {
   const { t, i18n } = useTranslation("common");
   const { id } = useParams();
-  const navigate = useNavigate();
   const examId = Number(id);
   const locale = i18n.resolvedLanguage ?? i18n.language;
 
@@ -358,11 +85,9 @@ export function TakeExam() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
-  const [timeRemaining, setTimeRemaining] = useState(0);
-  // null = con gio lam bai; so giay = dang trong thoi gian an han chi duoc nop bai.
-  const [graceRemaining, setGraceRemaining] = useState<number | null>(null);
+  // graceRemaining: null = con gio lam bai; so giay = dang trong thoi gian an han chi duoc nop bai.
+  const { timeRemaining, setTimeRemaining, graceRemaining, timeUpRef } = useExamTimer(session);
   const [showSubmitConfirm, setShowSubmitConfirm] = useState(false);
-  const timeUpRef = useRef(false);
   const autoSubmitTriggeredRef = useRef(false);
   const [lastSavedAt, setLastSavedAt] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
@@ -376,7 +101,6 @@ export function TakeExam() {
   const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>(
     navigator.onLine ? "stable" : "offline",
   );
-  const [controlSocketRevision, setControlSocketRevision] = useState(0);
 
   const [pendingSyncCount, setPendingSyncCount] = useState(0);
   const [isSyncFailed, setIsSyncFailed] = useState(false);
@@ -425,8 +149,6 @@ export function TakeExam() {
   const captureResourcesRef = useRef<ProctoringCaptureResources | null>(null);
   const liveRoomRef = useRef<ConnectedMediaRoom | null>(null);
   const liveRequestEnabledRef = useRef(false);
-  const controlSocketRef = useRef<WebSocket | null>(null);
-  const controlReconnectTimeoutRef = useRef<number | null>(null);
   const setupPreviewRef = useRef<HTMLVideoElement | null>(null);
   const examPreviewRef = useRef<HTMLVideoElement | null>(null);
   const screenEndedHandlerRef = useRef<(() => void) | null>(null);
@@ -444,13 +166,6 @@ export function TakeExam() {
       return await task();
     } finally {
       releaseCurrent();
-    }
-  };
-
-  const clearControlReconnectTimeout = () => {
-    if (controlReconnectTimeoutRef.current !== null) {
-      window.clearTimeout(controlReconnectTimeoutRef.current);
-      controlReconnectTimeoutRef.current = null;
     }
   };
 
@@ -563,11 +278,7 @@ export function TakeExam() {
 
   const saveAnswer = async (
     questionId: number,
-    payload: Partial<{
-      selected_option_keys: string[];
-      answer_text: string;
-      is_marked_for_review: boolean;
-    }>,
+    payload: AnswerPayload,
   ) => {
     if (!session) {
       return;
@@ -626,11 +337,7 @@ export function TakeExam() {
       captureResourcesRef.current.screenTrack.removeEventListener("ended", screenEndedHandlerRef.current);
     }
     screenEndedHandlerRef.current = null;
-    clearControlReconnectTimeout();
-    if (controlSocketRef.current) {
-      controlSocketRef.current.close();
-      controlSocketRef.current = null;
-    }
+    closeControlSocket();
     await disconnectRoom(liveRoomRef.current);
     liveRoomRef.current = null;
     liveRequestEnabledRef.current = false;
@@ -653,67 +360,16 @@ export function TakeExam() {
     await requestFullscreen();
   };
 
-  /**
-   * Chup anh vi pham va LUU VAO LOCAL (IndexedDB) - khong upload ngay.
-   * Viec upload se duoc thuc hien khi nop bai (chi top-3 snapshot).
-   */
   const captureViolationEvidence = async (
     event: ProctorEventResponse,
     message: string,
     severity: "critical" | "warning" | "info",
   ) => {
-    if (!session) {
-      return;
-    }
-
     const captureResources = captureResourcesRef.current;
-    if (!captureResources) {
+    if (!session || !captureResources) {
       return;
     }
-
-    const capturedAt = new Date().toISOString();
-
-    // Chup webcam -> luu local (JPEG chat luong cao, chua nen)
-    try {
-      const webcamBlob = await captureTrackSnapshot(captureResources.webcamTrack, {
-        maxWidth: 1280,
-        mimeType: "image/jpeg",
-        quality: 0.85,
-      });
-      await saveSnapshotLocally({
-        sessionId: session.id,
-        eventId: event.id,
-        evidenceType: "webcam_snapshot",
-        severity,
-        blob: webcamBlob,
-        message,
-        capturedAt,
-      });
-    } catch {
-      // Neu khong chup duoc webcam, bo qua (khong de loi nay chan nop bai)
-    }
-
-    // Chup man hinh -> luu local
-    if (captureResources.screenTrack && captureResources.screenTrack.readyState !== "ended") {
-      try {
-        const screenBlob = await captureTrackSnapshot(captureResources.screenTrack, {
-          maxWidth: 1280,
-          mimeType: "image/jpeg",
-          quality: 0.85,
-        });
-        await saveSnapshotLocally({
-          sessionId: session.id,
-          eventId: event.id,
-          evidenceType: "screen_capture",
-          severity,
-          blob: screenBlob,
-          message,
-          capturedAt,
-        });
-      } catch {
-        // Neu khong chup duoc man hinh, bo qua
-      }
-    }
+    await captureEvidenceLocally(session.id, captureResources, event, message, severity);
   };
 
   const reportViolation = async (
@@ -782,26 +438,7 @@ export function TakeExam() {
       });
       
       try {
-        const localDraft = await getExamDraft(nextSession.id);
-        const localFallbackStr = localStorage.getItem(`eduexam_pending_sync_${nextSession.id}`);
-        const localFallback = localFallbackStr ? JSON.parse(localFallbackStr) : null;
-        
-        nextSession.questions = nextSession.questions.map((q) => {
-          let localAns = localDraft?.answers[String(q.id)];
-          if (!localAns && localFallback && localFallback[String(q.id)]) {
-            localAns = localFallback[String(q.id)].payload;
-          }
-          if (localAns) {
-            return {
-              ...q,
-              selected_option_keys: localAns.selected_option_keys ?? q.selected_option_keys,
-              answer_text: localAns.answer_text ?? q.answer_text,
-              is_answered: true,
-              is_marked_for_review: localAns.is_marked_for_review ?? q.is_marked_for_review,
-            };
-          }
-          return q;
-        });
+        nextSession.questions = await mergeLocalDraftAnswers(nextSession.id, nextSession.questions);
       } catch (err) {
         console.error("Failed to load local draft answers", err);
       }
@@ -848,23 +485,11 @@ export function TakeExam() {
   }, []);
 
   useEffect(() => {
-    assignPreviewStream(
-      setupPreviewRef.current as (HTMLVideoElement & { srcObject?: MediaStream | null }) | null,
-      localPreviewStream,
-    );
-    assignPreviewStream(
-      examPreviewRef.current as (HTMLVideoElement & { srcObject?: MediaStream | null }) | null,
-      localPreviewStream,
-    );
+    assignPreviewStream(setupPreviewRef.current, localPreviewStream);
+    assignPreviewStream(examPreviewRef.current, localPreviewStream);
     return () => {
-      assignPreviewStream(
-        setupPreviewRef.current as (HTMLVideoElement & { srcObject?: MediaStream | null }) | null,
-        null,
-      );
-      assignPreviewStream(
-        examPreviewRef.current as (HTMLVideoElement & { srcObject?: MediaStream | null }) | null,
-        null,
-      );
+      assignPreviewStream(setupPreviewRef.current, null);
+      assignPreviewStream(examPreviewRef.current, null);
     };
   }, [localPreviewStream, proctoringReady]);
 
@@ -1002,118 +627,11 @@ export function TakeExam() {
     }
   };
 
-  useEffect(() => {
-    if (!session || session.status !== "in_progress") {
-      return;
-    }
-
-    const expiresTime = new Date(session.expires_at).getTime();
-    const graceSeconds = session.submission_grace_seconds ?? 300;
-    const deadlineTime = session.submission_deadline
-      ? new Date(session.submission_deadline).getTime()
-      : expiresTime + graceSeconds * 1000;
-
-    const updateTimer = () => {
-      const now = new Date().getTime();
-      const diffSeconds = Math.max(0, Math.ceil((expiresTime - now) / 1000));
-      setTimeRemaining(diffSeconds);
-      if (diffSeconds === 0) {
-        const graceLeft = Math.max(0, Math.ceil((deadlineTime - now) / 1000));
-        timeUpRef.current = true;
-        setGraceRemaining(graceLeft);
-      } else {
-        timeUpRef.current = false;
-        setGraceRemaining(null);
-      }
-    };
-
-    updateTimer();
-    const intervalId = window.setInterval(updateTimer, 1000);
-
-    return () => window.clearInterval(intervalId);
-  }, [session?.id, session?.status, session?.expires_at, session?.submission_deadline, session?.submission_grace_seconds]);
-
-  useEffect(() => {
-    const tokens = getStoredTokens();
-    if (
-      !session
-      || !session.enable_proctoring
-      || session.status !== "in_progress"
-      || !proctoringReady
-      || !tokens?.access
-    ) {
-      clearControlReconnectTimeout();
-      if (controlSocketRef.current) {
-        controlSocketRef.current.close();
-        controlSocketRef.current = null;
-      }
-      return;
-    }
-
-    let isActive = true;
-    const scheduleReconnect = () => {
-      if (!isActive || controlReconnectTimeoutRef.current !== null) {
-        return;
-      }
-      controlReconnectTimeoutRef.current = window.setTimeout(() => {
-        controlReconnectTimeoutRef.current = null;
-        if (!isActive) {
-          return;
-        }
-        setControlSocketRevision((current) => current + 1);
-      }, 3000);
-    };
-
-    const websocket = new WebSocket(
-      buildWsUrl(`/ws/proctoring/sessions/${session.id}/control/?token=${tokens.access}`),
-    );
-    controlSocketRef.current = websocket;
-
-    websocket.onopen = () => {
-      clearControlReconnectTimeout();
-    };
-
-    websocket.onmessage = (event) => {
-      try {
-        const message = JSON.parse(event.data) as {
-          type?: string;
-          payload?: { enabled?: boolean | string };
-        };
-        if (message.type !== "live_request") {
-          return;
-        }
-        const enabled = parseLiveRequestEnabled(message.payload?.enabled);
-        void syncRequestedLiveState(enabled);
-      } catch {
-        // Ignore malformed control payloads and wait for the next update.
-      }
-    };
-
-    websocket.onerror = () => {
-      scheduleReconnect();
-    };
-
-    websocket.onclose = () => {
-      if (!isActive) {
-        return;
-      }
-      scheduleReconnect();
-    };
-
-    return () => {
-      isActive = false;
-      if (controlSocketRef.current === websocket) {
-        controlSocketRef.current = null;
-      }
-      websocket.close();
-    };
-  }, [
-    proctoringReady,
-    session?.enable_proctoring,
+  const closeControlSocket = useLiveControlSocket(
+    Boolean(session?.enable_proctoring && session.status === "in_progress" && proctoringReady),
     session?.id,
-    session?.status,
-    controlSocketRevision,
-  ]);
+    (enabled) => void syncRequestedLiveState(enabled),
+  );
 
   useEffect(() => {
     if (!session || session.status !== "in_progress") {
@@ -1352,75 +870,13 @@ export function TakeExam() {
     await saveAnswer(currentQuestion.id, { is_marked_for_review: nextMarked });
   };
 
-  useEffect(() => {
-    if (!session || session.status !== "in_progress") {
-      return;
-    }
+  useExamShortcuts(session?.status === "in_progress", timeUpRef, {
+    onPrevious: () => void goToQuestion(currentQuestionIndex - 1),
+    onNext: () => void goToQuestion(currentQuestionIndex + 1),
+    onToggleFlag: () => void toggleMarked(),
+  });
 
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (timeUpRef.current) {
-        return;
-      }
-      // If Alt + ArrowLeft or Alt + P -> Previous
-      if ((event.altKey && event.key === "ArrowLeft") || (event.altKey && event.key === "p") || (event.altKey && event.key === "P")) {
-        event.preventDefault();
-        void goToQuestion(currentQuestionIndex - 1);
-      }
-      // If Alt + ArrowRight or Alt + N -> Next
-      else if ((event.altKey && event.key === "ArrowRight") || (event.altKey && event.key === "n") || (event.altKey && event.key === "N")) {
-        event.preventDefault();
-        void goToQuestion(currentQuestionIndex + 1);
-      }
-      // If Alt + F -> Toggle Flag
-      else if (event.altKey && (event.key === "f" || event.key === "F")) {
-        event.preventDefault();
-        void toggleMarked();
-      }
-    };
-
-    window.addEventListener("keydown", handleKeyDown);
-    return () => {
-      window.removeEventListener("keydown", handleKeyDown);
-    };
-  }, [session, currentQuestionIndex, currentQuestion]);
-
-  /**
-   * Upload top-3 snapshot vi pham (theo severity) len server truoc khi nop bai.
-   * Moi snapshot duoc nen tu JPEG 0.85 -> WebP 0.6 de giam tai duong truyen.
-   * Sau khi upload xong, toan bo snapshot local duoc xoa.
-   */
-  const uploadPendingSnapshots = async (sessionId: number) => {
-    const MAX_UPLOADS = 5;
-    let snapshots;
-    try {
-      snapshots = await getTopViolationSnapshots(sessionId, MAX_UPLOADS);
-    } catch {
-      // Neu IndexedDB loi, bo qua upload (khong chặn nop bai)
-      return;
-    }
-
-    for (const entry of snapshots) {
-      try {
-        // Nen anh truoc khi upload (WebP 0.6 - nhe hon ~60%)
-        const compressed = await compressSnapshotForUpload(entry.blob, entry.evidenceType);
-        await enqueueSessionMutation(() =>
-          uploadProctorEvidence(
-            entry.sessionId,
-            entry.eventId,
-            entry.evidenceType,
-            compressed,
-            { message: entry.message, compressed: true, original_size: entry.blob.size },
-          ),
-        );
-        // Xóa snapshot cục bộ trong IndexedDB chỉ khi upload thành công
-        if (entry.id !== undefined) {
-          await deleteSnapshot(entry.id);
-        }
-      } catch {
-        // Nếu upload thất bại (ví dụ R2 lỗi), giữ nguyên snapshot trong IndexedDB để có thể tải lại sau
-      }
-    }
-  };
+  const uploadPendingSnapshots = (sessionId: number) => uploadEvidenceSnapshots(sessionId, enqueueSessionMutation);
 
   const handleSubmit = async (options: { auto?: boolean } = {}) => {
     if (!session) {
@@ -1454,19 +910,7 @@ export function TakeExam() {
           ...(options.auto ? { body: { auto_submit: true } } : {}),
         }),
       );
-      setSession((current) =>
-        current
-          ? {
-              ...current,
-              status: response.status,
-              submitted_at: response.submitted_at,
-              objective_score: response.objective_score,
-              max_score: response.max_score,
-              manual_grading_required: response.manual_grading_required,
-              is_late: response.is_late ?? current.is_late,
-            }
-          : current,
-      );
+      setSession((current) => applySubmission(current, response));
       notify.success(t("examSession.submitSuccess"));
       setShowBackupModal(false);
 
@@ -1489,40 +933,7 @@ export function TakeExam() {
   const handleDownloadBackup = () => {
     if (!session) return;
     try {
-      const backupData = {
-        session_id: session.id,
-        exam_id: session.exam_id ?? examId,
-        exam_name: session.exam_name,
-        attempt_number: session.attempt_number,
-        timestamp: new Date().toISOString(),
-        answers: session.questions.map((q) => ({
-          question_id: q.id,
-          sort_order: q.sort_order,
-          question_type: q.question_type,
-          selected_option_keys: q.selected_option_keys,
-          answer_text: q.answer_text,
-        })),
-        tamper_proof_checksum: "",
-      };
-
-      const rawText = JSON.stringify(backupData.answers) + `_session_${session.id}_time_${backupData.timestamp}`;
-      let hash = 0;
-      for (let i = 0; i < rawText.length; i++) {
-        hash = (hash << 5) - hash + rawText.charCodeAt(i);
-        hash |= 0;
-      }
-      backupData.tamper_proof_checksum = Math.abs(hash).toString(16).toUpperCase();
-
-      const blob = new Blob([JSON.stringify(backupData, null, 2)], { type: "application/json" });
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement("a");
-      link.href = url;
-      const sanitizedName = session.exam_name.replace(/[^a-z0-9]/gi, "_").toLowerCase();
-      link.download = `${sanitizedName}_backup_session_${session.id}.json`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      URL.revokeObjectURL(url);
+      downloadJsonFile(buildBackupJson(session, examId), backupFileName(session));
       notify.success(t("examSession.downloadedSuccess"));
     } catch (err) {
       console.error(err);
@@ -1533,23 +944,7 @@ export function TakeExam() {
   const handleCopyBackup = () => {
     if (!session) return;
     try {
-      const answersSummary = session.questions.map((q) => {
-        const ans = q.question_type === "essay" 
-          ? q.answer_text 
-          : q.selected_option_keys.join(", ");
-        return `Q${q.sort_order}: ${ans || "[No answer]"}`;
-      }).join("\n");
-
-      const textToCopy = `--- EDUEXAM BACKUP ---
-Exam ID: ${session.exam_id ?? examId}
-Exam Name: ${session.exam_name}
-Session ID: ${session.id}
-Timestamp: ${new Date().toISOString()}
-Answers:
-${answersSummary}
----------------------`;
-
-      navigator.clipboard.writeText(textToCopy);
+      navigator.clipboard.writeText(buildBackupText(session, examId));
       notify.success(t("examSession.copiedSuccess"));
     } catch (err) {
       console.error(err);
@@ -1570,19 +965,7 @@ ${answersSummary}
           method: "POST",
         }),
       );
-      setSession((current) =>
-        current
-          ? {
-              ...current,
-              status: response.status,
-              submitted_at: response.submitted_at,
-              objective_score: response.objective_score,
-              max_score: response.max_score,
-              manual_grading_required: response.manual_grading_required,
-              is_late: response.is_late ?? current.is_late,
-            }
-          : current,
-      );
+      setSession((current) => applySubmission(current, response));
       notify.success(t("examSession.submitSuccess"));
       setShowBackupModal(false);
       
@@ -1636,703 +1019,127 @@ ${answersSummary}
   }, [isTimeUp, graceRemaining, isSubmitting]);
 
   if (isLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <p className="text-sm text-gray-500">{t("examSession.loading")}</p>
-      </div>
-    );
+    return <LoadingScreen />;
   }
 
   if (error || !session || !currentQuestion) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50 px-6">
-        <Card className="w-full max-w-lg">
-          <CardContent className="p-8 text-center">
-            <h1 className="text-xl font-semibold text-gray-900 mb-2">{t("examSession.unavailableTitle")}</h1>
-            <p className="text-sm text-gray-600 mb-6">{error ?? t("examSession.unavailableDescription")}</p>
-            <Button asChild>
-              <Link to="/candidate/exams">{t("examInstructions.backToMyExams")}</Link>
-            </Button>
-          </CardContent>
-        </Card>
-      </div>
-    );
+    return <UnavailableScreen error={error} />;
   }
 
   // Het gio: bo qua buoc thiet lap giam sat de thi sinh (vd. vua tai lai trang) van bam nop duoc.
   if (session.status !== "submitted" && session.enable_proctoring && !proctoringReady && !isTimeUp) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50 px-6">
-        <Card className="w-full max-w-xl">
-          <CardContent className="p-8">
-            <div className="text-center mb-8">
-              <h1 className="text-xl font-semibold text-gray-900 mb-2">{t("examSession.protectedSetupTitle")}</h1>
-              <p className="text-sm text-gray-600">
-                {t("examSession.protectedSetupDescription")}
-              </p>
-            </div>
-
-            <div className="rounded-xl border border-blue-200 bg-blue-50 p-4 text-sm text-blue-900">
-              <p className="font-medium">{t("examSession.protectedSetupIntroTitle")}</p>
-              <p className="mt-2">{t("examSession.protectedSetupIntroDescription")}</p>
-            </div>
-
-            <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700">
-              <p className="font-medium text-slate-900">{t("examSession.permissionsRequested")}</p>
-              <ul className="mt-2 list-disc space-y-1 pl-5">
-                <li>{t("examSession.permissionCamera")}</li>
-                <li>{t("examSession.permissionMicrophone")}</li>
-                <li>{t("examSession.permissionScreen")}</li>
-                <li>{t("examSession.permissionFullscreen")}</li>
-              </ul>
-              <div className="mt-3 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg p-3 leading-relaxed">
-                {t("examSession.screenShareTip")}
-              </div>
-            </div>
-
-            {proctoringBlockReason ? (
-              <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
-                {proctoringBlockReason}
-              </div>
-            ) : null}
-
-            {localPreviewStream ? (
-              <div className="mt-4 rounded-xl border border-sky-200 bg-sky-50 p-4">
-                <div className="mb-3 flex items-center justify-between gap-3">
-                  <div>
-                    <p className="text-sm font-semibold text-slate-900">{t("examSession.webcamPreviewTitle")}</p>
-                    <p className="text-xs text-slate-600">{t("examSession.webcamPreviewSetup")}</p>
-                  </div>
-                  <Badge variant="outline">{t("examSession.previewBadge")}</Badge>
-                </div>
-                <div className="overflow-hidden rounded-xl border border-slate-200 bg-slate-950">
-                  <video
-                    ref={setupPreviewRef}
-                    aria-label={t("examSession.webcamPreviewLabel")}
-                    autoPlay
-                    muted
-                    playsInline
-                    className="aspect-video h-full w-full object-cover"
-                  />
-                </div>
-              </div>
-            ) : null}
-
-            <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:justify-center">
-              <Button onClick={() => void beginProtectedExam()} disabled={isProctoringSetupPending}>
-                {isProctoringSetupPending
-                  ? t("examSession.startMonitoring")
-                  : localPreviewStream
-                    ? t("examSession.enterFullscreenAndStart")
-                    : t("examSession.grantPermissionsAndStart")}
-              </Button>
-              <Button asChild>
-                <Link to="/candidate/exams">{t("examInstructions.backToMyExams")}</Link>
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+      <ProctoringSetupScreen
+        blockReason={proctoringBlockReason}
+        previewStream={localPreviewStream}
+        previewRef={setupPreviewRef}
+        isPending={isProctoringSetupPending}
+        onBegin={() => void beginProtectedExam()}
+      />
     );
   }
 
   if (session.status === "submitted") {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50 px-6">
-        <Card className="w-full max-w-xl">
-          <CardContent className="p-8">
-            <div className="text-center mb-8">
-              <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-green-100">
-                <CheckCircle2 className="h-7 w-7 text-green-600" />
-              </div>
-              <h1 className="text-2xl font-semibold text-gray-900">{t("examSession.submittedTitle")}</h1>
-              <p className="mt-2 text-sm text-gray-600">
-                {t("examSession.submittedAt", {
-                  exam: session.exam_name,
-                  time: session.submitted_at
-                    ? formatDateTime(session.submitted_at, locale)
-                    : t("examSession.justNow"),
-                })}
-              </p>
-            </div>
-
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 mb-6">
-              <div className="rounded-lg border border-gray-200 p-4">
-                <p className="text-sm text-gray-500">{t("examSession.objectiveScore")}</p>
-                <p className="mt-1 text-2xl font-semibold text-gray-900">
-                  {session.objective_score}/{session.max_score}
-                </p>
-              </div>
-              <div className="rounded-lg border border-gray-200 p-4">
-                <p className="text-sm text-gray-500">{t("examSession.evaluationStatus")}</p>
-                <p className="mt-1 text-2xl font-semibold text-gray-900">
-                  {session.manual_grading_required ? t("examSession.pendingGrading") : t("examSession.finalized")}
-                </p>
-              </div>
-            </div>
-
-            {session.is_late ? (
-              <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900 mb-4">
-                {t("examSession.lateSubmissionNotice")}
-              </div>
-            ) : null}
-
-            <div className="rounded-lg border border-blue-200 bg-blue-50 p-4 text-sm text-blue-800 mb-6">
-              {session.show_results_immediately && !session.manual_grading_required
-                ? t("examSession.resultsImmediate")
-                : t("examSession.resultsLater")}
-            </div>
-
-            <div className="flex flex-col gap-3 sm:flex-row sm:justify-end">
-              <Button variant="outline" onClick={() => navigate(0)}>
-                {t("examSession.refresh")}
-              </Button>
-              <Button asChild>
-                <Link to="/candidate/exams">{t("examInstructions.backToMyExams")}</Link>
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-    );
+    return <SubmittedScreen session={session} locale={locale} />;
   }
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
       {!isFullscreen && session?.enable_proctoring && !isTimeUp ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm">
-          <div className="text-center p-8 bg-white rounded-xl max-w-md mx-auto shadow-2xl relative">
-            <AlertTriangle className="w-16 h-16 text-amber-500 mx-auto mb-4" />
-            <h2 className="text-2xl font-bold text-slate-900 mb-2">Đã thoát toàn màn hình</h2>
-            <p className="text-slate-600 mb-6">
-              Hệ thống giám sát yêu cầu bạn phải làm bài ở chế độ toàn màn hình. Vui lòng quay lại toàn màn hình để tiếp tục làm bài thi.
-            </p>
-            <Button onClick={() => void ensureFullscreenMode()} size="lg" className="w-full text-base py-6">
-              Quay lại toàn màn hình
-            </Button>
-          </div>
-        </div>
+        <FullscreenExitOverlay onReturn={() => void ensureFullscreenMode()} />
       ) : null}
-      <header className="sticky top-0 z-10 border-b border-gray-200 bg-white px-4 py-4 sm:px-6">
-        <div className="mx-auto flex max-w-7xl flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-          <div className="min-w-0">
-            <h1 className="font-bold text-lg text-gray-900">{session.exam_name}</h1>
-            <p className="text-sm text-gray-600">
-              {t("examSession.questionAttemptLine", {
-                current: currentQuestionIndex + 1,
-                total: session.questions.length,
-                attempt: session.attempt_number,
-              })}
-            </p>
-          </div>
-
-          <div className="flex flex-wrap items-center gap-3 lg:justify-end">
-            <div className="flex min-w-[8rem] items-center gap-2">
-              <Wifi
-                className={`w-4 h-4 ${
-                  connectionStatus === "stable"
-                    ? "text-green-600"
-                    : connectionStatus === "offline"
-                      ? "text-red-600"
-                      : "text-yellow-600"
-                }`}
-              />
-              <span className="text-sm text-gray-600 capitalize">{t(`examSession.connection.${connectionStatus}`)}</span>
-            </div>
-
-            <div className="flex min-w-[10rem] items-center gap-2">
-              <CheckCircle2 className={`w-4 h-4 ${pendingSyncCount > 0 ? "text-amber-500 animate-pulse" : lastSavedAt ? "text-green-600" : "text-gray-400"}`} />
-              <span className="text-sm text-gray-600">
-                {pendingSyncCount > 0
-                  ? t("examSession.syncStatus", { count: pendingSyncCount })
-                  : lastSavedAt
-                    ? t("examSession.savedAt", {
-                        time: new Date(lastSavedAt).toLocaleTimeString(normalizeCandidateLocale(locale)),
-                      })
-                    : t("examSession.autosavePending")}
-              </span>
-            </div>
-
-            <div className="flex items-center gap-2 rounded-lg border border-blue-200 bg-blue-50 px-4 py-2">
-              <Clock className="w-5 h-5 text-blue-600" />
-              <span className="font-mono font-semibold text-blue-900">{formatTime(timeRemaining)}</span>
-            </div>
-
-
-
-            <Button className="w-full sm:w-auto" onClick={() => void confirmSubmit()} disabled={isSubmitting}>
-              {t("examSession.submitExam")}
-            </Button>
-          </div>
-        </div>
-      </header>
+      <ExamHeader
+        examName={session.exam_name}
+        currentIndex={currentQuestionIndex}
+        totalQuestions={session.questions.length}
+        attemptNumber={session.attempt_number}
+        connectionStatus={connectionStatus}
+        pendingSyncCount={pendingSyncCount}
+        lastSavedAt={lastSavedAt}
+        timeRemaining={timeRemaining}
+        locale={locale}
+        isSubmitting={isSubmitting}
+        onSubmit={() => void confirmSubmit()}
+      />
 
       <div className="flex-1 p-4 sm:p-6">
         {isSyncFailed && (
-          <div className="mx-auto max-w-7xl mb-6 rounded-xl border border-amber-200 bg-amber-50 p-4 text-amber-900 shadow-sm animate-fade-in">
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-              <div className="flex items-start gap-3">
-                <AlertCircle className="mt-0.5 h-5 w-5 text-amber-600 shrink-0" />
-                <div>
-                  <p className="font-semibold text-amber-950 leading-relaxed">
-                    {t("examSession.syncErrorBanner")}
-                  </p>
-                  {pendingSyncCount > 0 && (
-                    <p className="mt-1 text-sm text-amber-800">
-                      {t("examSession.syncStatus", { count: pendingSyncCount })}
-                    </p>
-                  )}
-                </div>
-              </div>
-              <Button
-                variant="outline"
-                size="sm"
-                className="self-start sm:self-center shrink-0 border-amber-300 hover:bg-amber-100 hover:text-amber-950 gap-2 font-medium bg-white"
-                onClick={() => void handleManualSync()}
-                disabled={isManualSyncing}
-              >
-                <RefreshCw className={cn("h-4 w-4", isManualSyncing && "animate-spin")} />
-                {isManualSyncing ? t("examSession.syncingNow") : t("examSession.syncNow")}
-              </Button>
-            </div>
-          </div>
+          <SyncErrorBanner
+            pendingSyncCount={pendingSyncCount}
+            isSyncing={isManualSyncing}
+            onSync={() => void handleManualSync()}
+          />
         )}
         <div className="mx-auto grid gap-6 max-w-7xl grid-cols-1 lg:grid-cols-4">
           <div className="lg:col-span-3">
-            {latestViolationNotice ? (
-              <div
-                className={`mb-4 rounded-xl border px-4 py-4 text-sm ${
-                  latestViolationNotice.severity === "critical"
-                    ? "border-red-200 bg-red-50 text-red-800"
-                    : "border-amber-200 bg-amber-50 text-amber-900"
-                }`}
-              >
-                <div className="flex items-start gap-3">
-                  <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0" />
-                  <div>
-                    <p className="font-semibold">
-                      {latestViolationNotice.severity === "critical"
-                        ? t("examSession.criticalAlertRecorded")
-                        : t("examSession.warningAlertRecorded")}
-                    </p>
-                    <p className="mt-1">{latestViolationNotice.message}</p>
-                    <p className="mt-2 text-xs opacity-80">
-                      {t("examSession.recordedAt", {
-                        time: formatDateTime(latestViolationNotice.occurredAt, locale),
-                      })}
-                    </p>
-                  </div>
-                </div>
-              </div>
-            ) : null}
-            <Card>
-              <CardContent className="p-4 sm:p-6 lg:p-8">
-                <div className="mb-6">
-                  <div className="mb-4 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-                    <div>
-                      <div className="mb-2 flex flex-wrap items-center gap-2">
-                        <h2 className="text-xl font-semibold text-gray-900">
-                          {t("examSession.questionHeading", { number: currentQuestionIndex + 1 })}
-                        </h2>
-                        <Badge variant="outline">{currentQuestion.difficulty}</Badge>
-                        <Badge variant="outline">{currentQuestion.question_type.replace(/_/g, " ")}</Badge>
-                      </div>
-                      <p className="text-xs text-gray-500">{t("examSession.points", { points: currentQuestion.points })}</p>
-                    </div>
-                    <Button variant="outline" size="sm" className="w-full gap-2 sm:w-auto" onClick={() => void toggleMarked()}>
-                      <Flag className="w-4 h-4" />
-                      {currentQuestion.is_marked_for_review ? t("examSession.unmark") : t("examSession.markForReview")}
-                    </Button>
-                  </div>
-                  <p className="text-base leading-relaxed text-gray-800 sm:text-lg">
-                    <MathText text={currentQuestion.question_text} />
-                  </p>
-                </div>
-
-                {currentQuestion.question_type === "essay" ? (
-                  <Textarea
-                    rows={10}
-                    value={currentQuestion.answer_text}
-                    onChange={(event) => handleEssayChange(event.target.value)}
-                    onBlur={() => void persistEssayAnswer()}
-                    placeholder={t("examSession.answerPlaceholder")}
-                  />
-                ) : (
-                  <div className="space-y-3">
-                    <RadioGroup
-                      value={currentQuestion.selected_option_keys[0] ?? undefined}
-                      onValueChange={(value) => void handleOptionChange(value)}
-                    >
-                      {currentQuestion.options.map((option, index) => {
-                        const isSelected = currentQuestion.selected_option_keys.includes(option.key);
-                        return (
-                          <label
-                            key={option.key}
-                            className={`flex items-start gap-4 rounded-lg border-2 p-4 transition-colors ${
-                              isSelected
-                                ? "border-blue-500 bg-blue-50"
-                                : "border-gray-200 hover:border-gray-300 hover:bg-gray-50"
-                            }`}
-                          >
-                            <RadioGroupItem value={option.key} id={`option-${option.key}`} />
-                            <Label htmlFor={`option-${option.key}`} className="flex-1 cursor-pointer text-base">
-                              <span className="font-medium text-gray-700 mr-2">{String.fromCharCode(65 + index)}.</span>
-                              <MathText text={option.text} />
-                            </Label>
-                          </label>
-                        );
-                      })}
-                    </RadioGroup>
-                  </div>
-                )}
-
-                <div className="mt-8 flex flex-col gap-3 border-t border-gray-200 pt-6 sm:flex-row sm:items-center sm:justify-between">
-                  <Button className="w-full sm:w-auto" variant="outline" onClick={() => void goToQuestion(currentQuestionIndex - 1)} disabled={currentQuestionIndex === 0}>
-                    <ChevronLeft className="w-4 h-4 mr-2" />
-                    {t("examSession.previous")}
-                  </Button>
-                  <Button
-                    className="w-full sm:w-auto"
-                    onClick={() => void goToQuestion(currentQuestionIndex + 1)}
-                    disabled={currentQuestionIndex === session.questions.length - 1}
-                  >
-                    {t("examSession.next")}
-                    <ChevronRight className="w-4 h-4 ml-2" />
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
+            {latestViolationNotice ? <ViolationNoticeBanner notice={latestViolationNotice} locale={locale} /> : null}
+            <QuestionPanel
+              question={currentQuestion}
+              index={currentQuestionIndex}
+              totalQuestions={session.questions.length}
+              onToggleMarked={() => void toggleMarked()}
+              onEssayChange={handleEssayChange}
+              onEssayBlur={() => void persistEssayAnswer()}
+              onOptionChange={(value) => void handleOptionChange(value)}
+              onPrevious={() => void goToQuestion(currentQuestionIndex - 1)}
+              onNext={() => void goToQuestion(currentQuestionIndex + 1)}
+            />
           </div>
 
-            <div className="lg:col-span-1">
-              <Card className="lg:sticky lg:top-24">
-                <CardContent className="p-4 sm:p-6">
-                  <h3 className="font-semibold text-gray-900 mb-4">{t("examSession.questionNavigator")}</h3>
-                  
-                  <div className="mb-4">
-                    <div className="w-full h-3 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden flex border border-slate-200/50">
-                      <div 
-                        style={{ width: `${((session.questions.filter(q => q.is_answered && !q.is_marked_for_review).length) / session.questions.length) * 100}%` }} 
-                        className="h-full bg-emerald-500 transition-all duration-500 ease-out"
-                        title="Answered"
-                      />
-                      <div 
-                        style={{ width: `${((session.questions.filter(q => q.is_marked_for_review).length) / session.questions.length) * 100}%` }} 
-                        className="h-full bg-amber-500 transition-all duration-500 ease-out animate-pulse"
-                        title="Marked for Review"
-                      />
-                    </div>
-                  </div>
-
-                {session.enable_proctoring ? (
-                  <div className="mb-4 rounded-xl border border-sky-200 bg-sky-50 p-3">
-                    <div className="mb-3 flex items-center justify-between gap-3">
-                      <div>
-                        <p className="text-sm font-semibold text-slate-900">{t("examSession.webcamPreviewTitle")}</p>
-                        <p className="text-xs text-slate-600">
-                          {proctoringReady ? t("examSession.monitoringActive") : t("examSession.monitoringPending")}
-                        </p>
-                      </div>
-                      <Badge variant="outline">{proctoringReady ? t("examSession.liveBadge") : t("examSession.pendingBadge")}</Badge>
-                    </div>
-                    <div className="overflow-hidden rounded-xl border border-slate-200 bg-slate-950">
-                      {proctoringReady && localPreviewStream ? (
-                        <video
-                          ref={examPreviewRef}
-                          aria-label={t("examSession.webcamPreviewLabel")}
-                          autoPlay
-                          muted
-                          playsInline
-                          className="aspect-video h-full w-full object-cover"
-                        />
-                      ) : (
-                        <div className="flex aspect-video items-center justify-center px-4 text-center text-xs text-slate-200">
-                          {t("examSession.webcamPreviewWaiting")}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                ) : null}
-
-                <div className="space-y-2 mb-4 pb-4 border-b border-gray-200">
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="text-gray-600">{t("examSession.answered")}:</span>
-                    <span className="font-semibold text-green-600">
-                      {answeredCount}/{session.questions.length}
-                    </span>
-                  </div>
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="text-gray-600">{t("examSession.marked")}:</span>
-                    <span className="font-semibold text-orange-600">{markedCount}</span>
-                  </div>
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="text-gray-600">{t("examSession.unanswered")}:</span>
-                    <span className="font-semibold text-red-600">
-                      {session.questions.length - answeredCount}
-                    </span>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-4 gap-2 sm:grid-cols-5">
-                  {session.questions.map((question, index) => (
-                    <button
-                      key={question.id}
-                      onClick={() => void goToQuestion(index)}
-                      className={`aspect-square rounded-lg flex items-center justify-center text-sm font-semibold transition-all relative ${
-                        currentQuestionIndex === index
-                          ? "bg-blue-600 text-white ring-2 ring-blue-400 ring-offset-2"
-                          : question.is_answered
-                            ? "bg-green-100 text-green-800 hover:bg-green-200"
-                            : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-                      }`}
-                      type="button"
-                    >
-                      {index + 1}
-                      {question.is_marked_for_review ? (
-                        <Flag className="w-3 h-3 absolute -top-1 -right-1 text-orange-500 fill-orange-500" />
-                      ) : null}
-                    </button>
-                  ))}
-                </div>
-
-                <div className="mt-4 pt-4 border-t border-gray-200 space-y-2">
-                  <div className="flex items-center gap-2 text-xs">
-                    <div className="w-4 h-4 bg-green-100 rounded" />
-                    <span className="text-gray-600">{t("examSession.answered")}</span>
-                  </div>
-                  <div className="flex items-center gap-2 text-xs">
-                    <div className="w-4 h-4 bg-gray-100 rounded" />
-                    <span className="text-gray-600">{t("examSession.unanswered")}</span>
-                  </div>
-                  <div className="flex items-center gap-2 text-xs">
-                    <div className="w-4 h-4 bg-blue-600 rounded" />
-                    <span className="text-gray-600">{t("examSession.current")}</span>
-                  </div>
-                  <div className="flex items-center gap-2 text-xs">
-                    <Flag className="w-4 h-4 text-orange-500 fill-orange-500" />
-                    <span className="text-gray-600">{t("examSession.marked")}</span>
-                  </div>
-                  {isSaving ? <p className="text-xs text-blue-600 pt-2">{t("examSession.savingAnswer")}</p> : null}
-
-                  <div className="mt-4 pt-4 border-t border-gray-200">
-                    <p className="text-xs font-semibold text-slate-500 mb-2">⌨️ CS Shortcuts (Alt+):</p>
-                    <div className="grid grid-cols-2 gap-1 text-[11px] text-slate-500">
-                      <div><kbd className="px-1 bg-slate-100 border rounded">Alt</kbd>+<kbd className="px-1 bg-slate-100 border rounded">←</kbd> Prev</div>
-                      <div><kbd className="px-1 bg-slate-100 border rounded">Alt</kbd>+<kbd className="px-1 bg-slate-100 border rounded">→</kbd> Next</div>
-                      <div><kbd className="px-1 bg-slate-100 border rounded">Alt</kbd>+<kbd className="px-1 bg-slate-100 border rounded">F</kbd> Flag</div>
-                    </div>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
+          <div className="lg:col-span-1">
+            <QuestionNavigator
+              questions={session.questions}
+              currentIndex={currentQuestionIndex}
+              answeredCount={answeredCount}
+              markedCount={markedCount}
+              isSaving={isSaving}
+              enableProctoring={session.enable_proctoring}
+              proctoringReady={proctoringReady}
+              previewStream={localPreviewStream}
+              previewRef={examPreviewRef}
+              onSelect={(index) => void goToQuestion(index)}
+            />
           </div>
-
         </div>
       </div>
 
       {isTimeUp ? (
-        <div
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="time-up-title"
-          className="fixed inset-0 z-40 flex items-center justify-center bg-slate-900/90 p-4 backdrop-blur-sm"
-        >
-          <div className="w-full max-w-lg rounded-2xl bg-white p-8 text-center shadow-2xl">
-            <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-red-100">
-              <Clock className="h-7 w-7 text-red-600" />
-            </div>
-            <h2 id="time-up-title" className="text-2xl font-bold text-slate-900">
-              {t("examSession.timeUpTitle")}
-            </h2>
-            <p className="mt-2 text-sm text-slate-600">
-              {t("examSession.timeUpDescription", {
-                minutes: Math.max(1, Math.round((session.submission_grace_seconds ?? 300) / 60)),
-              })}
-            </p>
-            <p className="mt-6 text-xs font-medium uppercase tracking-wide text-slate-500">
-              {t("examSession.timeUpCountdownLabel")}
-            </p>
-            <p
-              className={cn(
-                "mt-1 font-mono text-5xl font-bold tabular-nums",
-                (graceRemaining ?? 0) <= 60 ? "text-red-600" : "text-slate-900",
-              )}
-              aria-live="polite"
-            >
-              {formatTime(graceRemaining ?? 0)}
-            </p>
-            <p className="mt-6 text-sm text-slate-700">
-              {t("examSession.answeredSummary", { answered: answeredCount, total: session.questions.length })}
-            </p>
-            {unansweredIndexes.length > 0 ? (
-              <p className="mt-1 text-sm font-medium text-amber-700">
-                {t("examSession.timeUpUnansweredNote", { count: unansweredIndexes.length })}
-              </p>
-            ) : null}
-            <Button
-              size="lg"
-              className="mt-6 w-full py-6 text-base"
-              onClick={() => void handleSubmit()}
-              disabled={isSubmitting}
-            >
-              {isSubmitting
-                ? graceRemaining === 0
-                  ? t("examSession.autoSubmitting")
-                  : t("examSession.savingAnswer")
-                : t("examSession.submitNow")}
-            </Button>
-          </div>
-        </div>
+        <TimeUpDialog
+          graceSeconds={session.submission_grace_seconds ?? 300}
+          graceRemaining={graceRemaining}
+          answeredCount={answeredCount}
+          totalQuestions={session.questions.length}
+          unansweredCount={unansweredIndexes.length}
+          isSubmitting={isSubmitting}
+          onSubmit={() => void handleSubmit()}
+        />
       ) : null}
 
       {showSubmitConfirm && !isTimeUp ? (
-        <div
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="submit-confirm-title"
-          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4 backdrop-blur-sm"
-        >
-          <div className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-2xl">
-            <h2 id="submit-confirm-title" className="text-lg font-bold text-slate-900">
-              {t("examSession.confirmSubmitTitle")}
-            </h2>
-            <p className="mt-2 text-sm text-slate-600">{t("examSession.confirmSubmitDescription")}</p>
-            <div className="mt-4 grid grid-cols-3 gap-3 text-center">
-              <div className="rounded-lg border border-slate-200 p-3">
-                <p className="text-xs text-slate-500">{t("examSession.confirmSubmitTotalQuestions")}</p>
-                <p className="text-xl font-semibold text-slate-900">{session.questions.length}</p>
-              </div>
-              <div className="rounded-lg border border-slate-200 p-3">
-                <p className="text-xs text-slate-500">{t("examSession.confirmSubmitAnswered")}</p>
-                <p className="text-xl font-semibold text-green-700">{answeredCount}</p>
-              </div>
-              <div className="rounded-lg border border-slate-200 p-3">
-                <p className="text-xs text-slate-500">{t("examSession.confirmSubmitUnanswered")}</p>
-                <p className="text-xl font-semibold text-amber-700">{unansweredIndexes.length}</p>
-              </div>
-            </div>
-            {markedCount > 0 ? (
-              <p className="mt-3 text-sm text-slate-600">
-                {t("examSession.confirmSubmitMarked")}: {markedCount}
-              </p>
-            ) : null}
-            {unansweredIndexes.length > 0 ? (
-              <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50 p-4">
-                <p className="text-sm text-amber-900">
-                  {t("examSession.unansweredWarning", { count: unansweredIndexes.length })}
-                </p>
-                <div className="mt-3 flex max-h-40 flex-wrap gap-2 overflow-y-auto">
-                  {unansweredIndexes.map((index) => (
-                    <Button
-                      key={session.questions[index].id}
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      className="border-amber-300 bg-white text-amber-900 hover:bg-amber-100"
-                      onClick={() => jumpToUnansweredQuestion(index)}
-                    >
-                      {t("examSession.jumpToQuestion", { number: index + 1 })}
-                    </Button>
-                  ))}
-                </div>
-              </div>
-            ) : null}
-            <div className="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
-              <Button type="button" variant="outline" onClick={() => setShowSubmitConfirm(false)}>
-                {t("examSession.goBack")}
-              </Button>
-              <Button type="button" onClick={() => void handleSubmit()} disabled={isSubmitting}>
-                {unansweredIndexes.length > 0
-                  ? t("examSession.submitAnyway")
-                  : t("examSession.confirmSubmitButton")}
-              </Button>
-            </div>
-          </div>
-        </div>
+        <SubmitConfirmDialog
+          totalQuestions={session.questions.length}
+          answeredCount={answeredCount}
+          markedCount={markedCount}
+          unansweredIndexes={unansweredIndexes}
+          questionIds={session.questions.map((question) => question.id)}
+          isSubmitting={isSubmitting}
+          onJump={jumpToUnansweredQuestion}
+          onCancel={() => setShowSubmitConfirm(false)}
+          onConfirm={() => void handleSubmit()}
+        />
       ) : null}
 
       {showBackupModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 overflow-y-auto">
-          <div className="relative w-full max-w-2xl rounded-2xl border border-slate-200 bg-white p-6 shadow-2xl dark:border-slate-800 dark:bg-slate-950 animate-scale-up">
-            <div className="flex items-center gap-3 border-b border-slate-100 pb-4 dark:border-slate-800">
-              <div className="flex h-12 w-12 items-center justify-center rounded-full bg-amber-100 dark:bg-amber-900/30">
-                <AlertCircle className="h-6 w-6 text-amber-600 dark:text-amber-400" />
-              </div>
-              <div>
-                <h3 className="text-lg font-bold text-slate-900 dark:text-slate-50">
-                  {t("examSession.backupModalTitle")}
-                </h3>
-                <p className="text-xs text-slate-500">
-                  Session ID: #{session.id} • Exam ID: #{session.exam_id ?? examId}
-                </p>
-              </div>
-            </div>
-
-            <div className="mt-4 space-y-4">
-              <p className="text-sm leading-relaxed text-slate-600 dark:text-slate-300">
-                {t("examSession.backupModalDescription")}
-              </p>
-
-              <div className="rounded-xl border border-slate-100 bg-slate-50 p-4 space-y-3 dark:border-slate-800 dark:bg-slate-900/50">
-                <div className="flex gap-3 text-sm text-slate-700 dark:text-slate-300">
-                  <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-blue-100 text-xs font-bold text-blue-600 dark:bg-blue-900/30 dark:text-blue-400">1</span>
-                  <p className="mt-0.5">{t("examSession.backupModalStep1")}</p>
-                </div>
-                <div className="flex gap-3 text-sm text-slate-700 dark:text-slate-300">
-                  <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-blue-100 text-xs font-bold text-blue-600 dark:bg-blue-900/30 dark:text-blue-400">2</span>
-                  <p className="mt-0.5">{t("examSession.backupModalStep2")}</p>
-                </div>
-                <div className="flex gap-3 text-sm text-slate-700 dark:text-slate-300">
-                  <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-blue-100 text-xs font-bold text-blue-600 dark:bg-blue-900/30 dark:text-blue-400">3</span>
-                  <p className="mt-0.5">{t("examSession.backupModalStep3")}</p>
-                </div>
-                <div className="flex gap-3 text-sm text-slate-700 dark:text-slate-300">
-                  <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-blue-100 text-xs font-bold text-blue-600 dark:bg-blue-900/30 dark:text-blue-400">4</span>
-                  <p className="mt-0.5">{t("examSession.backupModalStep4")}</p>
-                </div>
-              </div>
-
-              <div className="flex flex-col gap-2 sm:flex-row">
-                <Button
-                  onClick={handleDownloadBackup}
-                  className="flex-1 gap-2 font-medium bg-blue-600 hover:bg-blue-700 text-white"
-                >
-                  <Download className="h-4 w-4" />
-                  {t("examSession.downloadBackupBtn")}
-                </Button>
-                <Button
-                  onClick={handleCopyBackup}
-                  variant="outline"
-                  className="flex-1 gap-2 font-medium"
-                >
-                  <Copy className="h-4 w-4" />
-                  {t("examSession.copyBackupBtn")}
-                </Button>
-              </div>
-            </div>
-
-            <div className="mt-6 flex flex-col gap-2 border-t border-slate-100 pt-4 dark:border-slate-800 sm:flex-row sm:justify-end">
-              <Button
-                variant="ghost"
-                onClick={() => setShowBackupModal(false)}
-                disabled={isRetryingSubmit}
-                className="text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-100"
-              >
-                {t("examSession.goBack")}
-              </Button>
-              <Button
-                onClick={() => void handleRetrySubmit()}
-                disabled={isRetryingSubmit}
-                className="gap-2 font-semibold bg-emerald-600 hover:bg-emerald-700 text-white min-w-[8rem]"
-              >
-                <RefreshCw className={cn("h-4 w-4", isRetryingSubmit && "animate-spin")} />
-                {isRetryingSubmit ? t("examSession.syncingNow") : t("examSession.retrySubmitBtn")}
-              </Button>
-            </div>
-          </div>
-        </div>
+        <BackupRecoveryModal
+          sessionId={session.id}
+          examId={session.exam_id ?? examId}
+          isRetrying={isRetryingSubmit}
+          onDownload={handleDownloadBackup}
+          onCopy={handleCopyBackup}
+          onClose={() => setShowBackupModal(false)}
+          onRetry={() => void handleRetrySubmit()}
+        />
       )}
-
     </div>
   );
 }
