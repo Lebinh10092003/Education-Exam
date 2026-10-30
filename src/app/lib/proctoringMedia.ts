@@ -124,7 +124,12 @@ export async function uploadProctorEvidence(
   const contentType = file.type || "application/octet-stream";
 
   // 1. Xin Presigned URL tu backend
-  const presignedRes = await apiRequest<{ upload_url: string; object_key: string }>(
+  const presignedRes = await apiRequest<{
+    upload_url: string;
+    object_key: string;
+    content_type?: string;
+    upload_method?: "s3" | "backend";
+  }>(
     `/api/v1/proctoring/sessions/${sessionId}/evidence/presigned-url/`,
     {
       method: "POST",
@@ -138,10 +143,11 @@ export async function uploadProctorEvidence(
 
   const { upload_url, object_key } = presignedRes;
 
-  // 2. Put file trực tiếp lên R2/S3 (hoặc mock upload endpoint)
-  const isMock = upload_url.includes("mock-upload");
+  // 2. Tai thang len R2/S3 (hoac endpoint noi bo khi chay local). Content-Type phai
+  // trung voi gia tri server da ky trong URL, neu khong S3 se tu choi.
+  const isMock = presignedRes.upload_method ? presignedRes.upload_method === "backend" : upload_url.includes("mock-upload");
   const headers: Record<string, string> = {
-    "Content-Type": contentType,
+    "Content-Type": presignedRes.content_type || contentType,
   };
   if (isMock) {
     const tokens = getStoredTokens();

@@ -35,8 +35,15 @@ STORAGES = {
     "staticfiles": {
         "BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage",
     },
+    "evidence": {
+        "BACKEND": "django.core.files.storage.FileSystemStorage",
+    },
 }
+PROCTORING_EVIDENCE_STORAGE = "local"
 USE_S3_STORAGE = False
 
 
 PROCTORING_SKIP_RESOURCE_CHECK = True
+# Cache test dung chung giua cac test va id sqlite co the lap lai -> tat gop vi pham mac dinh.
+PROCTORING_VIOLATION_COOLDOWN_SECONDS = 0
+EXAM_RANDOM_POOL_CACHE_TTL_SECONDS = 0

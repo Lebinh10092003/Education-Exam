@@ -6,6 +6,7 @@ import pytest
 from rest_framework.test import APIClient
 from rest_framework.test import APIRequestFactory
 
+from tests.redis_fakes import FakePipeline
 
 BACKEND_DIR = Path(__file__).resolve().parents[1]
 if str(BACKEND_DIR) not in sys.path:
@@ -126,6 +127,9 @@ class RuntimeRedisStub:
 
     def zscore(self, key, member):
         return self.zsets.get(key, {}).get(member)
+
+    def pipeline(self, transaction=True):
+        return FakePipeline(self)
 
     def zrem(self, key, *members):
         bucket = self.zsets.setdefault(key, {})

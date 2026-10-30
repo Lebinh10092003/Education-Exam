@@ -94,7 +94,8 @@ const sessionPayload = {
   status: "in_progress",
   attempt_number: 1,
   started_at: "2026-03-23T08:00:00Z",
-  expires_at: "2026-03-23T09:00:00Z",
+  // Han lam bai tinh tu thoi diem chay test, neu khong man hinh "het gio" se bat len.
+  expires_at: new Date(Date.now() + 30 * 60 * 1000).toISOString(),
   submitted_at: null,
   show_results_immediately: false,
   enable_proctoring: true,
@@ -588,6 +589,9 @@ describe("TakeExam", () => {
 
     await user.click(await screen.findByRole("button", { name: /start monitoring/i }));
     await user.click(screen.getByRole("button", { name: /submit exam/i }));
+    // Hop xac nhan liet ke cau chua lam truoc khi nop.
+    expect(await screen.findByRole("button", { name: /question 1/i })).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: /submit anyway/i }));
 
     expect(await screen.findByText(/unable to submit exam to server/i)).toBeInTheDocument();
     expect(screen.getByText(/download the backup exam file/i)).toBeInTheDocument();
@@ -595,5 +599,79 @@ describe("TakeExam", () => {
     const copyBtn = screen.getByRole("button", { name: /copy backup code/i });
     await user.click(copyBtn);
     expect(mockNotifySuccess).toHaveBeenCalledWith("Backup code copied to clipboard!");
+  });
+
+  const mockSessionTiming = (timing: { expiresInSeconds: number; deadlineInSeconds: number }) => {
+    const defaultImplementation = mockApiRequest.getMockImplementation();
+    const submitCalls: Array<{ body?: unknown }> = [];
+    mockApiRequest.mockImplementation(async (path: string, options?: { method?: string; body?: unknown }) => {
+      if (path === "/api/v1/exams/1/start-session/" && options?.method === "POST") {
+        return {
+          ...sessionPayload,
+          expires_at: new Date(Date.now() + timing.expiresInSeconds * 1000).toISOString(),
+          submission_deadline: new Date(Date.now() + timing.deadlineInSeconds * 1000).toISOString(),
+          submission_grace_seconds: 300,
+          remaining_seconds: Math.max(0, timing.expiresInSeconds),
+        };
+      }
+      if (path === "/api/v1/exam-sessions/77/submit/" && options?.method === "POST") {
+        submitCalls.push({ body: options.body });
+        return {
+          id: 77,
+          status: "submitted",
+          submitted_at: new Date().toISOString(),
+          objective_score: "0.00",
+          max_score: "1.00",
+          manual_grading_required: false,
+          is_late: timing.deadlineInSeconds <= 0,
+        };
+      }
+      return defaultImplementation?.(path, options);
+    });
+    return submitCalls;
+  };
+
+  it("locks the exam behind a submit-only countdown once time is up", async () => {
+    const user = userEvent.setup();
+    const submitCalls = mockSessionTiming({ expiresInSeconds: -10, deadlineInSeconds: 290 });
+
+    renderTakeExam();
+
+    expect(await screen.findByRole("dialog", { name: /time is up/i })).toBeInTheDocument();
+    expect(screen.getByText(/1 unanswered question\(s\) will be marked as incorrect/i)).toBeInTheDocument();
+    expect(screen.getByText(/^0:04:[45]\d$/)).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: /submit now/i }));
+
+    expect(await screen.findByText(/exam submitted/i)).toBeInTheDocument();
+    expect(submitCalls).toHaveLength(1);
+    expect(submitCalls[0].body).toBeUndefined();
+  });
+
+  it("auto-submits as late when the grace period has ended", async () => {
+    const submitCalls = mockSessionTiming({ expiresInSeconds: -400, deadlineInSeconds: -100 });
+
+    renderTakeExam();
+
+    await waitFor(() => expect(submitCalls).toHaveLength(1));
+    expect(submitCalls[0].body).toEqual({ auto_submit: true });
+    expect(await screen.findByText(/recorded as a late submission/i)).toBeInTheDocument();
+  });
+
+  it("lists unanswered questions before submitting and lets the candidate jump back", async () => {
+    const user = userEvent.setup();
+    const submitCalls = mockSessionTiming({ expiresInSeconds: 1800, deadlineInSeconds: 2100 });
+
+    renderTakeExam();
+
+    await user.click(await screen.findByRole("button", { name: /start monitoring/i }));
+    await user.click(await screen.findByRole("button", { name: /submit exam/i }));
+
+    const dialog = await screen.findByRole("dialog", { name: /submit/i });
+    expect(dialog).toHaveTextContent(/1 unanswered question/i);
+    await user.click(screen.getByRole("button", { name: /^question 1$/i }));
+
+    await waitFor(() => expect(screen.queryByRole("dialog", { name: /submit/i })).not.toBeInTheDocument());
+    expect(submitCalls).toHaveLength(0);
   });
 });

@@ -6,6 +6,7 @@ import {
   MessageSquare,
   Search,
   Send,
+  Sparkles,
 } from "lucide-react";
 
 import { PageHeader } from "../components/PageHeader";
@@ -61,7 +62,27 @@ interface ManualGradingTaskRecord {
       full_name: string;
     };
   } | null;
+  suggestion?: {
+    score: string;
+    feedback: string;
+    rationale: string;
+    flags: string[];
+    source: string;
+    suggested_at: string | null;
+  } | null;
 }
+
+const SUGGESTION_FLAG_LABELS: Record<string, string> = {
+  low_confidence: "AI không chắc chắn",
+  off_topic: "Lạc đề",
+  possible_copy: "Nghi giống bài khác",
+  prompt_injection: "Bài làm chứa câu lệnh nhắm vào người chấm",
+  unreadable: "Không đọc được",
+  needs_teacher: "Cần giáo viên xem",
+};
+
+const isApprovableSuggestion = (task: ManualGradingTaskRecord) =>
+  task.status === "pending" && Boolean(task.suggestion) && (task.suggestion?.flags.length ?? 0) === 0;
 
 const PAGE_SIZE = 20;
 
@@ -210,11 +231,48 @@ export function ManualGrading() {
     }
   };
 
+  const approvableTasks = tasks.filter(isApprovableSuggestion);
+
+  const approvePageSuggestions = async () => {
+    if (approvableTasks.length === 0) {
+      return;
+    }
+    const confirmed = await notify.confirm({
+      title: "Duyệt gợi ý AI?",
+      html: `Ghi điểm chính thức cho <strong>${approvableTasks.length}</strong> bài có gợi ý AI trên trang này. Bài bị gắn cờ sẽ không được duyệt tự động.`,
+      confirmText: "Duyệt",
+      cancelText: "Huỷ",
+    });
+    if (!confirmed) {
+      return;
+    }
+    try {
+      const result = await mutation.run(() =>
+        apiRequest<{ graded_count: number; errors: Array<{ task_id: number; error: string }> }>(
+          "/api/v1/grading/tasks/approve-suggestions/",
+          { method: "POST", body: { task_ids: approvableTasks.map((task) => task.id) } },
+        ),
+      );
+      notify.success(`Đã duyệt ${result.graded_count} bài.`);
+      await tasksList.reload();
+    } catch (error) {
+      notify.error(error instanceof Error ? error.message : "Không duyệt được gợi ý.");
+    }
+  };
+
   return (
     <div>
       <PageHeader
         title="Manual Grading Queue"
         description="Review subjective answers and submit grades using the live grading task API."
+        action={
+          approvableTasks.length > 0 ? (
+            <Button onClick={() => void approvePageSuggestions()} disabled={mutation.isSubmitting}>
+              <Sparkles className="mr-2 h-4 w-4" />
+              Duyệt gợi ý AI ({approvableTasks.length})
+            </Button>
+          ) : undefined
+        }
       />
 
       {(tasksList.error || examsList.error || mutation.error) ? (
@@ -333,6 +391,11 @@ export function ManualGrading() {
 
                   <div className="mt-4 flex flex-wrap gap-2">
                     <Badge variant="outline">{task.max_points} pts</Badge>
+                    {task.status === "pending" && task.suggestion ? (
+                      <Badge className="bg-violet-100 text-violet-800 hover:bg-violet-100">
+                        AI gợi ý: {task.suggestion.score}
+                      </Badge>
+                    ) : null}
                     {task.manual_grade?.graded_by?.full_name ? (
                       <Badge variant="outline">By {task.manual_grade.graded_by.full_name}</Badge>
                     ) : null}
@@ -400,6 +463,11 @@ export function ManualGrading() {
                         >
                           {task.status}
                         </Badge>
+                        {task.status === "pending" && task.suggestion ? (
+                          <Badge className="ml-1 bg-violet-100 text-violet-800 hover:bg-violet-100">
+                            AI: {task.suggestion.score}
+                          </Badge>
+                        ) : null}
                       </td>
                       <td className="px-4 py-4 text-sm text-gray-600">
                         {formatDateTime(task.graded_at)}
@@ -480,6 +548,48 @@ export function ManualGrading() {
                   {selectedTask.answer_text || "No answer text submitted."}
                 </p>
               </div>
+
+              {selectedTask.suggestion && selectedTask.status === "pending" ? (
+                <div className="space-y-2 rounded-lg border border-violet-200 bg-violet-50 p-4 text-sm text-violet-950">
+                  <div className="flex items-center justify-between gap-2">
+                    <h3 className="flex items-center gap-2 font-medium">
+                      <Sparkles className="h-4 w-4" />
+                      Gợi ý chấm ({selectedTask.suggestion.source || "AI"}): {selectedTask.suggestion.score} /{" "}
+                      {selectedTask.max_points}
+                    </h3>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => {
+                        setScoreAwarded(selectedTask.suggestion?.score ?? "");
+                        setFeedback(selectedTask.suggestion?.feedback ?? "");
+                      }}
+                    >
+                      Dùng gợi ý
+                    </Button>
+                  </div>
+                  {selectedTask.suggestion.flags.length > 0 ? (
+                    <div className="flex flex-wrap gap-1">
+                      {selectedTask.suggestion.flags.map((flag) => (
+                        <Badge key={flag} className="bg-amber-100 text-amber-900 hover:bg-amber-100">
+                          {SUGGESTION_FLAG_LABELS[flag] ?? flag}
+                        </Badge>
+                      ))}
+                    </div>
+                  ) : null}
+                  {selectedTask.suggestion.feedback ? (
+                    <p>
+                      <span className="font-medium">Nhận xét:</span> {selectedTask.suggestion.feedback}
+                    </p>
+                  ) : null}
+                  {selectedTask.suggestion.rationale ? (
+                    <p className="whitespace-pre-wrap text-violet-900/80">
+                      <span className="font-medium">Cách cho điểm:</span> {selectedTask.suggestion.rationale}
+                    </p>
+                  ) : null}
+                  <p className="text-xs text-violet-800/70">Gợi ý chưa phải điểm chính thức cho đến khi bạn lưu.</p>
+                </div>
+              ) : null}
 
               <div className="space-y-4 rounded-lg border border-gray-200 p-4">
                 <div>

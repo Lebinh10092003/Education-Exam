@@ -1,5 +1,7 @@
 import pytest
 
+from tests.redis_fakes import FakePipeline
+
 
 class FakeRedis:
     def __init__(self):
@@ -103,6 +105,9 @@ class FakeRedis:
 
     def zscore(self, key, member):
         return self.zsets.get(key, {}).get(member)
+
+    def pipeline(self, transaction=True):
+        return FakePipeline(self)
 
     def zrem(self, key, *members):
         bucket = self.zsets.setdefault(key, {})

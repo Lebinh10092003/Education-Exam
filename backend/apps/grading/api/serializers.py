@@ -33,6 +33,7 @@ class ManualGradingTaskSerializer(serializers.ModelSerializer):
     question_text = serializers.CharField(source="session_question.question_revision.question_text", read_only=True)
     answer_text = serializers.SerializerMethodField()
     manual_grade = ManualGradeSerializer(read_only=True)
+    suggestion = serializers.SerializerMethodField()
 
     class Meta:
         model = ManualGradingTask
@@ -46,7 +47,21 @@ class ManualGradingTaskSerializer(serializers.ModelSerializer):
             "exam",
             "graded_at",
             "manual_grade",
+            "suggestion",
         )
+
+    @extend_schema_field(OpenApiTypes.OBJECT)
+    def get_suggestion(self, obj):
+        if obj.suggested_score is None:
+            return None
+        return {
+            "score": str(obj.suggested_score),
+            "feedback": obj.suggested_feedback,
+            "rationale": obj.suggestion_rationale,
+            "flags": obj.suggestion_flags or [],
+            "source": obj.suggestion_source,
+            "suggested_at": obj.suggested_at.isoformat() if obj.suggested_at else None,
+        }
 
     @extend_schema_field(ResultUserSummarySerializer)
     def get_candidate(self, obj):
@@ -89,6 +104,7 @@ class ResultSerializer(serializers.ModelSerializer):
     result_status = serializers.SerializerMethodField()
     completed_date = serializers.DateTimeField(source="session.submitted_at", read_only=True)
     time_taken_minutes = serializers.SerializerMethodField()
+    is_late = serializers.SerializerMethodField()
 
     class Meta:
         model = Result
@@ -109,8 +125,14 @@ class ResultSerializer(serializers.ModelSerializer):
             "passed",
             "completed_date",
             "time_taken_minutes",
+            "is_late",
             "published_at",
         )
+
+    @extend_schema_field(OpenApiTypes.BOOL)
+    def get_is_late(self, obj):
+        submission = getattr(obj.session, "submission", None) if hasattr(obj.session, "submission") else None
+        return bool(getattr(submission, "is_late", False))
 
     @extend_schema_field(ResultUserSummarySerializer)
     def get_candidate(self, obj):
@@ -235,6 +257,9 @@ class ResultReviewSerializer(serializers.Serializer):
                 "attempt_number": session.attempt_number,
                 "started_at": session.started_at,
                 "submitted_at": session.submitted_at,
+                "is_late": bool(getattr(getattr(session, "submission", None), "is_late", False))
+                if hasattr(session, "submission")
+                else False,
                 "objective_score": session.objective_score,
                 "max_score": session.max_score,
             },

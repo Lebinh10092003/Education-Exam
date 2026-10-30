@@ -129,11 +129,14 @@ def refresh_presence(*, session_id, exam_id, payload=None, ttl_seconds=None):
     )
     monitor_state = _serialize_mapping(monitor_state)
 
-    client.set(_presence_key(session_id), "online", ex=ttl)
-    client.hset(_monitor_session_key(session_id), mapping=monitor_state)
-    client.expire(_monitor_session_key(session_id), ttl)
-    client.sadd(_monitor_exam_sessions_key(exam_id), _normalize_session_id(session_id))
-    client.expire(_monitor_exam_sessions_key(exam_id), ttl)
+    # Gom 5 lenh vao 1 round-trip (heartbeat la request pho bien nhat khi thi).
+    pipe = client.pipeline(transaction=False)
+    pipe.set(_presence_key(session_id), "online", ex=ttl)
+    pipe.hset(_monitor_session_key(session_id), mapping=monitor_state)
+    pipe.expire(_monitor_session_key(session_id), ttl)
+    pipe.sadd(_monitor_exam_sessions_key(exam_id), _normalize_session_id(session_id))
+    pipe.expire(_monitor_exam_sessions_key(exam_id), ttl)
+    pipe.execute()
     return {
         "session_id": session_id,
         "exam_id": exam_id,
@@ -278,6 +281,60 @@ def release_live_slot(*, session_id, exam_id=None):
         removed = bool(client.zrem(_live_exam_slots_key(exam_id), member)) or removed
     client.delete(_live_request_key(session_id))
     return removed
+
+
+def _build_runtime_snapshot(*, session_id, monitor_state, presence, live_request, live_slot_score, default=None):
+    snapshot = dict(default or {})
+    monitor_state = monitor_state or {}
+    if monitor_state:
+        snapshot.update(_decode_monitor_state(monitor_state))
+
+    if presence is not None:
+        snapshot["presence"] = presence
+        snapshot["online"] = presence == "online"
+
+    live_request = live_request or {}
+    if live_request:
+        snapshot["live_request"] = {
+            "enabled": _coerce_bool(live_request.get("enabled")),
+            "updated_at": live_request.get("updated_at"),
+            **{
+                key: value
+                for key, value in live_request.items()
+                if key not in {"enabled", "updated_at"}
+            },
+        }
+    snapshot["live_slot_active"] = live_slot_score is not None and live_slot_score > _current_timestamp_ms()
+    snapshot.setdefault("session_id", session_id)
+    return snapshot
+
+
+def get_runtime_snapshots(session_ids):
+    """Doc trang thai realtime cua nhieu phien trong 1 round-trip Redis (pipeline)."""
+    session_ids = list(session_ids)
+    if not session_ids:
+        return {}
+    client = get_runtime_redis()
+    slots_key = _live_slots_key()
+    pipe = client.pipeline(transaction=False)
+    for session_id in session_ids:
+        pipe.hgetall(_monitor_session_key(session_id))
+        pipe.get(_presence_key(session_id))
+        pipe.hgetall(_live_request_key(session_id))
+        pipe.zscore(slots_key, _normalize_session_id(session_id))
+    results = pipe.execute()
+
+    snapshots = {}
+    for index, session_id in enumerate(session_ids):
+        monitor_state, presence, live_request, live_slot_score = results[index * 4 : index * 4 + 4]
+        snapshots[session_id] = _build_runtime_snapshot(
+            session_id=session_id,
+            monitor_state=monitor_state,
+            presence=presence,
+            live_request=live_request,
+            live_slot_score=live_slot_score,
+        )
+    return snapshots
 
 
 def get_runtime_snapshot(*, session_id, default=None, exam_id=None):

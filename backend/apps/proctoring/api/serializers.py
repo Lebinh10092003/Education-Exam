@@ -342,6 +342,8 @@ class EvidencePresignedUrlRequestSerializer(serializers.Serializer):
 class EvidencePresignedUrlResponseSerializer(serializers.Serializer):
     upload_url = serializers.CharField()
     object_key = serializers.CharField()
+    content_type = serializers.CharField()
+    upload_method = serializers.ChoiceField(choices=("s3", "backend"))
 
 
 class EvidenceConfirmSerializer(serializers.Serializer):

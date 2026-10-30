@@ -220,3 +220,7 @@ class QuestionImportBatchSerializer(serializers.ModelSerializer):
 class QuestionImportBatchCreateSerializer(serializers.Serializer):
     source_format = serializers.ChoiceField(choices=QuestionImportBatch.SourceFormat.choices)
     file = serializers.FileField()
+    # Chay thu: tra ve bao cao kiem tra tung dong, khong tao cau hoi nao.
+    dry_run = serializers.BooleanField(required=False, default=False)
+    # Bo qua cau trung voi ngan hang hoac trung trong cung file.
+    skip_duplicates = serializers.BooleanField(required=False, default=False)

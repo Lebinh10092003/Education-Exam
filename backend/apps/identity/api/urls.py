@@ -12,12 +12,14 @@ from .views import (
     RoleViewSet,
     UserViewSet,
 )
+from .api_token_views import ApiTokenViewSet
 
 
 router = SimpleRouter()
 router.register("users", UserViewSet, basename="users")
 router.register("roles", RoleViewSet, basename="roles")
 router.register("permissions", PermissionViewSet, basename="permissions")
+router.register("api-tokens", ApiTokenViewSet, basename="api-tokens")
 
 
 urlpatterns = [

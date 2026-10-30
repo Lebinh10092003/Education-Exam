@@ -110,6 +110,7 @@ verify_production() {
 
     curl -fsSIL --max-redirs 5 "https://$DOMAIN/" >/dev/null
     curl -fsS "https://$DOMAIN/api/v1/health/live/" >/dev/null
+    curl -fsS "https://$DOMAIN/mcp/healthz" >/dev/null
 }
 
 cd "$ROOT_DIR"
@@ -117,7 +118,7 @@ cd "$ROOT_DIR"
 git pull --ff-only
 
 "${COMPOSE[@]}" up -d postgres pgbouncer redis livekit
-"${COMPOSE[@]}" build backend worker beat frontend
+"${COMPOSE[@]}" build backend worker beat frontend mcp
 "${COMPOSE[@]}" run --rm backend python manage.py migrate
 "${COMPOSE[@]}" up -d
 "${COMPOSE[@]}" up -d --force-recreate --no-deps frontend

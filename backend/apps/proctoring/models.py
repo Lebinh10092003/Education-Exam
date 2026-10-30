@@ -5,6 +5,13 @@ from django.utils import timezone
 from apps.platform_core.models import TimeStampedModel
 
 
+def select_evidence_storage():
+    """Anh bang chung dung kho rieng (STORAGES["evidence"]): S3/R2 hoac o dia VPS."""
+    from django.core.files.storage import storages
+
+    return storages["evidence"]
+
+
 def _default_proctor_evidence_expiry():
     return timezone.now() + timezone.timedelta(days=settings.PROCTORING_EVIDENCE_RETENTION_DAYS)
 
@@ -166,7 +173,7 @@ class ProctorEvidence(TimeStampedModel):
         related_name="uploaded_proctor_evidences",
     )
     evidence_type = models.CharField(max_length=32, choices=EvidenceType.choices)
-    file = models.FileField(upload_to="proctoring/evidence/")
+    file = models.FileField(upload_to="proctoring/evidence/", storage=select_evidence_storage, max_length=500)
     metadata = models.JSONField(default=dict, blank=True)
     captured_at = models.DateTimeField(default=timezone.now)
     expires_at = models.DateTimeField(default=_default_proctor_evidence_expiry)

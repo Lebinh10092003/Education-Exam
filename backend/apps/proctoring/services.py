@@ -1,8 +1,4 @@
 import logging
-import uuid
-import boto3
-from botocore.config import Config
-from django.urls import reverse
 
 from asgiref.sync import async_to_sync
 from channels.layers import get_channel_layer
@@ -26,6 +22,11 @@ from apps.notifications.services import create_notification, create_notification
 from apps.platform_core.audit import record_audit_event
 from apps.platform_core.i18n import t
 
+from .evidence_storage import (
+    assert_evidence_key_belongs_to_session,
+    build_upload_target,
+    verify_uploaded_evidence,
+)
 from .media import get_media_provider
 from .models import (
     ClientCapability,
@@ -36,7 +37,14 @@ from .models import (
     ViolationCase,
     ViolationReview,
 )
-from .runtime import acquire_live_slot, get_runtime_snapshot, mark_live_request, refresh_presence, release_live_slot
+from .runtime import (
+    acquire_live_slot,
+    get_runtime_snapshot,
+    get_runtime_snapshots,
+    mark_live_request,
+    refresh_presence,
+    release_live_slot,
+)
 
 logger = logging.getLogger(__name__)
 _broadcast_warning_logged = False
@@ -259,9 +267,8 @@ def _resolve_session_connection_status(*, session, last_heartbeat, now):
 
 
 def _sync_session_status_for_monitoring(*, session, now):
-    if session.status == ExamSession.Status.IN_PROGRESS and session.expires_at <= now:
-        session.status = ExamSession.Status.EXPIRED
-        session.save(update_fields=["status", "updated_at"])
+    # Khong ghi DB trong request xem giam sat: phien het gio van "in_progress" trong thoi gian
+    # an han, sau do tac vu dinh ky tu nop bai (danh dau nop muon).
     return session.status
 
 
@@ -337,6 +344,93 @@ def record_heartbeat(*, session, connection_status, latency_ms=None, payload=Non
     }
 
 
+_SEVERITY_RANK = {
+    ProctorEvent.Severity.INFO: 0,
+    ProctorEvent.Severity.WARNING: 1,
+    ProctorEvent.Severity.CRITICAL: 2,
+}
+
+
+def _violation_cooldown_key(session_id, event_type):
+    return f"proctoring:violation-cooldown:{session_id}:{event_type}"
+
+
+def _violation_cooldown_seconds():
+    return max(int(getattr(settings, "PROCTORING_VIOLATION_COOLDOWN_SECONDS", 0) or 0), 0)
+
+
+def _find_recent_duplicate_event(*, session, event_type, severity):
+    """Vi pham cung loai lap lai trong cua so cooldown (vd. alt-tab lien tuc) duoc gop vao su kien truoc."""
+    cooldown = _violation_cooldown_seconds()
+    if not cooldown:
+        return None
+    event_id = cache.get(_violation_cooldown_key(session.id, event_type))
+    if event_id is None:
+        return None
+    previous = ProctorEvent.objects.filter(pk=event_id, session=session, event_type=event_type).first()
+    if previous is None:
+        return None
+    # Muc do nang hon thi van ghi rieng de khong bo sot.
+    if _SEVERITY_RANK.get(severity, 0) > _SEVERITY_RANK.get(previous.severity, 0):
+        return None
+    return previous
+
+
+def _find_open_case_for_event_type(*, session, event_type):
+    case_id = (
+        ViolationCase.objects.filter(
+            session=session,
+            status=ViolationCase.Status.OPEN,
+            events__event_type=event_type,
+        )
+        .order_by("-created_at")
+        .values_list("id", flat=True)
+        .first()
+    )
+    if case_id is None:
+        return None
+    return ViolationCase.objects.select_for_update().get(pk=case_id)
+
+
+def _attach_event_to_violation_case(*, session, event, severity, metadata):
+    """
+    Moi (phien, loai vi pham) chi co 1 case dang mo. Tra ve (case, created, escalated).
+    - Lan dau: tao case.
+    - Lap lai: gan su kien vao case cu; nang muc do neu su kien moi nang hon
+      hoac so lan dat nguong PROCTORING_VIOLATION_ESCALATE_AFTER.
+    """
+    case = _find_open_case_for_event_type(session=session, event_type=event.event_type)
+    if case is None:
+        case = ViolationCase.objects.create(
+            session=session,
+            severity=severity,
+            title=event.get_event_type_display(),
+            summary=metadata.get("message", ""),
+        )
+        case.events.add(event)
+        return case, True, False
+
+    case.events.add(event)
+    new_severity = case.severity
+    if _SEVERITY_RANK.get(severity, 0) > _SEVERITY_RANK.get(case.severity, 0):
+        new_severity = severity
+    escalate_after = max(int(getattr(settings, "PROCTORING_VIOLATION_ESCALATE_AFTER", 0) or 0), 0)
+    if (
+        escalate_after
+        and new_severity != ProctorEvent.Severity.CRITICAL
+        and case.events.count() >= escalate_after
+    ):
+        new_severity = ProctorEvent.Severity.CRITICAL
+
+    escalated = new_severity != case.severity
+    if escalated:
+        case.severity = new_severity
+        case.save(update_fields=["severity", "updated_at"])
+    else:
+        case.save(update_fields=["updated_at"])
+    return case, False, escalated
+
+
 @transaction.atomic
 def record_proctor_event(*, session, event_type, severity="info", metadata=None, reported_by=None):
     if not exam_supports_proctoring_runtime(session.exam):
@@ -346,69 +440,76 @@ def record_proctor_event(*, session, event_type, severity="info", metadata=None,
                 en="This exam is not currently recording live proctoring alerts.",
             )
         )
+    metadata = metadata or {}
+    duplicate = _find_recent_duplicate_event(session=session, event_type=event_type, severity=severity)
+    if duplicate is not None:
+        return duplicate
+
     event = ProctorEvent.objects.create(
         session=session,
         reported_by=reported_by,
         event_type=event_type,
         severity=severity,
-        metadata=metadata or {},
+        metadata=metadata,
     )
-    admin_notification_kwargs = None
-    candidate_notification_kwargs = None
+    cooldown = _violation_cooldown_seconds()
+    if cooldown:
+        cache.set(_violation_cooldown_key(session.id, event_type), event.id, cooldown)
+
     if severity in {ProctorEvent.Severity.WARNING, ProctorEvent.Severity.CRITICAL}:
-        case = ViolationCase.objects.create(
+        case, case_created, escalated = _attach_event_to_violation_case(
             session=session,
+            event=event,
             severity=severity,
-            title=event.get_event_type_display(),
-            summary=(metadata or {}).get("message", ""),
+            metadata=metadata,
         )
-        case.events.add(event)
-        admin_notification_kwargs = {
-            "permission_code": "proctoring.view",
-            "title": f"Proctoring {severity} detected",
-            "message": (
-                f'{session.candidate.full_name or session.candidate.email} triggered '
-                f'{event.get_event_type_display()} in "{session.exam.name}".'
-            ),
-            "category": Notification.Category.ALERT,
-            "priority": (
-                Notification.Priority.HIGH
-                if severity == ProctorEvent.Severity.CRITICAL
-                else Notification.Priority.MEDIUM
-            ),
-            "action_url": f"/exams/{session.exam_id}/monitor",
-            "metadata": {
-                "session_id": session.id,
-                "exam_id": session.exam_id,
-                "candidate_id": session.candidate_id,
-                "event_id": event.id,
-                "event_type": event.event_type,
-                "severity": severity,
-            },
+        notification_metadata = {
+            "session_id": session.id,
+            "exam_id": session.exam_id,
+            "candidate_id": session.candidate_id,
+            "event_id": event.id,
+            "case_id": case.id,
+            "event_type": event.event_type,
+            "severity": case.severity,
         }
-        candidate_notification_kwargs = {
-            "recipient": session.candidate,
-            "title": "Exam monitoring alert recorded",
-            "message": (metadata or {}).get("message") or event.get_event_type_display(),
-            "category": Notification.Category.ALERT,
-            "priority": (
-                Notification.Priority.HIGH
-                if severity == ProctorEvent.Severity.CRITICAL
-                else Notification.Priority.MEDIUM
-            ),
-            "action_url": "/candidate/notifications",
-            "metadata": {
-                "session_id": session.id,
-                "exam_id": session.exam_id,
-                "candidate_id": session.candidate_id,
-                "event_id": event.id,
-                "event_type": event.event_type,
-                "severity": severity,
-                "audience": "candidate",
-            },
-        }
-        create_notifications_for_permission(**admin_notification_kwargs)
-        create_notification(**candidate_notification_kwargs)
+        priority = (
+            Notification.Priority.HIGH
+            if case.severity == ProctorEvent.Severity.CRITICAL
+            else Notification.Priority.MEDIUM
+        )
+        # Giam thi da nhan tung su kien realtime qua WebSocket; thong bao luu DB cho admin
+        # chi tao khi mo case moi hoac case bi nang muc do, khong tao cho moi lan lap lai.
+        if case_created or escalated:
+            candidate_label = session.candidate.full_name or session.candidate.email
+            if escalated:
+                title = f"Proctoring escalated to {case.severity}"
+                message = (
+                    f"{candidate_label} repeated {event.get_event_type_display()} "
+                    f'{case.events.count()} times in "{session.exam.name}".'
+                )
+            else:
+                title = f"Proctoring {severity} detected"
+                message = f'{candidate_label} triggered {event.get_event_type_display()} in "{session.exam.name}".'
+            create_notifications_for_permission(
+                permission_code="proctoring.view",
+                title=title,
+                message=message,
+                category=Notification.Category.ALERT,
+                priority=priority,
+                action_url=f"/exams/{session.exam_id}/monitor",
+                metadata=notification_metadata,
+            )
+        # Thi sinh da thay canh bao ngay tren man hinh thi; chi luu 1 thong bao cho moi loai vi pham.
+        if case_created and getattr(settings, "PROCTORING_NOTIFY_CANDIDATE_ON_VIOLATION", True):
+            create_notification(
+                recipient=session.candidate,
+                title="Exam monitoring alert recorded",
+                message=metadata.get("message") or event.get_event_type_display(),
+                category=Notification.Category.ALERT,
+                priority=priority,
+                action_url="/candidate/notifications",
+                metadata={**notification_metadata, "audience": "candidate"},
+            )
 
     def publish_event_side_effects():
         _broadcast_exam_monitoring_update(
@@ -621,6 +722,8 @@ def build_exam_monitoring_snapshot(*, exam):
     now = timezone.now()
     monitoring_active = exam_supports_live_monitoring(exam, now=now)
     exam_question_count = exam.current_version.items.count() if exam.current_version_id else 0
+    # 1 round-trip Redis cho ca phong thi thay vi 4 lenh/thi sinh.
+    runtime_snapshots = get_runtime_snapshots(session.id for session in latest_sessions.values())
 
     for candidate in assigned_candidates:
         session = latest_sessions.get(candidate.id)
@@ -653,7 +756,7 @@ def build_exam_monitoring_snapshot(*, exam):
         answered_count = getattr(session, "answered_question_count", 0)
         progress_percentage = int((answered_count / total_questions) * 100) if total_questions else 0
         session_status = _sync_session_status_for_monitoring(session=session, now=now)
-        runtime_snapshot = get_runtime_snapshot(session_id=session.id)
+        runtime_snapshot = runtime_snapshots.get(session.id) or {}
         media_state = getattr(session, "proctoring_media_state", None)
         end_time = session.submitted_at or now
         connection_status = (
@@ -674,6 +777,7 @@ def build_exam_monitoring_snapshot(*, exam):
                     "full_name": candidate.full_name,
                 },
                 "status": session_status,
+                "time_up": session_status == ExamSession.Status.IN_PROGRESS and session.expires_at <= now,
                 "progress_percentage": progress_percentage,
                 "questions_answered": answered_count,
                 "total_questions": total_questions,
@@ -803,87 +907,27 @@ def assert_admin_monitoring_access(*, user):
     return user
 
 
-def sanitize_path_segment(value: str) -> str:
-    import re
-    if not value:
-        return "default"
-    sanitized = re.sub(r'[\/\\:\*\?"<>\|]', '_', str(value))
-    return sanitized.strip().strip('.') or "default"
-
-
-def get_grade_folder_name(session) -> str:
-    import re
-    candidate = session.candidate
-    profile = getattr(candidate, 'profile', None)
-    student_class = getattr(profile, 'student_class', '') if profile else ''
-    
-    if student_class:
-        match = re.match(r'^(\d+)', student_class.strip())
-        if match:
-            return f"Khối {match.group(1)}"
-        return f"Khối {student_class.strip()}"
-    return "Khối Khác"
-
-
 def generate_evidence_presigned_url(*, session, evidence_type, file_name, content_type, request=None):
-    ext = file_name.split('.')[-1] if '.' in file_name else 'jpg'
-    
-    subject_name = sanitize_path_segment(session.exam.subject.name)
-    exam_name = sanitize_path_segment(session.exam.name)
-    grade_folder = sanitize_path_segment(get_grade_folder_name(session))
-    
-    if session.started_at:
-        exam_date = session.started_at.strftime("%Y-%m-%d")
-    else:
-        exam_date = timezone.now().strftime("%Y-%m-%d")
-        
-    candidate_username = sanitize_path_segment(session.candidate.username)
-    unique_id = uuid.uuid4().hex
-    unique_name = f"{candidate_username}_{unique_id}.{ext}"
-    
-    object_key = f"{subject_name}/{exam_name}/{grade_folder}/{exam_date}/{candidate_username}/{unique_name}"
-    
-    use_s3 = getattr(settings, 'USE_S3_STORAGE', False)
-    if use_s3:
-        s3_client = boto3.client(
-            's3',
-            aws_access_key_id=getattr(settings, 'AWS_ACCESS_KEY_ID', None),
-            aws_secret_access_key=getattr(settings, 'AWS_SECRET_ACCESS_KEY', None),
-            endpoint_url=getattr(settings, 'AWS_S3_ENDPOINT_URL', None),
-            region_name=getattr(settings, 'AWS_S3_REGION_NAME', 'us-east-1'),
-            config=Config(signature_version='s3v4'),
-        )
-        bucket_name = getattr(settings, 'AWS_STORAGE_BUCKET_NAME', '')
-        upload_url = s3_client.generate_presigned_url(
-            ClientMethod='put_object',
-            Params={
-                'Bucket': bucket_name,
-                'Key': object_key,
-                'ContentType': content_type,
-            },
-            ExpiresIn=300
-        )
-    else:
-        url_path = reverse('proctoring-session-evidence-mock-upload', kwargs={'session_id': session.id})
-        if request:
-            upload_url = request.build_absolute_uri(f"{url_path}?key={object_key}")
-        else:
-            upload_url = f"{url_path}?key={object_key}"
-            
-    return {
-        "upload_url": upload_url,
-        "object_key": object_key,
-    }
+    """Tra ve URL de trinh duyet tai anh thang len S3/R2 (hoac endpoint noi bo khi chay local)."""
+    return build_upload_target(
+        session=session,
+        evidence_type=evidence_type,
+        file_name=file_name,
+        content_type=content_type,
+        request=request,
+    )
 
 
 @transaction.atomic
 def confirm_evidence_upload(*, session, evidence_type, object_key, metadata=None, uploaded_by=None, event=None):
+    object_key = assert_evidence_key_belongs_to_session(session=session, object_key=object_key)
+    stored = verify_uploaded_evidence(object_key=object_key)
     evidence = ProctorEvidence(
         session=session,
         event=event,
         uploaded_by=uploaded_by,
         evidence_type=evidence_type,
-        metadata=metadata or {},
+        metadata={**(metadata or {}), "stored_size": stored["size"]},
     )
     evidence.file.name = object_key
     evidence.save()

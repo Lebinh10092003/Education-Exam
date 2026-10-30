@@ -87,6 +87,9 @@ interface CandidateSession {
   attempt_number: number;
   started_at: string;
   expires_at: string;
+  submission_deadline?: string;
+  submission_grace_seconds?: number;
+  is_late?: boolean;
   submitted_at: string | null;
   show_results_immediately: boolean;
   enable_proctoring: boolean;
@@ -124,6 +127,7 @@ interface SubmissionSummary {
   objective_score: string;
   max_score: string;
   manual_grading_required: boolean;
+  is_late?: boolean;
 }
 
 type ConnectionStatus = "stable" | "offline" | "unstable";
@@ -142,6 +146,15 @@ const HEARTBEAT_INTERVAL_MS = 60_000;
 const AUTOSAVE_INTERVAL_MS = 120_000;
 const ESSAY_AUTOSAVE_DELAY_MS = 25_000;
 const DEGRADED_CONNECTION_RTT_MS = 1_500;
+// Cung loai vi pham lap lai trong khoang nay chi gui 1 lan (backend cung gop tuong tu).
+const VIOLATION_COOLDOWN_MS = 5_000;
+// Rai thoi diem upload anh bang chung sau khi nop bai de tranh don tai luc het gio.
+const EVIDENCE_UPLOAD_MIN_DELAY_MS = 2_000;
+const EVIDENCE_UPLOAD_MAX_DELAY_MS = 15_000;
+
+const getEvidenceUploadDelayMs = () =>
+  EVIDENCE_UPLOAD_MIN_DELAY_MS +
+  Math.floor(Math.random() * (EVIDENCE_UPLOAD_MAX_DELAY_MS - EVIDENCE_UPLOAD_MIN_DELAY_MS));
 
 const formatTime = (seconds: number) => {
   const clampedSeconds = Math.max(0, seconds);
@@ -343,6 +356,11 @@ export function TakeExam() {
   const [error, setError] = useState<string | null>(null);
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [timeRemaining, setTimeRemaining] = useState(0);
+  // null = con gio lam bai; so giay = dang trong thoi gian an han chi duoc nop bai.
+  const [graceRemaining, setGraceRemaining] = useState<number | null>(null);
+  const [showSubmitConfirm, setShowSubmitConfirm] = useState(false);
+  const timeUpRef = useRef(false);
+  const autoSubmitTriggeredRef = useRef(false);
   const [lastSavedAt, setLastSavedAt] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -410,6 +428,7 @@ export function TakeExam() {
   const examPreviewRef = useRef<HTMLVideoElement | null>(null);
   const screenEndedHandlerRef = useRef<(() => void) | null>(null);
   const violationCapturePendingRef = useRef(false);
+  const lastViolationAtRef = useRef<Record<string, number>>({});
 
   const enqueueSessionMutation = async <T,>(task: () => Promise<T>) => {
     const previous = requestQueueRef.current;
@@ -702,6 +721,12 @@ export function TakeExam() {
     if (!session || violationCapturePendingRef.current) {
       return;
     }
+    const nowMs = Date.now();
+    const lastReportedAt = lastViolationAtRef.current[eventType] ?? 0;
+    if (nowMs - lastReportedAt < VIOLATION_COOLDOWN_MS) {
+      return;
+    }
+    lastViolationAtRef.current[eventType] = nowMs;
 
     violationCapturePendingRef.current = true;
     try {
@@ -779,6 +804,13 @@ export function TakeExam() {
       }
 
       setSession(nextSession);
+      if (nextSession.status !== "in_progress") {
+        // Phien da nop: tai bu anh bang chung con sot trong IndexedDB (vd. dong tab truoc khi upload xong).
+        const submittedSessionId = nextSession.id;
+        window.setTimeout(() => {
+          void uploadPendingSnapshots(submittedSessionId).catch(() => undefined);
+        }, getEvidenceUploadDelayMs());
+      }
       setLatestViolationNotice(null);
       setProctoringBlockReason(null);
       setProctoringReady(!nextSession.enable_proctoring);
@@ -950,18 +982,30 @@ export function TakeExam() {
     }
 
     const expiresTime = new Date(session.expires_at).getTime();
+    const graceSeconds = session.submission_grace_seconds ?? 300;
+    const deadlineTime = session.submission_deadline
+      ? new Date(session.submission_deadline).getTime()
+      : expiresTime + graceSeconds * 1000;
 
     const updateTimer = () => {
       const now = new Date().getTime();
       const diffSeconds = Math.max(0, Math.ceil((expiresTime - now) / 1000));
       setTimeRemaining(diffSeconds);
+      if (diffSeconds === 0) {
+        const graceLeft = Math.max(0, Math.ceil((deadlineTime - now) / 1000));
+        timeUpRef.current = true;
+        setGraceRemaining(graceLeft);
+      } else {
+        timeUpRef.current = false;
+        setGraceRemaining(null);
+      }
     };
 
     updateTimer();
     const intervalId = window.setInterval(updateTimer, 1000);
 
     return () => window.clearInterval(intervalId);
-  }, [session?.id, session?.status, session?.expires_at]);
+  }, [session?.id, session?.status, session?.expires_at, session?.submission_deadline, session?.submission_grace_seconds]);
 
   useEffect(() => {
     const tokens = getStoredTokens();
@@ -1055,6 +1099,9 @@ export function TakeExam() {
     }
 
     const autosave = () => {
+      if (timeUpRef.current) {
+        return;
+      }
       void syncLocalDraftQueue(session.id, () => {
         void refreshPendingSyncCount();
       }).catch(() => undefined);
@@ -1192,6 +1239,9 @@ export function TakeExam() {
     }
 
     const timeoutId = window.setTimeout(() => {
+      if (timeUpRef.current) {
+        return;
+      }
       void persistEssayAnswer(currentQuestionIndex).catch(() => undefined);
     }, ESSAY_AUTOSAVE_DELAY_MS);
 
@@ -1214,6 +1264,17 @@ export function TakeExam() {
     () => session?.questions.filter((question) => question.is_marked_for_review).length ?? 0,
     [session],
   );
+  const unansweredIndexes = useMemo(
+    () =>
+      (session?.questions ?? []).reduce<number[]>((indexes, question, index) => {
+        if (!question.is_answered) {
+          indexes.push(index);
+        }
+        return indexes;
+      }, []),
+    [session],
+  );
+  const isTimeUp = session?.status === "in_progress" && graceRemaining !== null;
 
   const goToQuestion = async (nextIndex: number) => {
     if (!session || nextIndex < 0 || nextIndex >= session.questions.length) {
@@ -1229,7 +1290,7 @@ export function TakeExam() {
   };
 
   const handleOptionChange = async (optionKey: string) => {
-    if (!currentQuestion) {
+    if (!currentQuestion || timeUpRef.current) {
       return;
     }
     updateQuestion(currentQuestion.id, {
@@ -1244,7 +1305,7 @@ export function TakeExam() {
   };
 
   const handleEssayChange = (nextText: string) => {
-    if (!currentQuestion) {
+    if (!currentQuestion || timeUpRef.current) {
       return;
     }
     dirtyEssayQuestionIdsRef.current.add(currentQuestion.id);
@@ -1256,7 +1317,7 @@ export function TakeExam() {
   };
 
   const toggleMarked = async () => {
-    if (!currentQuestion) {
+    if (!currentQuestion || timeUpRef.current) {
       return;
     }
     const nextMarked = !currentQuestion.is_marked_for_review;
@@ -1271,6 +1332,9 @@ export function TakeExam() {
     }
 
     const handleKeyDown = (event: KeyboardEvent) => {
+      if (timeUpRef.current) {
+        return;
+      }
       // If Alt + ArrowLeft or Alt + P -> Previous
       if ((event.altKey && event.key === "ArrowLeft") || (event.altKey && event.key === "p") || (event.altKey && event.key === "P")) {
         event.preventDefault();
@@ -1312,7 +1376,7 @@ export function TakeExam() {
     for (const entry of snapshots) {
       try {
         // Nen anh truoc khi upload (WebP 0.6 - nhe hon ~60%)
-        const compressed = await compressSnapshotForUpload(entry.blob);
+        const compressed = await compressSnapshotForUpload(entry.blob, entry.evidenceType);
         await enqueueSessionMutation(() =>
           uploadProctorEvidence(
             entry.sessionId,
@@ -1332,14 +1396,20 @@ export function TakeExam() {
     }
   };
 
-  const handleSubmit = async () => {
+  const handleSubmit = async (options: { auto?: boolean } = {}) => {
     if (!session) {
       return;
     }
 
     setIsSubmitting(true);
+    setShowSubmitConfirm(false);
     try {
-      await persistEssayAnswer();
+      if (timeUpRef.current) {
+        // Het gio: server co the da tu choi cau tra loi moi -> khong de loi nay chan viec nop bai.
+        await persistEssayAnswer().catch(() => undefined);
+      } else {
+        await persistEssayAnswer();
+      }
       
       // Try to sync any remaining local answers first
       try {
@@ -1355,6 +1425,7 @@ export function TakeExam() {
       const response = await enqueueSessionMutation(() =>
         apiRequest<SubmissionSummary>(`/api/v1/exam-sessions/${session.id}/submit/`, {
           method: "POST",
+          ...(options.auto ? { body: { auto_submit: true } } : {}),
         }),
       );
       setSession((current) =>
@@ -1366,6 +1437,7 @@ export function TakeExam() {
               objective_score: response.objective_score,
               max_score: response.max_score,
               manual_grading_required: response.manual_grading_required,
+              is_late: response.is_late ?? current.is_late,
             }
           : current,
       );
@@ -1378,7 +1450,7 @@ export function TakeExam() {
         void uploadPendingSnapshots(currentSessionId).catch((err) => {
           console.error("Failed to upload pending evidence snapshots", err);
         });
-      }, 500);
+      }, getEvidenceUploadDelayMs());
 
     } catch (submitError) {
       console.error("Final submit failed. Opening recovery modal.", submitError);
@@ -1481,6 +1553,7 @@ ${answersSummary}
               objective_score: response.objective_score,
               max_score: response.max_score,
               manual_grading_required: response.manual_grading_required,
+              is_late: response.is_late ?? current.is_late,
             }
           : current,
       );
@@ -1492,7 +1565,7 @@ ${answersSummary}
         void uploadPendingSnapshots(currentSessionId).catch((err) => {
           console.error("Failed to upload pending evidence snapshots", err);
         });
-      }, 500);
+      }, getEvidenceUploadDelayMs());
     } catch (submitError) {
       const message = submitError instanceof Error ? submitError.message : t("examSession.submitUnavailable");
       notify.error(`${t("examSession.submitUnavailable")} (${message})`);
@@ -1501,35 +1574,40 @@ ${answersSummary}
     }
   };
 
-  const confirmSubmit = async () => {
-    if (!session) {
+  const confirmSubmit = () => {
+    if (!session || isSubmitting) {
       return;
     }
-
-    const confirmed = await notify.confirm({
-      title: t("examSession.confirmSubmitTitle"),
-      html: `
-        <div style="text-align:left">
-          <p style="margin:0 0 12px;">${t("examSession.confirmSubmitDescription")}</p>
-          <div style="display:grid;gap:8px;">
-            <div><strong>${t("examSession.confirmSubmitTotalQuestions")}:</strong> ${session.questions.length}</div>
-            <div><strong>${t("examSession.confirmSubmitAnswered")}:</strong> ${answeredCount}</div>
-            <div><strong>${t("examSession.confirmSubmitUnanswered")}:</strong> ${session.questions.length - answeredCount}</div>
-            ${markedCount > 0 ? `<div><strong>${t("examSession.confirmSubmitMarked")}:</strong> ${markedCount}</div>` : ""}
-          </div>
-        </div>
-      `,
-      confirmText: t("examSession.submitExam"),
-      cancelText: t("examSession.goBack"),
-      confirmButtonColor: "#2563eb",
-    });
-
-    if (!confirmed) {
-      return;
-    }
-
-    await handleSubmit();
+    setShowSubmitConfirm(true);
   };
+
+  const jumpToUnansweredQuestion = (index: number) => {
+    setShowSubmitConfirm(false);
+    void goToQuestion(index);
+  };
+
+  useEffect(() => {
+    if (!isTimeUp || !session) {
+      return;
+    }
+    // Vua het gio: day not cau tra loi con xep hang (server con nhan trong vai chuc giay).
+    setShowSubmitConfirm(false);
+    void persistEssayAnswer().catch(() => undefined);
+    void syncLocalDraftQueue(session.id, () => {
+      void refreshPendingSyncCount();
+    }).catch(() => undefined);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isTimeUp, session?.id]);
+
+  useEffect(() => {
+    if (!isTimeUp || graceRemaining !== 0 || autoSubmitTriggeredRef.current || isSubmitting) {
+      return;
+    }
+    // Het ca thoi gian an han: tu nop (server ghi nhan nop muon).
+    autoSubmitTriggeredRef.current = true;
+    void handleSubmit({ auto: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isTimeUp, graceRemaining, isSubmitting]);
 
   if (isLoading) {
     return (
@@ -1555,7 +1633,8 @@ ${answersSummary}
     );
   }
 
-  if (session.status !== "submitted" && session.enable_proctoring && !proctoringReady) {
+  // Het gio: bo qua buoc thiet lap giam sat de thi sinh (vd. vua tai lai trang) van bam nop duoc.
+  if (session.status !== "submitted" && session.enable_proctoring && !proctoringReady && !isTimeUp) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50 px-6">
         <Card className="w-full max-w-xl">
@@ -1666,6 +1745,12 @@ ${answersSummary}
               </div>
             </div>
 
+            {session.is_late ? (
+              <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900 mb-4">
+                {t("examSession.lateSubmissionNotice")}
+              </div>
+            ) : null}
+
             <div className="rounded-lg border border-blue-200 bg-blue-50 p-4 text-sm text-blue-800 mb-6">
               {session.show_results_immediately && !session.manual_grading_required
                 ? t("examSession.resultsImmediate")
@@ -1688,7 +1773,7 @@ ${answersSummary}
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
-      {!isFullscreen && session?.enable_proctoring ? (
+      {!isFullscreen && session?.enable_proctoring && !isTimeUp ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm">
           <div className="text-center p-8 bg-white rounded-xl max-w-md mx-auto shadow-2xl relative">
             <AlertTriangle className="w-16 h-16 text-amber-500 mx-auto mb-4" />
@@ -2018,6 +2103,127 @@ ${answersSummary}
 
         </div>
       </div>
+
+      {isTimeUp ? (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="time-up-title"
+          className="fixed inset-0 z-40 flex items-center justify-center bg-slate-900/90 p-4 backdrop-blur-sm"
+        >
+          <div className="w-full max-w-lg rounded-2xl bg-white p-8 text-center shadow-2xl">
+            <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-red-100">
+              <Clock className="h-7 w-7 text-red-600" />
+            </div>
+            <h2 id="time-up-title" className="text-2xl font-bold text-slate-900">
+              {t("examSession.timeUpTitle")}
+            </h2>
+            <p className="mt-2 text-sm text-slate-600">
+              {t("examSession.timeUpDescription", {
+                minutes: Math.max(1, Math.round((session.submission_grace_seconds ?? 300) / 60)),
+              })}
+            </p>
+            <p className="mt-6 text-xs font-medium uppercase tracking-wide text-slate-500">
+              {t("examSession.timeUpCountdownLabel")}
+            </p>
+            <p
+              className={cn(
+                "mt-1 font-mono text-5xl font-bold tabular-nums",
+                (graceRemaining ?? 0) <= 60 ? "text-red-600" : "text-slate-900",
+              )}
+              aria-live="polite"
+            >
+              {formatTime(graceRemaining ?? 0)}
+            </p>
+            <p className="mt-6 text-sm text-slate-700">
+              {t("examSession.answeredSummary", { answered: answeredCount, total: session.questions.length })}
+            </p>
+            {unansweredIndexes.length > 0 ? (
+              <p className="mt-1 text-sm font-medium text-amber-700">
+                {t("examSession.timeUpUnansweredNote", { count: unansweredIndexes.length })}
+              </p>
+            ) : null}
+            <Button
+              size="lg"
+              className="mt-6 w-full py-6 text-base"
+              onClick={() => void handleSubmit()}
+              disabled={isSubmitting}
+            >
+              {isSubmitting
+                ? graceRemaining === 0
+                  ? t("examSession.autoSubmitting")
+                  : t("examSession.savingAnswer")
+                : t("examSession.submitNow")}
+            </Button>
+          </div>
+        </div>
+      ) : null}
+
+      {showSubmitConfirm && !isTimeUp ? (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="submit-confirm-title"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4 backdrop-blur-sm"
+        >
+          <div className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-2xl">
+            <h2 id="submit-confirm-title" className="text-lg font-bold text-slate-900">
+              {t("examSession.confirmSubmitTitle")}
+            </h2>
+            <p className="mt-2 text-sm text-slate-600">{t("examSession.confirmSubmitDescription")}</p>
+            <div className="mt-4 grid grid-cols-3 gap-3 text-center">
+              <div className="rounded-lg border border-slate-200 p-3">
+                <p className="text-xs text-slate-500">{t("examSession.confirmSubmitTotalQuestions")}</p>
+                <p className="text-xl font-semibold text-slate-900">{session.questions.length}</p>
+              </div>
+              <div className="rounded-lg border border-slate-200 p-3">
+                <p className="text-xs text-slate-500">{t("examSession.confirmSubmitAnswered")}</p>
+                <p className="text-xl font-semibold text-green-700">{answeredCount}</p>
+              </div>
+              <div className="rounded-lg border border-slate-200 p-3">
+                <p className="text-xs text-slate-500">{t("examSession.confirmSubmitUnanswered")}</p>
+                <p className="text-xl font-semibold text-amber-700">{unansweredIndexes.length}</p>
+              </div>
+            </div>
+            {markedCount > 0 ? (
+              <p className="mt-3 text-sm text-slate-600">
+                {t("examSession.confirmSubmitMarked")}: {markedCount}
+              </p>
+            ) : null}
+            {unansweredIndexes.length > 0 ? (
+              <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50 p-4">
+                <p className="text-sm text-amber-900">
+                  {t("examSession.unansweredWarning", { count: unansweredIndexes.length })}
+                </p>
+                <div className="mt-3 flex max-h-40 flex-wrap gap-2 overflow-y-auto">
+                  {unansweredIndexes.map((index) => (
+                    <Button
+                      key={session.questions[index].id}
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="border-amber-300 bg-white text-amber-900 hover:bg-amber-100"
+                      onClick={() => jumpToUnansweredQuestion(index)}
+                    >
+                      {t("examSession.jumpToQuestion", { number: index + 1 })}
+                    </Button>
+                  ))}
+                </div>
+              </div>
+            ) : null}
+            <div className="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+              <Button type="button" variant="outline" onClick={() => setShowSubmitConfirm(false)}>
+                {t("examSession.goBack")}
+              </Button>
+              <Button type="button" onClick={() => void handleSubmit()} disabled={isSubmitting}>
+                {unansweredIndexes.length > 0
+                  ? t("examSession.submitAnyway")
+                  : t("examSession.confirmSubmitButton")}
+              </Button>
+            </div>
+          </div>
+        </div>
+      ) : null}
 
       {showBackupModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 overflow-y-auto">

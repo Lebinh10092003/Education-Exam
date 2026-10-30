@@ -152,6 +152,8 @@ class Submission(TimeStampedModel):
     source = models.CharField(max_length=16, choices=Source.choices, default=Source.MANUAL)
     checksum = models.CharField(max_length=128, blank=True)
     answered_count = models.PositiveIntegerField(default=0)
+    # Nop sau khi het ca thoi gian lam bai lan thoi gian an han (EXAM_SUBMISSION_GRACE_SECONDS).
+    is_late = models.BooleanField(default=False)
 
     def __str__(self):
         return f"Submission<{self.session_id}>"

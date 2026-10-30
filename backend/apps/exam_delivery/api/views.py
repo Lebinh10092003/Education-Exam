@@ -242,9 +242,17 @@ class ExamSessionViewSet(mixins.RetrieveModelMixin, viewsets.GenericViewSet):
 
     @action(detail=True, methods=["post"])
     def submit(self, request, pk=None):
+        from ..models import Submission
+
         session = self.get_object()
-        submit_session(session=session, submitted_by=request.user)
-        session.refresh_from_db()
+        # Trinh duyet tu nop khi het thoi gian an han -> ghi nguon "auto_timeout".
+        auto_submit = str(request.data.get("auto_submit", "")).lower() in {"1", "true", "yes"}
+        submit_session(
+            session=session,
+            submitted_by=request.user,
+            source=Submission.Source.AUTO_TIMEOUT if auto_submit else Submission.Source.MANUAL,
+        )
+        session = ExamSession.objects.select_related("submission").get(pk=session.pk)
         output = SessionSubmissionSummarySerializer(session)
         return Response(output.data)
 

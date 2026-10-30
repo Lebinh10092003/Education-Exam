@@ -93,15 +93,41 @@ def _assert_candidate_can_start(*, exam, candidate, now):
     assert_exam_phase_allows_start(exam, now=now)
 
 
-def _expire_if_needed(session, *, now):
-    if session.paused_at is not None and session.remaining_seconds_at_pause is not None:
+def _setting_seconds(name, default):
+    return max(int(getattr(settings, name, default) or 0), 0)
+
+
+def _is_paused(session):
+    return session.paused_at is not None and session.remaining_seconds_at_pause is not None
+
+
+def get_submission_deadline(session):
+    """Moc cuoi cung de nop dung han = het gio lam bai + thoi gian an han."""
+    return session.expires_at + timedelta(seconds=_setting_seconds("EXAM_SUBMISSION_GRACE_SECONDS", 300))
+
+
+def is_answering_closed(session, *, now=None):
+    """Da het gio lam bai (khong nhan cau tra loi moi), tinh ca do tre dong bo cho phep."""
+    if _is_paused(session) or session.status != ExamSession.Status.IN_PROGRESS:
         return False
-    if session.status == ExamSession.Status.IN_PROGRESS and session.expires_at <= now:
-        session.status = ExamSession.Status.EXPIRED
-        session.save(update_fields=["status", "updated_at"])
-        cache.delete(f"exam_session_cache:{session.id}")
-        return True
-    return False
+    now = now or timezone.now()
+    tolerance = timedelta(seconds=_setting_seconds("EXAM_ANSWER_SYNC_TOLERANCE_SECONDS", 30))
+    return now >= session.expires_at + tolerance
+
+
+def is_in_grace_period(session, *, now=None):
+    if _is_paused(session) or session.status != ExamSession.Status.IN_PROGRESS:
+        return False
+    now = now or timezone.now()
+    return session.expires_at <= now < get_submission_deadline(session)
+
+
+def is_overdue(session, *, now=None):
+    """Qua ca thoi gian an han ma chua nop -> can tu nop va danh dau nop muon."""
+    if _is_paused(session) or session.status != ExamSession.Status.IN_PROGRESS:
+        return False
+    now = now or timezone.now()
+    return now >= get_submission_deadline(session)
 
 
 def _sum_points(items):
@@ -109,6 +135,35 @@ def _sum_points(items):
     for item in items:
         total += item.points
     return total
+
+
+def _random_rule_candidate_pool(*, session, rule):
+    """
+    Danh sach (question_id, current_revision_id) sap xep theo id cho 1 luat ngau nhien.
+    Khi nhieu thi sinh vao thi cung luc, chi query ngan hang cau hoi 1 lan moi TTL
+    thay vi tai toan bo ngan hang cho tung thi sinh.
+    """
+    ttl_seconds = max(int(getattr(settings, "EXAM_RANDOM_POOL_CACHE_TTL_SECONDS", 0) or 0), 0)
+    cache_key = f"exam_random_pool:{session.exam_version_id}:{rule.pk}:{session.exam.subject_id}"
+    if ttl_seconds:
+        cached_pool = cache.get(cache_key)
+        if cached_pool is not None:
+            return cached_pool
+
+    queryset = Question.objects.filter(subject_id=session.exam.subject_id, current_revision__isnull=False)
+    if rule.difficulty:
+        queryset = queryset.filter(difficulty=rule.difficulty)
+    if rule.question_type:
+        queryset = queryset.filter(question_type=rule.question_type)
+    if rule.tag_ids:
+        queryset = queryset.filter(tags__id__in=rule.tag_ids)
+    pool = [
+        (question_id, revision_id)
+        for question_id, revision_id in queryset.values_list("id", "current_revision_id").distinct().order_by("id")
+    ]
+    if ttl_seconds:
+        cache.set(cache_key, pool, ttl_seconds)
+    return pool
 
 
 def _build_session_questions(*, session, exam_items):
@@ -127,17 +182,9 @@ def _build_session_questions(*, session, exam_items):
         static_random_ptr = 0
 
         for rule in random_rules:
-            queryset = Question.objects.filter(subject=session.exam.subject, current_revision__isnull=False)
-            if rule.difficulty:
-                queryset = queryset.filter(difficulty=rule.difficulty)
-            if rule.question_type:
-                queryset = queryset.filter(question_type=rule.question_type)
-            if rule.tag_ids:
-                queryset = queryset.filter(tags__id__in=rule.tag_ids)
-            if excluded_ids:
-                queryset = queryset.exclude(id__in=excluded_ids)
-
-            candidates = list(queryset.select_related("current_revision").distinct().order_by("id"))
+            pool = _random_rule_candidate_pool(session=session, rule=rule)
+            # Loai tru trong Python thay vi query lai: thu tu (theo id) giu nguyen nhu truoc.
+            candidates = [entry for entry in pool if entry[0] not in excluded_ids]
             if len(candidates) < rule.count:
                 raise ValidationError(t(
                     vi=f"Không đủ câu hỏi trong ngân hàng để sinh đề ngẫu nhiên theo yêu cầu (Luật #{rule.sort_order}).",
@@ -148,19 +195,19 @@ def _build_session_questions(*, session, exam_items):
             seeded_rng.shuffle(candidates)
             selected_questions = candidates[:rule.count]
 
-            for question in selected_questions:
-                excluded_ids.add(question.id)
+            for question_id, revision_id in selected_questions:
+                excluded_ids.add(question_id)
                 item = static_random_items[static_random_ptr]
                 static_random_ptr += 1
-                paired_specs.append((item, question.current_revision))
+                paired_specs.append((item, revision_id))
     else:
         # Fallback to static items if no random rules or mismatch
         for item in static_random_items:
-            paired_specs.append((item, item.question_revision))
+            paired_specs.append((item, item.question_revision_id))
 
     # Add all manual items
     for item in manual_items:
-        paired_specs.append((item, item.question_revision))
+        paired_specs.append((item, item.question_revision_id))
 
     # Shuffle paired_specs if required by exam configurations
     if session.exam.shuffle_questions and len(paired_specs) > 1:
@@ -172,11 +219,11 @@ def _build_session_questions(*, session, exam_items):
             SessionQuestion(
                 session=session,
                 exam_item=item,
-                question_revision=revision,
+                question_revision_id=revision_id,
                 sort_order=index,
                 points=item.points,
             )
-            for index, (item, revision) in enumerate(paired_specs, start=1)
+            for index, (item, revision_id) in enumerate(paired_specs, start=1)
         ]
     )
 
@@ -191,8 +238,15 @@ def start_or_resume_session(*, exam, candidate):
         .first()
     )
     if current_session:
-        if not _expire_if_needed(current_session, now=now):
+        if not is_overdue(current_session, now=now):
+            # Ke ca trong thoi gian an han: tra ve phien de thi sinh bam nop.
             set_session_cache(current_session)
+            return current_session
+        # Qua han ma chua nop (vd. dong trinh duyet): tu nop va danh dau nop muon.
+        finalize_overdue_session(session=current_session)
+        current_session.refresh_from_db()
+        # Het luot thi: tra ve bai vua nop (khong bao loi, neu khong transaction se huy luon ban nop).
+        if ExamSession.objects.filter(exam=exam, candidate=candidate).count() >= exam.max_attempts:
             return current_session
 
     latest_session = (
@@ -243,11 +297,18 @@ def start_or_resume_session(*, exam, candidate):
 
 def _assert_session_is_active(session):
     now = timezone.now()
-    interaction_time = assert_session_allows_interaction(session, now=now)
-    if _expire_if_needed(session, now=interaction_time):
-        raise ValidationError(t(vi="Phiên thi này đã hết hạn.", en="This session has expired."))
     if session.status != ExamSession.Status.IN_PROGRESS:
         raise ValidationError(t(vi="Phiên thi này hiện không nhận câu trả lời.", en="This session is not accepting answers."))
+    # Lich thi co the dong dung luc het gio; van cho dong bo cau tra loi trong khoang tre cho phep.
+    within_answer_window = _is_paused(session) or not is_answering_closed(session, now=now)
+    interaction_time = assert_session_allows_interaction(session, now=now, allow_closed=within_answer_window)
+    if not within_answer_window:
+        raise ValidationError(
+            t(
+                vi="Đã hết giờ làm bài. Bạn chỉ có thể nộp bài.",
+                en="Time is up. You can only submit the exam now.",
+            )
+        )
     return interaction_time
 
 
@@ -338,20 +399,28 @@ def build_autosave_receipt(*, session, payload=None):
 
 
 @transaction.atomic
-def submit_session(*, session, submitted_by, source=Submission.Source.MANUAL, force=False):
-    if hasattr(session, "submission"):
+def submit_session(*, session, submitted_by, source=Submission.Source.MANUAL, force=False, is_late=None):
+    # Khoa dong phien de thi sinh bam nop va tac vu tu nop khong cung tao 2 ban nop.
+    locked = ExamSession.objects.select_for_update().only("id", "status").get(pk=session.pk)
+    existing_submission = Submission.objects.filter(session_id=session.pk).first()
+    if existing_submission is not None:
         try:
             from apps.grading.services import initialize_grading_for_submission
         except ModuleNotFoundError:
-            return session.submission
+            return existing_submission
         initialize_grading_for_submission(session=session)
-        return session.submission
+        return existing_submission
+    session.status = locked.status
 
     now = timezone.now()
-    if force:
-        assert_session_allows_interaction(session, now=now, allow_closed=True)
-    else:
-        now = _assert_session_is_active(session)
+    if not force and session.status != ExamSession.Status.IN_PROGRESS:
+        raise ValidationError(
+            t(vi="Phiên thi này hiện không nhận bài nộp.", en="This session is not accepting submissions.")
+        )
+    # Nop bai luon duoc phep ke ca khi lich thi da dong (het gio / an han); chi chan khi dang tam dung.
+    assert_session_allows_interaction(session, now=now, allow_closed=True)
+    if is_late is None:
+        is_late = not _is_paused(session) and now >= get_submission_deadline(session)
     objective_score = Decimal("0.00")
     max_score = Decimal("0.00")
     manual_grading_required = False
@@ -416,6 +485,7 @@ def submit_session(*, session, submitted_by, source=Submission.Source.MANUAL, fo
         submitted_by=submitted_by,
         source=source,
         answered_count=answered_count,
+        is_late=bool(is_late),
     )
     try:
         from apps.grading.services import initialize_grading_for_submission
@@ -423,6 +493,53 @@ def submit_session(*, session, submitted_by, source=Submission.Source.MANUAL, fo
         return submission
     initialize_grading_for_submission(session=session)
     return submission
+
+
+def finalize_overdue_session(*, session):
+    """Tu nop bai cho phien da qua thoi gian an han; cau chua lam tinh la sai."""
+    return submit_session(
+        session=session,
+        submitted_by=None,
+        source=Submission.Source.AUTO_TIMEOUT,
+        force=True,
+        is_late=True,
+    )
+
+
+def finalize_overdue_sessions(*, now=None, batch_size=200):
+    """Chay dinh ky (Celery beat): tu nop moi phien qua han ma thi sinh chua bam nop."""
+    import logging
+
+    logger = logging.getLogger(__name__)
+    now = now or timezone.now()
+    grace = timedelta(seconds=_setting_seconds("EXAM_SUBMISSION_GRACE_SECONDS", 300))
+    candidate_ids = list(
+        ExamSession.objects.filter(
+            status=ExamSession.Status.IN_PROGRESS,
+            paused_at__isnull=True,
+            expires_at__lte=now - grace,
+            submission__isnull=True,
+        )
+        .order_by("expires_at", "id")
+        .values_list("id", flat=True)[:batch_size]
+    )
+    finalized = 0
+    failed = 0
+    for session_id in candidate_ids:
+        session = (
+            ExamSession.objects.select_related("exam", "exam__schedule_window", "candidate")
+            .filter(pk=session_id)
+            .first()
+        )
+        if session is None or not is_overdue(session, now=now):
+            continue
+        try:
+            finalize_overdue_session(session=session)
+            finalized += 1
+        except Exception:
+            failed += 1
+            logger.exception("Unable to auto-submit overdue exam session.", extra={"session_id": session_id})
+    return {"checked": len(candidate_ids), "finalized": finalized, "failed": failed}
 
 
 def get_remaining_seconds(session):

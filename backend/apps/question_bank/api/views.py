@@ -5,7 +5,7 @@ from rest_framework.response import Response
 
 from apps.identity.permissions import HasAPIPermissionCode
 from apps.question_bank.models import Question, QuestionImportBatch, QuestionTag
-from apps.question_bank.services import import_questions_from_upload
+from apps.question_bank.services import import_questions_from_upload, preview_import
 
 from .serializers import (
     QuestionImportBatchCreateSerializer,
@@ -103,10 +103,17 @@ class QuestionImportBatchViewSet(
     def create(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data, context=self.get_serializer_context())
         serializer.is_valid(raise_exception=True)
+        if serializer.validated_data.get("dry_run"):
+            report = preview_import(
+                source_format=serializer.validated_data["source_format"],
+                raw_content=serializer.validated_data["file"].read(),
+            )
+            return Response({"dry_run": True, **report}, status=status.HTTP_200_OK)
         batch = import_questions_from_upload(
             uploaded_by=request.user,
             source_format=serializer.validated_data["source_format"],
             uploaded_file=serializer.validated_data["file"],
+            skip_duplicates=serializer.validated_data.get("skip_duplicates", False),
         )
         output = QuestionImportBatchSerializer(batch, context=self.get_serializer_context())
         return Response(output.data, status=status.HTTP_201_CREATED)

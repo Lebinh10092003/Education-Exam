@@ -57,7 +57,11 @@ from .serializers import (
 
 
 def _get_candidate_session(session_id, user):
-    session = get_object_or_404(ExamSession.objects.select_related("candidate"), pk=session_id)
+    # Heartbeat/event deu doc session.exam va lich thi -> lay luon trong 1 query.
+    session = get_object_or_404(
+        ExamSession.objects.select_related("candidate", "exam", "exam__schedule_window"),
+        pk=session_id,
+    )
     return assert_candidate_session_access(session=session, user=user)
 
 
@@ -211,19 +215,35 @@ class CandidateSessionEvidenceMockUploadView(APIView):
     parser_classes = [PlainBinaryParser]
 
     def put(self, request, session_id):
-        session = get_object_or_404(ExamSession, pk=session_id)
-        if session.candidate_id != request.user.id and not request.user.has_platform_permission("proctoring.view"):
+        from django.conf import settings
+        from django.core.files.base import ContentFile
+
+        from ..evidence_storage import assert_evidence_key_belongs_to_session
+        from ..models import select_evidence_storage
+
+        session = get_object_or_404(ExamSession.objects.select_related("candidate"), pk=session_id)
+        if session.candidate_id != request.user.id:
             return Response({"detail": "Access denied."}, status=status.HTTP_403_FORBIDDEN)
-            
+
         object_key = request.query_params.get("key")
         if not object_key:
             return Response({"detail": "Missing key parameter."}, status=status.HTTP_400_BAD_REQUEST)
-            
-        from django.core.files.storage import default_storage
-        from django.core.files.base import ContentFile
-        
-        file_content = ContentFile(request.data)
-        default_storage.save(object_key, file_content)
+        assert_evidence_key_belongs_to_session(session=session, object_key=object_key)
+
+        # Kiem tra kich thuoc truoc khi doc body vao RAM.
+        max_bytes = int(getattr(settings, "PROCTORING_EVIDENCE_MAX_UPLOAD_BYTES", 5 * 1024 * 1024))
+        try:
+            content_length = int(request.META.get("CONTENT_LENGTH") or 0)
+        except ValueError:
+            content_length = 0
+        if content_length > max_bytes:
+            return Response({"detail": "Evidence file is too large."}, status=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE)
+        payload = request.data
+        if not isinstance(payload, (bytes, bytearray)) or len(payload) > max_bytes:
+            return Response({"detail": "Invalid evidence payload."}, status=status.HTTP_400_BAD_REQUEST)
+
+        file_content = ContentFile(payload)
+        select_evidence_storage().save(object_key, file_content)
         
         return Response({"status": "success"}, status=status.HTTP_200_OK)
 

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { notify } from "../lib/notify";
-import { Bell, Lock, User } from "lucide-react";
+import { Bell, Bot, Lock, User } from "lucide-react";
 
 import { PageHeader } from "../components/PageHeader";
 import { Card, CardContent } from "../components/ui/card";
@@ -13,6 +13,7 @@ import { Switch } from "../components/ui/switch";
 import { apiRequest } from "../lib/http";
 import { useMutationState } from "../hooks/useMutationState";
 import { useAuth } from "../auth/useAuth";
+import { McpAccessTokens } from "../components/McpAccessTokens";
 
 interface NotificationPreferences {
   emailNotifications: boolean;
@@ -176,6 +177,10 @@ export function Profile() {
                   <Bell className="w-4 h-4" />
                   Notifications
                 </TabsTrigger>
+                <TabsTrigger value="mcp" className="flex items-center gap-2">
+                  <Bot className="w-4 h-4" />
+                  Kết nối AI (MCP)
+                </TabsTrigger>
               </TabsList>
 
               <TabsContent value="profile" className="space-y-6">
@@ -294,6 +299,10 @@ export function Profile() {
                     {notificationMutation.isSubmitting ? "Saving..." : "Save Preferences"}
                   </Button>
                 </div>
+              </TabsContent>
+
+              <TabsContent value="mcp">
+                <McpAccessTokens />
               </TabsContent>
             </Tabs>
           </CardContent>

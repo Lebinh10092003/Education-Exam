@@ -178,52 +178,9 @@ def revise_question(
 
 
 def _build_question_payload_from_import(row, subjects_cache=None):
-    subject_code = str(row.get("subject_code", "")).strip()
-    if not subject_code:
-        raise ValueError("subject_code is required.")
+    from .quality import build_question_payload_from_row
 
-    try:
-        if subjects_cache is not None and subject_code in subjects_cache:
-            subject = subjects_cache[subject_code]
-        else:
-            subject = Subject.objects.get(code=subject_code)
-            if subjects_cache is not None:
-                subjects_cache[subject_code] = subject
-    except Subject.DoesNotExist as exc:
-        raise ValueError(f"Unknown subject code: {subject_code}") from exc
-
-    tags = row.get("tags", [])
-    if isinstance(tags, str):
-        tags = [item.strip() for item in tags.split("|") if item.strip()]
-
-    options = row.get("options")
-    if options is None:
-        options = []
-        for key, value in row.items():
-            if key.startswith("option_") and value:
-                option_key = key.replace("option_", "").upper()
-                options.append({"key": option_key, "text": str(value).strip()})
-
-    correct_option_keys = row.get("correct_option_keys", [])
-    if isinstance(correct_option_keys, str):
-        correct_option_keys = [item.strip() for item in correct_option_keys.split("|") if item.strip()]
-
-    acceptable_answers = row.get("acceptable_answers", [])
-    if isinstance(acceptable_answers, str):
-        acceptable_answers = [item.strip() for item in acceptable_answers.split("|") if item.strip()]
-
-    return {
-        "subject": subject,
-        "difficulty": row.get("difficulty"),
-        "question_type": row.get("question_type"),
-        "question_text": row.get("question_text"),
-        "tags": tags,
-        "options": options,
-        "correct_option_keys": correct_option_keys,
-        "essay_rubric": row.get("essay_rubric", ""),
-        "sample_answer": row.get("sample_answer", ""),
-        "acceptable_answers": acceptable_answers,
-    }
+    return build_question_payload_from_row(row, subjects_cache=subjects_cache)
 
 
 def _parse_xlsx_rows(content):
@@ -246,33 +203,65 @@ def _parse_xlsx_rows(content):
     return rows
 
 
+def read_import_rows(*, source_format, raw_content):
+    """Doc file import thanh danh sach dong. File hong -> ValidationError (thay vi loi 500)."""
+    try:
+        if source_format == QuestionImportBatch.SourceFormat.JSON:
+            rows = json.loads(raw_content.decode("utf-8-sig"))
+            if isinstance(rows, dict):
+                rows = rows.get("questions", rows.get("rows", []))
+            if not isinstance(rows, list):
+                raise ValueError("JSON phải là danh sách câu hỏi.")
+            return rows
+        if source_format == QuestionImportBatch.SourceFormat.XLSX:
+            return _parse_xlsx_rows(raw_content)
+        return list(csv.DictReader(StringIO(raw_content.decode("utf-8-sig"))))
+    except (ValueError, UnicodeDecodeError, KeyError) as exc:
+        raise ValidationError(f"Không đọc được file {source_format}: {exc}") from exc
+    except Exception as exc:  # noqa: BLE001 - openpyxl/zipfile nem nhieu loai loi khac nhau
+        raise ValidationError(f"Không đọc được file {source_format}: {exc}") from exc
+
+
+def preview_import(*, source_format, raw_content):
+    """Chay thu: kiem tra toan bo file, khong ghi gi vao CSDL."""
+    from .quality import analyze_import_rows, public_report
+
+    rows = read_import_rows(source_format=source_format, raw_content=raw_content)
+    return public_report(analyze_import_rows(rows))
+
+
 @transaction.atomic
-def import_questions_from_upload(*, uploaded_by, source_format, uploaded_file):
+def import_questions_from_upload(*, uploaded_by, source_format, uploaded_file, skip_duplicates=False):
+    from .quality import analyze_import_rows
+
+    raw_content = uploaded_file.read()
+    rows = read_import_rows(source_format=source_format, raw_content=raw_content)
     batch = QuestionImportBatch.objects.create(
         imported_by=uploaded_by,
         source_format=source_format,
         file_name=uploaded_file.name,
         status=QuestionImportBatch.Status.PENDING,
+        total_records=len(rows),
     )
     created_question_ids = []
-    subjects_cache = {}
+    report = analyze_import_rows(rows)
 
-    raw_content = uploaded_file.read()
-    if source_format == QuestionImportBatch.SourceFormat.JSON:
-        content = raw_content.decode("utf-8-sig")
-        rows = json.loads(content)
-    elif source_format == QuestionImportBatch.SourceFormat.XLSX:
-        rows = _parse_xlsx_rows(raw_content)
-    else:
-        content = raw_content.decode("utf-8-sig")
-        rows = list(csv.DictReader(StringIO(content)))
-
-    batch.total_records = len(rows)
-    batch.save(update_fields=["total_records"])
-
-    for index, row in enumerate(rows, start=1):
+    for index, row, payload, issues in report["_parsed"]:
+        errors = [issue for issue in issues if issue["level"] == "error"]
+        duplicates = [issue for issue in issues if issue["code"] in {"duplicate_in_file", "duplicate_in_bank"}]
+        if not errors and skip_duplicates and duplicates:
+            errors = [{**duplicates[0], "message": "Bỏ qua: " + duplicates[0]["message"]}]
+        if errors:
+            QuestionImportError.objects.create(
+                batch=batch,
+                row_number=index,
+                field_name=errors[0]["field"],
+                message="; ".join(issue["message"] for issue in errors),
+                raw_payload=row if isinstance(row, dict) else {"value": row},
+            )
+            batch.error_count += 1
+            continue
         try:
-            payload = _build_question_payload_from_import(row, subjects_cache=subjects_cache)
             question = create_question(
                 subject=payload["subject"],
                 created_by=uploaded_by,

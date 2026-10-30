@@ -240,3 +240,274 @@ def publish_result(*, result, published_by, request=None):
         request=request,
     )
     return result
+
+
+BULK_GRADE_LIMIT = 200
+
+
+def bulk_grade_manual_tasks(*, grades, grader, request=None):
+    """
+    Cham nhieu bai tu luan trong 1 lan (vd. cham theo tung cau cho ca phong thi).
+    Moi bai cham trong transaction rieng: 1 bai loi khong lam hong cac bai con lai.
+    grades: [{"task_id": int, "score_awarded": number, "feedback": str}]
+    """
+    if len(grades) > BULK_GRADE_LIMIT:
+        raise ValidationError(
+            t(
+                vi=f"Mỗi lần chấm tối đa {BULK_GRADE_LIMIT} bài.",
+                en=f"At most {BULK_GRADE_LIMIT} tasks per request.",
+            )
+        )
+    task_ids = [item["task_id"] for item in grades]
+    tasks = {
+        task.id: task
+        for task in ManualGradingTask.objects.select_related(
+            "session", "session__exam", "session__candidate", "session_question"
+        ).filter(id__in=task_ids)
+    }
+    graded, errors = [], []
+    for item in grades:
+        task = tasks.get(item["task_id"])
+        if task is None:
+            errors.append({"task_id": item["task_id"], "error": "Không tìm thấy bài cần chấm."})
+            continue
+        try:
+            with transaction.atomic():
+                grade_manual_task(
+                    task=task,
+                    grader=grader,
+                    score_awarded=item["score_awarded"],
+                    feedback=item.get("feedback", ""),
+                    request=request,
+                )
+            graded.append(task.id)
+        except ValidationError as exc:
+            detail = exc.detail[0] if isinstance(exc.detail, list) and exc.detail else exc.detail
+            errors.append({"task_id": task.id, "error": str(detail)})
+    return {"graded_count": len(graded), "graded_task_ids": graded, "errors": errors}
+
+
+def grade_blank_answers_as_zero(*, exam_id, grader, feedback="Bỏ trống, không làm bài.", request=None):
+    """Bai tu luan bo trong (chua cham) -> 0 diem, de nguoi cham chi tap trung vao bai co noi dung."""
+    pending = ManualGradingTask.objects.select_related(
+        "session", "session__exam", "session__candidate", "session_question", "session_question__answer"
+    ).filter(session__exam_id=exam_id, status=ManualGradingTask.Status.PENDING)
+    blank_ids = [
+        task.id
+        for task in pending
+        if not (getattr(getattr(task.session_question, "answer", None), "answer_text", "") or "").strip()
+    ]
+    return _grade_in_chunks(blank_ids, grader, feedback, request)
+
+
+def _grade_in_chunks(task_ids, grader, feedback, request):
+    total = {"graded_count": 0, "graded_task_ids": [], "errors": []}
+    for start in range(0, len(task_ids), BULK_GRADE_LIMIT):
+        chunk = bulk_grade_manual_tasks(
+            grades=[{"task_id": task_id, "score_awarded": 0, "feedback": feedback}
+                    for task_id in task_ids[start:start + BULK_GRADE_LIMIT]],
+            grader=grader,
+            request=request,
+        )
+        total["graded_count"] += chunk["graded_count"]
+        total["graded_task_ids"] += chunk["graded_task_ids"]
+        total["errors"] += chunk["errors"]
+    return total
+
+
+def grading_progress_by_question(*, exam_id):
+    """Tien do cham theo tung cau tu luan cua de: tong / da cham / con lai / bo trong."""
+    from django.db.models import Count, Q
+
+    rows = (
+        ManualGradingTask.objects.filter(session__exam_id=exam_id)
+        .values(
+            "session_question__exam_item_id",
+            "session_question__question_revision__question_id",
+            "session_question__question_revision__question_text",
+        )
+        .annotate(
+            total=Count("id"),
+            graded=Count("id", filter=Q(status=ManualGradingTask.Status.GRADED)),
+            blank_pending=Count(
+                "id",
+                filter=Q(status=ManualGradingTask.Status.PENDING)
+                & (Q(session_question__answer__isnull=True) | Q(session_question__answer__answer_text="")),
+            ),
+        )
+        .order_by("session_question__exam_item_id")
+    )
+    return [
+        {
+            "exam_item_id": row["session_question__exam_item_id"],
+            "question_id": row["session_question__question_revision__question_id"],
+            "question_preview": (row["session_question__question_revision__question_text"] or "")[:160],
+            "total": row["total"],
+            "graded": row["graded"],
+            "pending": row["total"] - row["graded"],
+            "blank_pending": row["blank_pending"],
+        }
+        for row in rows
+    ]
+
+
+# ============================== Goi y diem (AI qua MCP) ==================================
+SUGGESTION_FLAGS = {
+    "low_confidence",  # AI khong chac chan
+    "off_topic",  # lac de
+    "possible_copy",  # giong bai khac bat thuong
+    "prompt_injection",  # bai lam chua cau lenh nham dieu khien nguoi/AI cham
+    "unreadable",  # khong doc duoc / sai dinh dang
+    "needs_teacher",  # ly do khac can giao vien xem
+}
+ESSAY_BATCH_MAX = 50
+
+
+def build_essay_grading_batch(*, exam_id, question_id=None, limit=20, include_suggested=False):
+    """
+    Lo bai tu luan cua 1 cau de AI cham goi y. Bai lam duoc AN DANH (chi co task_id, khong ten/email)
+    de tranh thien vi va khong gui thong tin ca nhan cua hoc sinh ra dich vu AI ben ngoai.
+    """
+    limit = max(1, min(int(limit or 20), ESSAY_BATCH_MAX))
+    pending = ManualGradingTask.objects.filter(session__exam_id=exam_id, status=ManualGradingTask.Status.PENDING)
+    if not include_suggested:
+        pending = pending.filter(suggested_score__isnull=True)
+    if question_id is None:
+        question_id = (
+            pending.order_by("session_question__exam_item__sort_order", "id")
+            .values_list("session_question__question_revision__question_id", flat=True)
+            .first()
+        )
+        if question_id is None:
+            return {"exam_id": int(exam_id), "question": None, "answers": [], "remaining": 0}
+
+    tasks = list(
+        pending.filter(session_question__question_revision__question_id=question_id)
+        .select_related(
+            "session_question__answer",
+            "session_question__question_revision",
+            "session_question__question_revision__answer_key",
+        )
+        .order_by("id")
+    )
+    remaining = len(tasks)
+    tasks = tasks[:limit]
+    question = None
+    if tasks:
+        revision = tasks[0].session_question.question_revision
+        answer_key = getattr(revision, "answer_key", None)
+        question = {
+            "question_id": revision.question_id,
+            "question_text": revision.question_text,
+            "max_points": str(tasks[0].max_points),
+            "essay_rubric": getattr(answer_key, "essay_rubric", "") if answer_key else "",
+            "sample_answer": getattr(answer_key, "sample_answer", "") if answer_key else "",
+            "acceptable_answers": getattr(answer_key, "acceptable_answers", []) if answer_key else [],
+        }
+    answers = []
+    for task in tasks:
+        text = (getattr(getattr(task.session_question, "answer", None), "answer_text", "") or "").strip()
+        answers.append(
+            {
+                "task_id": task.id,
+                "max_points": str(task.max_points),
+                "answer_text": text,
+                "is_blank": not text,
+                "word_count": len(text.split()),
+                "current_suggestion": (
+                    {"score": str(task.suggested_score), "feedback": task.suggested_feedback}
+                    if task.suggested_score is not None
+                    else None
+                ),
+            }
+        )
+    return {
+        "exam_id": int(exam_id),
+        "question": question,
+        "answers": answers,
+        "remaining": remaining,
+        "returned": len(answers),
+    }
+
+
+def save_grade_suggestions(*, suggestions, user, source="ai"):
+    """Luu diem goi y. KHONG thay doi diem chinh thuc, ket qua hay trang thai bai."""
+    if len(suggestions) > BULK_GRADE_LIMIT:
+        raise ValidationError(
+            t(vi=f"Mỗi lần tối đa {BULK_GRADE_LIMIT} gợi ý.", en=f"At most {BULK_GRADE_LIMIT} suggestions per request.")
+        )
+    tasks = {task.id: task for task in ManualGradingTask.objects.filter(id__in=[s["task_id"] for s in suggestions])}
+    now = timezone.now()
+    saved, errors = [], []
+    for item in suggestions:
+        task = tasks.get(item["task_id"])
+        if task is None:
+            errors.append({"task_id": item["task_id"], "error": "Không tìm thấy bài cần chấm."})
+            continue
+        if task.status != ManualGradingTask.Status.PENDING:
+            errors.append({"task_id": task.id, "error": "Bài đã có điểm chính thức, không ghi gợi ý."})
+            continue
+        try:
+            score = _as_decimal(item["score"])
+        except ValidationError:
+            errors.append({"task_id": task.id, "error": "Điểm gợi ý không hợp lệ."})
+            continue
+        if score < 0 or score > task.max_points:
+            errors.append({"task_id": task.id, "error": f"Điểm gợi ý phải trong khoảng 0–{task.max_points}."})
+            continue
+        flags = [flag for flag in (item.get("flags") or []) if flag in SUGGESTION_FLAGS]
+        task.suggested_score = score
+        task.suggested_feedback = str(item.get("feedback") or "")[:4000]
+        task.suggestion_rationale = str(item.get("rationale") or "")[:8000]
+        task.suggestion_flags = flags
+        task.suggestion_source = str(source or "ai")[:64]
+        task.suggested_by = user
+        task.suggested_at = now
+        task.save(
+            update_fields=[
+                "suggested_score",
+                "suggested_feedback",
+                "suggestion_rationale",
+                "suggestion_flags",
+                "suggestion_source",
+                "suggested_by",
+                "suggested_at",
+                "updated_at",
+            ]
+        )
+        saved.append(task.id)
+    return {"saved_count": len(saved), "saved_task_ids": saved, "errors": errors}
+
+
+def approve_grade_suggestions(*, task_ids, grader, include_flagged=False, request=None):
+    """
+    Giao vien duyet: bien diem goi y thanh diem chinh thuc (dung chung luong cham hang loat).
+    Bai bi gan co (lac de, nghi chep bai, chen lenh...) bi bo qua tru khi include_flagged=True.
+    """
+    tasks = ManualGradingTask.objects.filter(
+        id__in=task_ids, status=ManualGradingTask.Status.PENDING, suggested_score__isnull=False
+    )
+    grades, skipped = [], []
+    for task in tasks:
+        if task.suggestion_flags and not include_flagged:
+            skipped.append({"task_id": task.id, "flags": task.suggestion_flags})
+            continue
+        grades.append({"task_id": task.id, "score_awarded": task.suggested_score, "feedback": task.suggested_feedback})
+    missing = sorted(set(task_ids) - {task.id for task in tasks})
+    result = bulk_grade_manual_tasks(grades=grades, grader=grader, request=request) if grades else {
+        "graded_count": 0,
+        "graded_task_ids": [],
+        "errors": [],
+    }
+    if result["graded_count"]:
+        record_audit_event(
+            actor=grader,
+            action="grading.suggestions_approved",
+            category="grading",
+            description=f"Approved {result['graded_count']} suggested essay grade(s).",
+            metadata={"task_ids": result["graded_task_ids"]},
+            request=request,
+        )
+    result["skipped_flagged"] = skipped
+    result["not_found_or_not_suggested"] = missing
+    return result

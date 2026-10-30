@@ -59,6 +59,7 @@ interface ResultReviewPayload {
     attempt_number: number;
     started_at: string;
     submitted_at: string | null;
+    is_late?: boolean;
     objective_score: string | number;
     max_score: string | number;
   };
@@ -198,6 +199,11 @@ export function AdminResultReview() {
           <CardContent className="p-5">
             <p className="text-sm text-slate-500">Nộp bài</p>
             <p className="mt-2 text-sm font-medium text-slate-950">{formatDate(payload.session.submitted_at)}</p>
+            {payload.session.is_late ? (
+              <span className="mt-2 inline-flex rounded-full bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-800">
+                Nộp muộn (hệ thống tự nộp)
+              </span>
+            ) : null}
           </CardContent>
         </Card>
       </div>

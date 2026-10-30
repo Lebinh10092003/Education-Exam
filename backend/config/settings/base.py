@@ -4,7 +4,7 @@ from urllib.parse import urlsplit, urlunsplit
 
 import environ
 
-from .storage import build_storages
+from .storage import build_storages, split_s3_endpoint
 
 BASE_DIR = Path(__file__).resolve().parents[2]
 
@@ -47,12 +47,29 @@ env = environ.Env(
     PROCTORING_HEARTBEAT_UNSTABLE_AFTER_SECONDS=(int, 90),
     PROCTORING_HEARTBEAT_OFFLINE_AFTER_SECONDS=(int, 150),
     PROCTORING_MONITORING_SNAPSHOT_TTL_SECONDS=(int, 10),
-    PROCTORING_EVIDENCE_RETENTION_DAYS=(int, 15),
+    PROCTORING_EVIDENCE_RETENTION_DAYS=(int, 180),
     PROCTORING_EVIDENCE_CLEANUP_INTERVAL_SECONDS=(int, 3600),
     NOTIFICATION_PERMISSION_RECIPIENT_CACHE_TTL_SECONDS=(int, 60),
     EXAM_SESSION_ACTIVITY_WRITE_INTERVAL_SECONDS=(int, 30),
     PRACTICE_DETAILS_RETENTION_DAYS=(int, 15),
     PRACTICE_DETAILS_CLEANUP_INTERVAL_SECONDS=(int, 3600),
+    PROCTORING_VIOLATION_COOLDOWN_SECONDS=(int, 5),
+    PROCTORING_VIOLATION_ESCALATE_AFTER=(int, 3),
+    PROCTORING_NOTIFY_CANDIDATE_ON_VIOLATION=(bool, True),
+    PROCTORING_EVIDENCE_MAX_UPLOAD_BYTES=(int, 5 * 1024 * 1024),
+    EXAM_RANDOM_POOL_CACHE_TTL_SECONDS=(int, 120),
+    EXAM_SUBMISSION_GRACE_SECONDS=(int, 300),
+    EXAM_ANSWER_SYNC_TOLERANCE_SECONDS=(int, 30),
+    EXAM_OVERDUE_FINALIZE_INTERVAL_SECONDS=(int, 60),
+    PROCTORING_EVIDENCE_STORAGE=(str, "auto"),
+    PROCTORING_EVIDENCE_ROOT_FOLDER=(str, "Vi phạm kỳ thi"),
+    PROCTORING_EVIDENCE_S3_BUCKET=(str, ""),
+    PROCTORING_EVIDENCE_S3_ENDPOINT_URL=(str, ""),
+    PROCTORING_EVIDENCE_S3_ACCESS_KEY_ID=(str, ""),
+    PROCTORING_EVIDENCE_S3_SECRET_ACCESS_KEY=(str, ""),
+    PROCTORING_EVIDENCE_S3_REGION=(str, "auto"),
+    PROCTORING_EVIDENCE_URL_EXPIRE_SECONDS=(int, 3600),
+    PROCTORING_EVIDENCE_UPLOAD_URL_EXPIRE_SECONDS=(int, 300),
 )
 
 environ.Env.read_env(BASE_DIR / ".env")
@@ -188,12 +205,27 @@ NOTIFICATION_PERMISSION_RECIPIENT_CACHE_TTL_SECONDS = env.int("NOTIFICATION_PERM
 EXAM_SESSION_ACTIVITY_WRITE_INTERVAL_SECONDS = env.int("EXAM_SESSION_ACTIVITY_WRITE_INTERVAL_SECONDS")
 PRACTICE_DETAILS_RETENTION_DAYS = env.int("PRACTICE_DETAILS_RETENTION_DAYS")
 PRACTICE_DETAILS_CLEANUP_INTERVAL_SECONDS = env.int("PRACTICE_DETAILS_CLEANUP_INTERVAL_SECONDS")
+# Gop vi pham: cung loai vi pham trong N giay chi ghi 1 lan (0 = tat).
+PROCTORING_VIOLATION_COOLDOWN_SECONDS = env.int("PROCTORING_VIOLATION_COOLDOWN_SECONDS")
+# Lan vi pham thu N cung loai trong 1 phien se nang case len critical va bao lai admin (0 = tat).
+PROCTORING_VIOLATION_ESCALATE_AFTER = env.int("PROCTORING_VIOLATION_ESCALATE_AFTER")
+PROCTORING_NOTIFY_CANDIDATE_ON_VIOLATION = env.bool("PROCTORING_NOTIFY_CANDIDATE_ON_VIOLATION")
+PROCTORING_EVIDENCE_MAX_UPLOAD_BYTES = env.int("PROCTORING_EVIDENCE_MAX_UPLOAD_BYTES")
+# Cache danh sach cau hoi ung vien cho moi luat de ngau nhien, tranh query lai cho tung thi sinh.
+EXAM_RANDOM_POOL_CACHE_TTL_SECONDS = env.int("EXAM_RANDOM_POOL_CACHE_TTL_SECONDS")
+# Het gio lam bai -> thi sinh con N giay de bam nop; qua han he thong tu nop va danh dau nop muon.
+EXAM_SUBMISSION_GRACE_SECONDS = env.int("EXAM_SUBMISSION_GRACE_SECONDS")
+# Cho phep dong bo cau tra loi bi xep hang tren trinh duyet them N giay sau khi het gio.
+EXAM_ANSWER_SYNC_TOLERANCE_SECONDS = env.int("EXAM_ANSWER_SYNC_TOLERANCE_SECONDS")
+EXAM_OVERDUE_FINALIZE_INTERVAL_SECONDS = env.int("EXAM_OVERDUE_FINALIZE_INTERVAL_SECONDS")
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 AUTH_USER_MODEL = "identity.User"
 
 REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": (
+        # Ma truy cap ca nhan cho MCP (Bearer eduexam_pat_...), dat truoc JWT.
+        "apps.identity.api_tokens.ApiTokenAuthentication",
         "rest_framework_simplejwt.authentication.JWTAuthentication",
     ),
     "DEFAULT_PERMISSION_CLASSES": (
@@ -250,6 +282,10 @@ CELERY_BEAT_SCHEDULE = {
         "task": "apps.proctoring.tasks.cleanup_expired_proctor_evidence_task",
         "schedule": PROCTORING_EVIDENCE_CLEANUP_INTERVAL_SECONDS,
     },
+    "finalize-overdue-exam-sessions": {
+        "task": "apps.exam_delivery.tasks.finalize_overdue_exam_sessions_task",
+        "schedule": EXAM_OVERDUE_FINALIZE_INTERVAL_SECONDS,
+    },
     "cleanup-expired-practice-details": {
         "task": "apps.practice.tasks.cleanup_expired_practice_details_task",
         "schedule": PRACTICE_DETAILS_CLEANUP_INTERVAL_SECONDS,
@@ -285,7 +321,52 @@ if USE_S3_STORAGE:
     AWS_S3_REGION_NAME = env("AWS_S3_REGION_NAME")
     AWS_QUERYSTRING_AUTH = True
 
+# Kho anh bang chung tach rieng khoi media chung: bat S3/R2 cho anh vi pham ma khong
+# phai chuyen toan bo media (tai lieu, avatar...) khoi VPS.
+PROCTORING_EVIDENCE_ROOT_FOLDER = env("PROCTORING_EVIDENCE_ROOT_FOLDER")
+# Uu tien: PROCTORING_EVIDENCE_S3_BUCKET > ten bucket nam trong link endpoint > AWS_STORAGE_BUCKET_NAME.
+PROCTORING_EVIDENCE_S3_ENDPOINT_URL, PROCTORING_EVIDENCE_S3_BUCKET = split_s3_endpoint(
+    env("PROCTORING_EVIDENCE_S3_ENDPOINT_URL") or env("AWS_S3_ENDPOINT_URL"),
+    env("PROCTORING_EVIDENCE_S3_BUCKET"),
+)
+PROCTORING_EVIDENCE_S3_BUCKET = PROCTORING_EVIDENCE_S3_BUCKET or env("AWS_STORAGE_BUCKET_NAME")
+PROCTORING_EVIDENCE_S3_ACCESS_KEY_ID = env("PROCTORING_EVIDENCE_S3_ACCESS_KEY_ID") or env("AWS_ACCESS_KEY_ID")
+PROCTORING_EVIDENCE_S3_SECRET_ACCESS_KEY = env("PROCTORING_EVIDENCE_S3_SECRET_ACCESS_KEY") or env("AWS_SECRET_ACCESS_KEY")
+# Mac dinh "auto": co du endpoint + bucket + khoa R2/S3 thi luu anh vi pham len R2, thieu thi luu tren VPS.
+# Dat "s3" de bat buoc dung R2 (thieu cau hinh se bao loi ngay khi khoi dong), "local" de luon luu VPS.
+PROCTORING_EVIDENCE_STORAGE = (env("PROCTORING_EVIDENCE_STORAGE") or "auto").strip().lower()
+if PROCTORING_EVIDENCE_STORAGE == "auto":
+    PROCTORING_EVIDENCE_STORAGE = (
+        "s3"
+        if USE_S3_STORAGE
+        or all(
+            (
+                PROCTORING_EVIDENCE_S3_ENDPOINT_URL,
+                PROCTORING_EVIDENCE_S3_BUCKET,
+                PROCTORING_EVIDENCE_S3_ACCESS_KEY_ID,
+                PROCTORING_EVIDENCE_S3_SECRET_ACCESS_KEY,
+            )
+        )
+        else "local"
+    )
+PROCTORING_EVIDENCE_S3_REGION = env("PROCTORING_EVIDENCE_S3_REGION")
+PROCTORING_EVIDENCE_URL_EXPIRE_SECONDS = env.int("PROCTORING_EVIDENCE_URL_EXPIRE_SECONDS")
+PROCTORING_EVIDENCE_UPLOAD_URL_EXPIRE_SECONDS = env.int("PROCTORING_EVIDENCE_UPLOAD_URL_EXPIRE_SECONDS")
+
 STORAGES = build_storages(
     use_s3_storage=USE_S3_STORAGE,
     bucket_name=env("AWS_STORAGE_BUCKET_NAME"),
+    evidence_storage=PROCTORING_EVIDENCE_STORAGE,
+    evidence_s3_options={
+        "bucket_name": PROCTORING_EVIDENCE_S3_BUCKET,
+        "endpoint_url": PROCTORING_EVIDENCE_S3_ENDPOINT_URL or None,
+        "access_key": PROCTORING_EVIDENCE_S3_ACCESS_KEY_ID,
+        "secret_key": PROCTORING_EVIDENCE_S3_SECRET_ACCESS_KEY,
+        "region_name": PROCTORING_EVIDENCE_S3_REGION,
+        "signature_version": "s3v4",
+        "querystring_auth": True,
+        "querystring_expire": PROCTORING_EVIDENCE_URL_EXPIRE_SECONDS,
+        "file_overwrite": False,
+        "default_acl": None,
+    },
 )

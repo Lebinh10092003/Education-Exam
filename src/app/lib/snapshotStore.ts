@@ -312,58 +312,98 @@ export async function deleteSnapshot(id: number): Promise<void> {
 // ────────────────────────────────────────────────────────────
 
 /**
- * Nen mot Blob anh sang WebP de giam dung luong upload.
- * - Ban goc JPEG 0.85 giu trong IndexedDB (xem duoc, chat luong cao)
- * - Ban nen WebP 0.60 duoc upload len server (nhe hon ~60-70%)
+ * Nen anh bang chung tai trinh duyet truoc khi tai len (khong ton CPU server).
  *
- * Neu trinh duyet khong ho tro WebP, fallback sang JPEG 0.70.
+ * - Thu nho kich thuoc: webcam toi da 960px (du nhan dien khuon mat),
+ *   chup man hinh toi da 1280px (van doc duoc chu).
+ * - Uu tien WebP (nhe hon JPEG ~30-40% cung do net); trinh duyet nao khong
+ *   xuat duoc WebP (Safari cu se tra ve PNG nang hon) thi dung JPEG.
+ * - Luon chon ban nhe nhat, khong bao gio tra ve file nang hon ban goc.
+ *
+ * Anh WebP/JPEG xem truc tiep duoc tren moi trinh duyet nen server khong can
+ * "giai nen" khi giam thi/cham thi xem.
  */
-export async function compressSnapshotForUpload(blob: Blob): Promise<Blob> {
-  return new Promise<Blob>((resolve, reject) => {
+export type SnapshotCompressionProfile = {
+  maxWidth: number;
+  webpQuality: number;
+  jpegQuality: number;
+};
+
+export const SNAPSHOT_COMPRESSION_PROFILES: Record<string, SnapshotCompressionProfile> = {
+  webcam_snapshot: { maxWidth: 960, webpQuality: 0.62, jpegQuality: 0.7 },
+  screen_capture: { maxWidth: 1280, webpQuality: 0.72, jpegQuality: 0.75 },
+};
+
+const DEFAULT_COMPRESSION_PROFILE: SnapshotCompressionProfile = {
+  maxWidth: 1280,
+  webpQuality: 0.68,
+  jpegQuality: 0.72,
+};
+
+const canvasToBlob = (canvas: HTMLCanvasElement, type: string, quality: number) =>
+  new Promise<Blob | null>((resolve) => {
+    canvas.toBlob(resolve, type, quality);
+  });
+
+const loadImage = (blob: Blob) =>
+  new Promise<HTMLImageElement>((resolve, reject) => {
     const img = new Image();
     const url = URL.createObjectURL(blob);
-
     img.onload = () => {
       URL.revokeObjectURL(url);
-      const canvas = document.createElement("canvas");
-      canvas.width = img.naturalWidth;
-      canvas.height = img.naturalHeight;
-      const ctx = canvas.getContext("2d");
-      if (!ctx) {
-        // Fallback: tra ve blob goc neu khong ve duoc canvas
-        resolve(blob);
-        return;
-      }
-      ctx.drawImage(img, 0, 0);
-
-      // Thu WebP truoc, neu khong ho tro thi dung JPEG chat luong thap hon
-      canvas.toBlob(
-        (webpBlob) => {
-          if (webpBlob && webpBlob.size > 0) {
-            resolve(webpBlob);
-          } else {
-            // Fallback: JPEG quality 0.70
-            canvas.toBlob(
-              (jpegBlob) => {
-                resolve(jpegBlob ?? blob);
-              },
-              "image/jpeg",
-              0.7,
-            );
-          }
-        },
-        "image/webp",
-        0.6,
-      );
+      resolve(img);
     };
-
     img.onerror = () => {
       URL.revokeObjectURL(url);
       reject(new Error("Failed to load snapshot image for compression."));
     };
-
     img.src = url;
   });
+
+export async function compressSnapshotForUpload(
+  blob: Blob,
+  evidenceType: string = "webcam_snapshot",
+): Promise<Blob> {
+  const profile = SNAPSHOT_COMPRESSION_PROFILES[evidenceType] ?? DEFAULT_COMPRESSION_PROFILE;
+  const img = await loadImage(blob);
+  const sourceWidth = img.naturalWidth || img.width;
+  const sourceHeight = img.naturalHeight || img.height;
+  if (!sourceWidth || !sourceHeight) {
+    return blob;
+  }
+
+  const scale = sourceWidth > profile.maxWidth ? profile.maxWidth / sourceWidth : 1;
+  const canvas = document.createElement("canvas");
+  canvas.width = Math.max(1, Math.round(sourceWidth * scale));
+  canvas.height = Math.max(1, Math.round(sourceHeight * scale));
+  const ctx = canvas.getContext("2d");
+  if (!ctx) {
+    return blob;
+  }
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = "high";
+  ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+
+  const candidates: Blob[] = [];
+  const webpBlob = await canvasToBlob(canvas, "image/webp", profile.webpQuality);
+  // Trinh duyet khong ho tro se am tham tra ve PNG -> bo qua.
+  if (webpBlob && webpBlob.size > 0 && webpBlob.type === "image/webp") {
+    candidates.push(webpBlob);
+  }
+  if (candidates.length === 0) {
+    const jpegBlob = await canvasToBlob(canvas, "image/jpeg", profile.jpegQuality);
+    if (jpegBlob && jpegBlob.size > 0 && jpegBlob.type === "image/jpeg") {
+      candidates.push(jpegBlob);
+    }
+  }
+  const allowedOriginal = ["image/webp", "image/jpeg", "image/png"].includes(blob.type);
+  if (allowedOriginal) {
+    candidates.push(blob);
+  }
+  if (candidates.length === 0) {
+    return blob;
+  }
+  return candidates.reduce((smallest, current) => (current.size < smallest.size ? current : smallest));
 }
 
 // ────────────────────────────────────────────────────────────

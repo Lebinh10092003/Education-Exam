@@ -2,7 +2,24 @@ services:
   postgres:
     image: postgres:16-alpine
     restart: unless-stopped
-    command: ["postgres", "-c", "max_connections=200", "-c", "idle_session_timeout=5min"]
+    shm_size: 256mb
+    # Tinh chinh cho VPS 4 GB: PgBouncer chi mo ~25 ket noi that nen khong can 200.
+    command:
+      - postgres
+      - -c
+      - max_connections=${POSTGRES_MAX_CONNECTIONS:-100}
+      - -c
+      - idle_session_timeout=5min
+      - -c
+      - shared_buffers=${POSTGRES_SHARED_BUFFERS:-512MB}
+      - -c
+      - effective_cache_size=${POSTGRES_EFFECTIVE_CACHE_SIZE:-1536MB}
+      - -c
+      - work_mem=${POSTGRES_WORK_MEM:-8MB}
+      - -c
+      - maintenance_work_mem=${POSTGRES_MAINTENANCE_WORK_MEM:-128MB}
+      - -c
+      - random_page_cost=1.1
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-eduexam}
       POSTGRES_USER: ${POSTGRES_USER:-eduexam}
@@ -41,7 +58,8 @@ services:
   redis:
     image: redis:7-alpine
     restart: unless-stopped
-    command: ["redis-server", "--appendonly", "yes"]
+    # volatile-lru: khi day bo nho chi xoa key co TTL (cache/presence), khong dung toi hang doi Celery.
+    command: ["redis-server", "--appendonly", "yes", "--maxmemory", "${REDIS_MAXMEMORY:-512mb}", "--maxmemory-policy", "volatile-lru"]
     volumes:
       - redis_data:/data
     healthcheck:
@@ -90,19 +108,44 @@ services:
       PROCTORING_HEARTBEAT_UNSTABLE_AFTER_SECONDS: ${PROCTORING_HEARTBEAT_UNSTABLE_AFTER_SECONDS:-90}
       PROCTORING_HEARTBEAT_OFFLINE_AFTER_SECONDS: ${PROCTORING_HEARTBEAT_OFFLINE_AFTER_SECONDS:-150}
       PROCTORING_MONITORING_SNAPSHOT_TTL_SECONDS: ${PROCTORING_MONITORING_SNAPSHOT_TTL_SECONDS:-10}
-      PROCTORING_EVIDENCE_RETENTION_DAYS: ${PROCTORING_EVIDENCE_RETENTION_DAYS:-15}
+      PROCTORING_EVIDENCE_RETENTION_DAYS: ${PROCTORING_EVIDENCE_RETENTION_DAYS:-180}
       PROCTORING_EVIDENCE_CLEANUP_INTERVAL_SECONDS: ${PROCTORING_EVIDENCE_CLEANUP_INTERVAL_SECONDS:-3600}
       NOTIFICATION_PERMISSION_RECIPIENT_CACHE_TTL_SECONDS: ${NOTIFICATION_PERMISSION_RECIPIENT_CACHE_TTL_SECONDS:-60}
       EXAM_SESSION_ACTIVITY_WRITE_INTERVAL_SECONDS: ${EXAM_SESSION_ACTIVITY_WRITE_INTERVAL_SECONDS:-30}
       PRACTICE_DETAILS_RETENTION_DAYS: ${PRACTICE_DETAILS_RETENTION_DAYS:-15}
       PRACTICE_DETAILS_CLEANUP_INTERVAL_SECONDS: ${PRACTICE_DETAILS_CLEANUP_INTERVAL_SECONDS:-3600}
+      PROCTORING_VIOLATION_COOLDOWN_SECONDS: ${PROCTORING_VIOLATION_COOLDOWN_SECONDS:-5}
+      PROCTORING_VIOLATION_ESCALATE_AFTER: ${PROCTORING_VIOLATION_ESCALATE_AFTER:-3}
+      PROCTORING_NOTIFY_CANDIDATE_ON_VIOLATION: ${PROCTORING_NOTIFY_CANDIDATE_ON_VIOLATION:-True}
+      PROCTORING_EVIDENCE_MAX_UPLOAD_BYTES: ${PROCTORING_EVIDENCE_MAX_UPLOAD_BYTES:-5242880}
+      EXAM_RANDOM_POOL_CACHE_TTL_SECONDS: ${EXAM_RANDOM_POOL_CACHE_TTL_SECONDS:-120}
+      EXAM_SUBMISSION_GRACE_SECONDS: ${EXAM_SUBMISSION_GRACE_SECONDS:-300}
+      EXAM_ANSWER_SYNC_TOLERANCE_SECONDS: ${EXAM_ANSWER_SYNC_TOLERANCE_SECONDS:-30}
+      EXAM_OVERDUE_FINALIZE_INTERVAL_SECONDS: ${EXAM_OVERDUE_FINALIZE_INTERVAL_SECONDS:-60}
+      # Anh vi pham mac dinh luu tren Cloudflare R2 (bucket exam-education). Khoa R2 bat buoc
+      # khai bao trong deploy/.env.production; dat PROCTORING_EVIDENCE_STORAGE=local de quay ve luu VPS.
+      PROCTORING_EVIDENCE_STORAGE: ${PROCTORING_EVIDENCE_STORAGE:-s3}
+      PROCTORING_EVIDENCE_ROOT_FOLDER: ${PROCTORING_EVIDENCE_ROOT_FOLDER:-Vi phạm kỳ thi}
+      PROCTORING_EVIDENCE_S3_BUCKET: ${PROCTORING_EVIDENCE_S3_BUCKET:-exam-education}
+      PROCTORING_EVIDENCE_S3_ENDPOINT_URL: ${PROCTORING_EVIDENCE_S3_ENDPOINT_URL:-https://7434d745c58a48a09fac57b92aab5253.r2.cloudflarestorage.com}
+      PROCTORING_EVIDENCE_S3_ACCESS_KEY_ID: ${PROCTORING_EVIDENCE_S3_ACCESS_KEY_ID:?Set PROCTORING_EVIDENCE_S3_ACCESS_KEY_ID (R2) in deploy/.env.production}
+      PROCTORING_EVIDENCE_S3_SECRET_ACCESS_KEY: ${PROCTORING_EVIDENCE_S3_SECRET_ACCESS_KEY:?Set PROCTORING_EVIDENCE_S3_SECRET_ACCESS_KEY (R2) in deploy/.env.production}
+      PROCTORING_EVIDENCE_S3_REGION: ${PROCTORING_EVIDENCE_S3_REGION:-auto}
+      PROCTORING_EVIDENCE_URL_EXPIRE_SECONDS: ${PROCTORING_EVIDENCE_URL_EXPIRE_SECONDS:-3600}
       USE_S3_STORAGE: ${USE_S3_STORAGE:-False}
       AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-}
       AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-}
       AWS_STORAGE_BUCKET_NAME: ${AWS_STORAGE_BUCKET_NAME:-}
       AWS_S3_ENDPOINT_URL: ${AWS_S3_ENDPOINT_URL:-}
       AWS_S3_REGION_NAME: ${AWS_S3_REGION_NAME:-us-east-1}
-    command: sh -c "python manage.py collectstatic --noinput && daphne -b 0.0.0.0 -p 8000 config.asgi:application"
+    # Nhieu tien trinh ASGI de dung het CPU (1 tien trinh Python chi dung ~1 nhan do GIL).
+    # WebSocket giua cac worker dong bo qua Redis channel layer.
+    command: >-
+      sh -c "python manage.py collectstatic --noinput &&
+      uvicorn config.asgi:application --host 0.0.0.0 --port 8000
+      --workers ${WEB_WORKERS:-3}
+      --proxy-headers --forwarded-allow-ips='*'
+      --lifespan off --timeout-keep-alive 15 --no-server-header"
     volumes:
       - backend_static:/app/backend/staticfiles
       - backend_media:/app/backend/media
@@ -174,6 +217,32 @@ services:
       test: ["CMD-SHELL", "wget -qO- http://127.0.0.1/ >/dev/null || exit 1"]
       interval: 30s
       timeout: 5s
+      retries: 5
+
+  mcp:
+    # MCP cho tro ly AI tai https://khaothi.fermat.vn/mcp. Khong chua tai khoan/mat khau:
+    # nguoi dung gui ma truy cap ca nhan (tao trong trang Ho so) kem moi request.
+    build:
+      context: ../mcp-server
+    container_name: khaothi-mcp
+    restart: unless-stopped
+    environment:
+      EDUEXAM_API_URL: http://khaothi-backend:8000
+      EDUEXAM_MCP_ALLOWED_HOSTS: ${EDUEXAM_MCP_ALLOWED_HOSTS:-khaothi.fermat.vn,khaothi-mcp:8765,127.0.0.1:*}
+      EDUEXAM_MCP_ALLOWED_ORIGINS: ${EDUEXAM_MCP_ALLOWED_ORIGINS:-https://khaothi.fermat.vn,https://claude.ai}
+      EDUEXAM_MCP_MODE: ${EDUEXAM_MCP_MODE:-full}
+    expose:
+      - "8765"
+    depends_on:
+      backend:
+        condition: service_healthy
+    networks:
+      - default
+      - caddy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8765/healthz', timeout=5).read()"]
+      interval: 30s
+      timeout: 10s
       retries: 5
 
   livekit:

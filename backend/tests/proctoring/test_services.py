@@ -220,7 +220,7 @@ def test_build_exam_monitoring_snapshot_derives_connection_status_from_stale_run
 
 
 @pytest.mark.django_db
-def test_build_exam_monitoring_snapshot_expires_stale_in_progress_session_for_monitoring(
+def test_build_exam_monitoring_snapshot_keeps_time_up_session_in_grace_period(
     subject,
     admin_user,
     candidate_user,
@@ -249,9 +249,10 @@ def test_build_exam_monitoring_snapshot_expires_stale_in_progress_session_for_mo
     snapshot = build_exam_monitoring_snapshot(exam=exam)
     session.refresh_from_db()
 
-    assert session.status == ExamSession.Status.EXPIRED
-    assert snapshot["candidate_statuses"][0]["status"] == "expired"
-    assert snapshot["candidate_statuses"][0]["connection_status"] == "offline"
+    # Het gio nhung con trong thoi gian an han nop bai: khong ghi DB, chi danh dau time_up.
+    assert session.status == ExamSession.Status.IN_PROGRESS
+    assert snapshot["candidate_statuses"][0]["status"] == "in_progress"
+    assert snapshot["candidate_statuses"][0]["time_up"] is True
 
 
 @pytest.mark.django_db

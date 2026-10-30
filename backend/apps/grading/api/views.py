@@ -19,7 +19,16 @@ from apps.identity.permissions import HasAPIPermissionCode
 from apps.institutions.models import GroupMembership
 
 from ..models import ManualGradingTask, Result
-from ..services import grade_manual_task, publish_result
+from ..services import (
+    approve_grade_suggestions,
+    build_essay_grading_batch,
+    bulk_grade_manual_tasks,
+    save_grade_suggestions,
+    grade_blank_answers_as_zero,
+    grade_manual_task,
+    grading_progress_by_question,
+    publish_result,
+)
 from .serializers import (
     ManualGradingTaskGradeSerializer,
     ManualGradingTaskSerializer,
@@ -347,6 +356,8 @@ class ManualGradingTaskViewSet(
                 "session__exam",
                 "session__exam__subject",
                 "session_question",
+                "session_question__question_revision",
+                "session_question__answer",
                 "manual_grade",
                 "manual_grade__graded_by",
             )
@@ -355,6 +366,13 @@ class ManualGradingTaskViewSet(
         status_filter = self.request.query_params.get("status")
         if status_filter:
             queryset = queryset.filter(status=status_filter)
+        # Cham theo cau: loc moi bai lam cua cung 1 vi tri cau (exam_item) hoac cung 1 cau hoi.
+        exam_item_id = self.request.query_params.get("exam_item")
+        if exam_item_id:
+            queryset = queryset.filter(session_question__exam_item_id=exam_item_id)
+        question_id = self.request.query_params.get("question")
+        if question_id:
+            queryset = queryset.filter(session_question__question_revision__question_id=question_id)
         exam_id = self.request.query_params.get("exam")
         if exam_id:
             queryset = queryset.filter(session__exam_id=exam_id)
@@ -367,6 +385,91 @@ class ManualGradingTaskViewSet(
                 | Q(session_question__question_revision__question_text__icontains=search)
             )
         return queryset
+
+    @action(detail=False, methods=["post"], url_path="bulk-grade")
+    def bulk_grade(self, request):
+        """Body: {"grades": [{"task_id": 1, "score_awarded": 2.5, "feedback": "..."}]} (toi da 200 bai)."""
+        grades = request.data.get("grades")
+        if not isinstance(grades, list) or not grades:
+            return Response({"detail": "grades must be a non-empty list."}, status=status.HTTP_400_BAD_REQUEST)
+        normalized = []
+        for item in grades:
+            if not isinstance(item, dict) or "task_id" not in item or "score_awarded" not in item:
+                return Response(
+                    {"detail": "Each grade needs task_id and score_awarded."}, status=status.HTTP_400_BAD_REQUEST
+                )
+            normalized.append(
+                {
+                    "task_id": int(item["task_id"]),
+                    "score_awarded": item["score_awarded"],
+                    "feedback": str(item.get("feedback", "")),
+                }
+            )
+        return Response(bulk_grade_manual_tasks(grades=normalized, grader=request.user, request=request))
+
+    @action(detail=False, methods=["post"], url_path="grade-blank")
+    def grade_blank(self, request):
+        """Cho 0 diem moi bai tu luan bo trong chua cham cua 1 de. Body: {"exam_id": 1, "feedback": "..."}"""
+        exam_id = request.data.get("exam_id")
+        if not exam_id:
+            return Response({"detail": "exam_id is required."}, status=status.HTTP_400_BAD_REQUEST)
+        feedback = str(request.data.get("feedback") or "Bỏ trống, không làm bài.")
+        return Response(
+            grade_blank_answers_as_zero(exam_id=exam_id, grader=request.user, feedback=feedback, request=request)
+        )
+
+    @action(detail=False, methods=["get"], url_path="essay-batch")
+    def essay_batch(self, request):
+        """Lo bai tu luan an danh cua 1 cau cho AI cham goi y: ?exam=&question=&limit=&include_suggested=."""
+        exam_id = request.query_params.get("exam")
+        if not exam_id:
+            return Response({"detail": "exam is required."}, status=status.HTTP_400_BAD_REQUEST)
+        question_id = request.query_params.get("question")
+        return Response(
+            build_essay_grading_batch(
+                exam_id=exam_id,
+                question_id=int(question_id) if question_id else None,
+                limit=request.query_params.get("limit") or 20,
+                include_suggested=str(request.query_params.get("include_suggested", "")).lower() in {"1", "true"},
+            )
+        )
+
+    @action(detail=False, methods=["post"], url_path="suggest")
+    def suggest(self, request):
+        """Body: {"source": "claude", "suggestions": [{"task_id", "score", "feedback", "rationale", "flags"}]}."""
+        suggestions = request.data.get("suggestions")
+        if not isinstance(suggestions, list) or not suggestions:
+            return Response({"detail": "suggestions must be a non-empty list."}, status=status.HTTP_400_BAD_REQUEST)
+        if any(not isinstance(item, dict) or "task_id" not in item or "score" not in item for item in suggestions):
+            return Response({"detail": "Each suggestion needs task_id and score."}, status=status.HTTP_400_BAD_REQUEST)
+        normalized = [{**item, "task_id": int(item["task_id"])} for item in suggestions]
+        return Response(
+            save_grade_suggestions(suggestions=normalized, user=request.user, source=request.data.get("source") or "ai")
+        )
+
+    @action(detail=False, methods=["post"], url_path="approve-suggestions")
+    def approve_suggestions(self, request):
+        """Giao vien duyet goi y thanh diem chinh thuc. Body: {"task_ids": [...], "include_flagged": false}."""
+        task_ids = request.data.get("task_ids")
+        if not isinstance(task_ids, list) or not task_ids:
+            return Response({"detail": "task_ids must be a non-empty list."}, status=status.HTTP_400_BAD_REQUEST)
+        include_flagged = str(request.data.get("include_flagged", "")).lower() in {"1", "true"}
+        return Response(
+            approve_grade_suggestions(
+                task_ids=[int(task_id) for task_id in task_ids],
+                grader=request.user,
+                include_flagged=include_flagged,
+                request=request,
+            )
+        )
+
+    @action(detail=False, methods=["get"], url_path="progress")
+    def progress(self, request):
+        """Tien do cham theo tung cau tu luan: ?exam=<id>."""
+        exam_id = request.query_params.get("exam")
+        if not exam_id:
+            return Response({"detail": "exam is required."}, status=status.HTTP_400_BAD_REQUEST)
+        return Response({"exam_id": int(exam_id), "questions": grading_progress_by_question(exam_id=exam_id)})
 
     @action(detail=True, methods=["post"])
     def grade(self, request, pk=None):

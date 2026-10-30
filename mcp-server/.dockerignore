@@ -1,0 +1,6 @@
+.venv/
+tests_mcp/
+__pycache__/
+*.egg-info/
+conftest.py
+pytest.ini

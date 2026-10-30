@@ -99,6 +99,13 @@ class ExamViewSet(viewsets.ModelViewSet):
         output = ExamReadSerializer(exam, context=self.get_serializer_context())
         return Response(output.data)
 
+    @action(detail=True, methods=["get"], url_path="quality-check")
+    def quality_check(self, request, pk=None):
+        """Kiem tra de: cau hoi loi, luat ngau nhien thieu cau, lich thi, phan cong thi sinh..."""
+        from ..quality import check_exam
+
+        return Response(check_exam(self.get_object()))
+
     @action(detail=True, methods=["post"])
     def clone(self, request, pk=None):
         exam = self.get_object()

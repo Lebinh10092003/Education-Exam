@@ -1,3 +1,4 @@
+from django.conf import settings
 from drf_spectacular.types import OpenApiTypes
 from drf_spectacular.utils import extend_schema_field
 from rest_framework import serializers
@@ -10,7 +11,7 @@ from apps.platform_core.i18n import t
 from apps.question_bank.models import QuestionOption
 
 from ..models import ExamSession, SessionAnswer, SessionQuestion
-from ..services import get_remaining_seconds
+from ..services import get_remaining_seconds, get_submission_deadline
 
 
 class CandidateExamSubjectSerializer(serializers.Serializer):
@@ -154,6 +155,9 @@ class CandidateExamSessionSerializer(serializers.ModelSerializer):
     total_questions = serializers.SerializerMethodField()
     questions = SessionQuestionSerializer(many=True, read_only=True)
     lifecycle_phase = serializers.SerializerMethodField()
+    submission_deadline = serializers.SerializerMethodField()
+    submission_grace_seconds = serializers.SerializerMethodField()
+    is_late = serializers.SerializerMethodField()
 
     class Meta:
         model = ExamSession
@@ -166,6 +170,9 @@ class CandidateExamSessionSerializer(serializers.ModelSerializer):
             "attempt_number",
             "started_at",
             "expires_at",
+            "submission_deadline",
+            "submission_grace_seconds",
+            "is_late",
             "submitted_at",
             "show_results_immediately",
             "enable_proctoring",
@@ -183,6 +190,19 @@ class CandidateExamSessionSerializer(serializers.ModelSerializer):
     @extend_schema_field(OpenApiTypes.INT)
     def get_remaining_seconds(self, obj):
         return get_remaining_seconds(obj)
+
+    @extend_schema_field(OpenApiTypes.DATETIME)
+    def get_submission_deadline(self, obj):
+        return get_submission_deadline(obj).isoformat()
+
+    @extend_schema_field(OpenApiTypes.INT)
+    def get_submission_grace_seconds(self, obj):
+        return max(int(getattr(settings, "EXAM_SUBMISSION_GRACE_SECONDS", 300) or 0), 0)
+
+    @extend_schema_field(OpenApiTypes.BOOL)
+    def get_is_late(self, obj):
+        submission = getattr(obj, "submission", None) if hasattr(obj, "submission") else None
+        return bool(getattr(submission, "is_late", False))
 
     def _prefetched_questions(self, obj):
         return getattr(obj, "_prefetched_objects_cache", {}).get("questions")
@@ -258,6 +278,8 @@ class AutosaveSnapshotSerializer(serializers.Serializer):
 
 
 class SessionSubmissionSummarySerializer(serializers.ModelSerializer):
+    is_late = serializers.SerializerMethodField()
+
     class Meta:
         model = ExamSession
         fields = (
@@ -267,7 +289,13 @@ class SessionSubmissionSummarySerializer(serializers.ModelSerializer):
             "objective_score",
             "max_score",
             "manual_grading_required",
+            "is_late",
         )
+
+    @extend_schema_field(OpenApiTypes.BOOL)
+    def get_is_late(self, obj):
+        submission = getattr(obj, "submission", None) if hasattr(obj, "submission") else None
+        return bool(getattr(submission, "is_late", False))
 
 
 class CandidateDashboardStatsSerializer(serializers.Serializer):

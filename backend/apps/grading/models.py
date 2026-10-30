@@ -32,8 +32,28 @@ class ManualGradingTask(TimeStampedModel):
     )
     graded_at = models.DateTimeField(null=True, blank=True)
 
+    # Diem GOI Y (vd. tu AI qua MCP). Chua phai diem chinh thuc: chi thanh diem khi giao vien duyet.
+    suggested_score = models.DecimalField(max_digits=8, decimal_places=2, null=True, blank=True)
+    suggested_feedback = models.TextField(blank=True)
+    suggestion_rationale = models.TextField(blank=True)
+    # Co can giao vien xem ky: low_confidence, off_topic, possible_copy, prompt_injection, unreadable...
+    suggestion_flags = models.JSONField(default=list, blank=True)
+    suggestion_source = models.CharField(max_length=64, blank=True)
+    suggested_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="suggested_manual_grades",
+    )
+    suggested_at = models.DateTimeField(null=True, blank=True)
+
     class Meta:
         ordering = ("status", "created_at")
+
+    @property
+    def has_suggestion(self):
+        return self.suggested_score is not None
 
     def __str__(self):
         return f"ManualGradingTask<{self.session_id}:{self.session_question_id}>"

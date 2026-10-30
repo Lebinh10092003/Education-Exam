@@ -199,3 +199,24 @@ class UserRole(TimeStampedModel):
 
     def __str__(self):
         return f"{self.user} -> {self.role}"
+
+
+class ApiToken(TimeStampedModel):
+    """
+    Ma truy cap ca nhan (personal access token) cho MCP/tich hop, thay mat khau.
+    Chi luu bang bam SHA-256; ma goc chi hien 1 lan khi tao. Thu hoi bang revoked_at.
+    """
+
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="api_tokens")
+    name = models.CharField(max_length=120)
+    key_prefix = models.CharField(max_length=24)
+    key_hash = models.CharField(max_length=64, unique=True)
+    expires_at = models.DateTimeField(null=True, blank=True)
+    last_used_at = models.DateTimeField(null=True, blank=True)
+    revoked_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ("-created_at",)
+
+    def __str__(self):
+        return f"ApiToken<{self.user_id}:{self.name}>"

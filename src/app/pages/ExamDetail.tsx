@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router";
 import {
+  ClipboardCheck,
   Clock,
   Copy,
   Download,
@@ -25,6 +26,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../components/ui/tabs";
 import { cn } from "../components/ui/utils";
 import { LiveMonitoring } from "./LiveMonitoring";
+import { ExamQualityCheckDialog } from "../components/ExamQualityCheckDialog";
 import { apiRequest, type PaginatedResponse } from "../lib/http";
 import { getStoredTokens } from "../lib/storage";
 import { buildApiUrl } from "../lib/env";
@@ -235,6 +237,7 @@ export function ExamDetail() {
     queryTab && queryTab !== "monitoring" ? queryTab : "details",
   );
   const [previewOpen, setPreviewOpen] = useState(false);
+  const [qualityCheckOpen, setQualityCheckOpen] = useState(false);
   const mutation = useMutationState();
 
   const examDetail = useAsyncList(
@@ -443,6 +446,9 @@ export function ExamDetail() {
 
   return (
     <div>
+      {!isClass ? (
+        <ExamQualityCheckDialog examId={exam.id} open={qualityCheckOpen} onOpenChange={setQualityCheckOpen} />
+      ) : null}
       <PageHeader
         title={exam.name}
         description={
@@ -453,6 +459,12 @@ export function ExamDetail() {
         }
         action={
           <div className="flex flex-wrap gap-2">
+            {!isClass ? (
+              <Button variant="outline" onClick={() => setQualityCheckOpen(true)}>
+                <ClipboardCheck className="mr-2 h-4 w-4" />
+                Kiểm tra đề
+              </Button>
+            ) : null}
             {!isClass && exam.current_version && (
               <Button variant="outline" onClick={() => setPreviewOpen(true)}>
                 <Eye className="mr-2 h-4 w-4" />
@@ -960,6 +972,12 @@ export function ExamDetail() {
             <CardTitle className="text-base">Quick Actions</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
+            {!isClass ? (
+              <Button variant="outline" className="w-full justify-start" onClick={() => setQualityCheckOpen(true)}>
+                <ClipboardCheck className="mr-2 h-4 w-4" />
+                Kiểm tra đề
+              </Button>
+            ) : null}
             {!isClass && exam.current_version && (
               <Button variant="outline" className="w-full justify-start" onClick={() => setPreviewOpen(true)}>
                 <Eye className="mr-2 h-4 w-4" />
