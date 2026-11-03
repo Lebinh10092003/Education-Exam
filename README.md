@@ -129,7 +129,7 @@ Write-Host ">>> HOÀN THÀNH! Dự án đã được chạy thành công." -Fore
 ```mermaid
 graph TD
     A[Vite + React Frontend] <-->|REST API / WebSockets| B[Django Backend API]
-    B <--> C[(SQLite Database)]
+    B <--> C[(PostgreSQL qua PgBouncer)]
     B <--> D[(Redis Broker / Cache)]
     A <-->|WebRTC Live Video| E[LiveKit Server]
     B <-->|Token Signing| E
@@ -174,6 +174,25 @@ cd backend
 cd backend
 .\.venv\Scripts\celery.exe -A config beat -l info
 ```
+
+---
+
+## ✅ Kiểm Thử (giống CI)
+
+```powershell
+# Frontend
+npm run typecheck
+npm test
+npm run build
+
+# Backend + MCP (dùng SQLite trong settings test, không cần Docker)
+cd backend
+.\.venv\Scripts\python.exe -m pytest -q
+cd ..\mcp-server
+..\backend\.venv\Scripts\python.exe -m pytest -q
+```
+
+Sau khi thêm/sửa API, sinh lại schema: `cd backend; .\.venv\Scripts\python.exe manage.py spectacular --file openapi.yaml`.
 
 ---
 

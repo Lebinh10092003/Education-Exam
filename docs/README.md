@@ -18,5 +18,5 @@ Bộ tài liệu này mô tả trạng thái hiện tại của hệ thống d�
 
 ## Ghi chú
 
-- Bộ tài liệu `docs/superpowers/plans` và `docs/superpowers/specs` đã được loại bỏ để tránh trùng lặp với tài liệu hiện trạng.
+- `docs/superpowers/plans` và `docs/superpowers/specs` là plan/spec lịch sử; toàn bộ các plan trong đó đã được triển khai. Trạng thái hiện tại xem ở hai tài liệu trên.
 - Nếu hệ thống tiếp tục thay đổi, cần cập nhật lại hai tài liệu trên thay vì tạo thêm các plan/spec rời trong `docs/`.

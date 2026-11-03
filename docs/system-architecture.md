@@ -14,8 +14,9 @@ Về mặt kỹ thuật, hệ thống đang chạy theo mô hình monolith tách
 - Realtime: Redis + Django Channels WebSocket.
 - Live webcam proctoring: LiveKit.
 - Tác vụ nền: Celery worker + Celery beat.
-- Lưu trữ dữ liệu: SQLite local mặc định, có thể mở rộng PostgreSQL.
-- Lưu trữ file: local media hoặc S3-compatible storage.
+- Lưu trữ dữ liệu: PostgreSQL qua PgBouncer (local bằng Docker Compose và production); chỉ rơi về SQLite khi không đặt `DATABASE_URL`.
+- Lưu trữ file: local media hoặc S3-compatible storage (MinIO local, Cloudflare R2 cho bằng chứng giám sát).
+- Tích hợp AI: MCP server (`mcp-server/`) gọi REST API bằng mã truy cập cá nhân (PAT).
 
 ## 2. Sơ đồ kiến trúc chạy thực tế
 
@@ -26,7 +27,7 @@ React/Vite frontend
   |- live media request -> Django -> LiveKit token/room
 
 Django backend
-  |- SQLite/PostgreSQL
+  |- PostgreSQL (qua PgBouncer)
   |- Redis (channel layer + Celery broker/result backend)
   |- Local media hoặc S3-compatible storage
   |- Celery worker/beat cho cleanup định kỳ
@@ -46,7 +47,10 @@ Education-Exam/
 |  |- config/              # cấu hình Django/ASGI/Celery/URL
 |  |- tests/               # test backend
 |  |- openapi.yaml         # schema API
-|  |- docker-compose.yml   # redis, postgres, minio, livekit
+|  |- docker-compose.yml   # postgres, pgbouncer, redis, minio, livekit
+|- mcp-server/             # MCP server cho trợ lý AI (stdio hoặc HTTP từ xa)
+|- deploy/                 # compose production, Caddy, TURN, backup/restore/rollback
+|- .github/workflows/      # CI: pytest backend + MCP, typecheck/test/build frontend
 |- docs/                   # tài liệu hệ thống hiện trạng
 |- README.md               # hướng dẫn setup và chạy local
 ```
@@ -56,7 +60,8 @@ Education-Exam/
 Frontend nằm ở `src/` và tổ chức theo hướng ứng dụng nghiệp vụ:
 
 - `src/app/App.tsx`: khởi tạo `ThemeProvider`, `AuthProvider`, router và bridge i18n cho UI cũ.
-- `src/app/routes.ts`: định nghĩa toàn bộ route của cổng quản trị và cổng thí sinh.
+- `src/app/routes.tsx`: định nghĩa toàn bộ route (trang công khai, cổng quản trị, cổng thí sinh), lazy-load từng trang.
+- `src/app/pages/take-exam/`: các thành phần tách ra từ màn hình làm bài (`TakeExam.tsx`).
 - `src/app/auth/`: quản lý đăng nhập, bootstrap phiên, profile, điều hướng theo vai trò.
 - `src/app/components/layouts/`: shell giao diện cho admin và candidate.
 - `src/app/pages/`: các màn hình nghiệp vụ chính.
@@ -66,22 +71,32 @@ Frontend nằm ở `src/` và tổ chức theo hướng ứng dụng nghiệp v�
 
 ### 4.1. Route frontend hiện tại
 
+#### Trang công khai
+
+- `/`: trang chủ cuộc thi (danh sách cuộc thi, tra cứu kết quả công khai)
+- `/register`: phiếu đăng ký dự thi
+- `/login`, `/forgot-password`, `/reset-password`: xác thực
+
 #### Cổng quản trị
 
-- `/`: dashboard
+- `/dashboard`: dashboard
 - `/users`: quản lý người dùng
 - `/groups`: nhóm thí sinh
+- `/groups/:id/members`: thành viên nhóm
 - `/subjects`: môn học
+- `/competitions`: cuộc thi và phiếu đăng ký dự thi
 - `/question-bank`: ngân hàng câu hỏi
 - `/exams`: danh sách kỳ thi/lớp học
 - `/exams/create`: tạo mới kỳ thi/lớp học
 - `/exams/:id`: chi tiết kỳ thi
 - `/exams/:id/edit`: chỉnh sửa kỳ thi
 - `/exams/:id/assign`: phân công/gán đối tượng
+- `/exams/:id/monitor`: chuyển hướng sang tab giám sát của chi tiết kỳ thi
 - `/exams/monitoring`: trung tâm giám sát
 - `/manual-grading`: chấm tự luận
 - `/materials`: thư viện tài liệu
 - `/results`: kết quả và báo cáo
+- `/results/:id/review`: xem lại bài làm của một kết quả
 - `/discipline`: kỷ luật và chứng chỉ
 - `/discipline/exams/:id`: bảng xử lý kỷ luật theo kỳ thi
 - `/roles-permissions`: vai trò và quyền
@@ -91,7 +106,7 @@ Frontend nằm ở `src/` và tổ chức theo hướng ứng dụng nghiệp v�
 
 #### Cổng thí sinh
 
-- `/candidate`: dashboard
+- `/candidate`, `/candidate/dashboard`: dashboard
 - `/candidate/exams`: bài thi của tôi
 - `/candidate/exams/:id/instructions`: hướng dẫn trước khi vào thi
 - `/candidate/exam/:id`: phiên làm bài thi
@@ -119,7 +134,7 @@ Backend là Django monolith chia theo app nghiệp vụ trong `backend/apps/`.
 
 ### 5.2. Các app nghiệp vụ
 
-- `identity`: user, profile, vai trò, quyền, đăng nhập JWT, quên mật khẩu, đổi mật khẩu, seed/reset demo data.
+- `identity`: user, profile, vai trò, quyền, đăng nhập JWT, mã truy cập cá nhân (PAT) cho MCP, quên mật khẩu, đổi mật khẩu, seed/reset demo data.
 - `institutions`: trường, nhóm thí sinh, thành viên nhóm.
 - `academics`: môn học.
 - `question_bank`: câu hỏi, tag, phiên bản câu hỏi, đáp án, import câu hỏi, lỗi import.
@@ -131,6 +146,7 @@ Backend là Django monolith chia theo app nghiệp vụ trong `backend/apps/`.
 - `materials`: tài liệu học tập.
 - `notifications`: thông báo người dùng và thao tác đã đọc/chưa đọc.
 - `practice`: phiên luyện tập, autosave luyện tập, review luyện tập, cleanup dữ liệu chi tiết hết hạn.
+- `competitions`: cuộc thi công khai trên trang chủ, phiếu đăng ký dự thi, duyệt và xuất danh sách đăng ký.
 
 ## 6. API và realtime
 
@@ -138,7 +154,7 @@ Backend là Django monolith chia theo app nghiệp vụ trong `backend/apps/`.
 
 Toàn bộ API đi qua tiền tố `api/v1/`. Các nhóm chính:
 
-- `auth/*`, `profile/*`
+- `auth/*`, `profile/*`, `api-tokens`
 - `users`, `roles`, `permissions`
 - `schools`, `groups`, `subjects`
 - `questions`, `question-tags`, `question-imports`
@@ -149,7 +165,11 @@ Toàn bộ API đi qua tiền tố `api/v1/`. Các nhóm chính:
 - `materials`, `my-materials`
 - `notifications/*`
 - `practice/*`
+- `competitions`, `competition-registrations`
+- Công khai (không cần đăng nhập): `public/competitions`, `public/competition-registrations`, `public-results/lookup`
 - `dashboard/overview`, `audit/events/*`, `health/*`
+
+Schema đầy đủ sinh tự động tại `/api/schema/` (Swagger `/api/docs/`) và được lưu lại ở `backend/openapi.yaml`. Test `tests/platform_core/test_schema.py` chạy `spectacular --fail-on-warn`, nên view mới phải khai báo được request/response.
 
 ### 6.2. WebSocket
 

@@ -33,6 +33,13 @@ Quyền truy cập thực tế được kiểm soát bởi RBAC ở backend, vì
 - Ghi nhận audit event cho các luồng xác thực, chấm bài, công bố kết quả, giám sát và phân công.
 - Có API thống kê audit summary và danh sách audit event.
 
+## 2A. Trang công khai (không cần đăng nhập)
+
+- Trang chủ giới thiệu các cuộc thi nổi bật, trạng thái sắp diễn ra/đang diễn ra/đã kết thúc và hạn đăng ký.
+- Nút đăng ký nhanh dẫn tới phiếu đăng ký đã chọn sẵn cuộc thi.
+- Phiếu đăng ký dự thi (`/register`) lưu vào backend, có giới hạn tần suất gửi.
+- Tra cứu kết quả đã công bố của kỳ thi đã đóng, theo tên đăng nhập hoặc theo họ tên + ngày sinh + số điện thoại.
+
 ## 3. Chức năng cổng quản trị
 
 ## 3.1. Dashboard
@@ -53,7 +60,8 @@ Quyền truy cập thực tế được kiểm soát bởi RBAC ở backend, vì
 
 - Quản lý môn học.
 - Quản lý nhóm thí sinh.
-- Quản lý thành viên nhóm.
+- Quản lý thành viên nhóm trên trang riêng, import danh sách bằng CSV.
+- Import tự nhận diện trường theo mã hoặc theo tên đã chuẩn hóa (bỏ dấu, gộp "TH"/"Tiểu học"...), tự tạo trường mới khi chưa có.
 - Liên kết người dùng với trường/nhóm phục vụ phân công thi và tài liệu.
 
 ## 3.4. Ngân hàng câu hỏi
@@ -111,8 +119,9 @@ Quyền truy cập thực tế được kiểm soát bởi RBAC ở backend, vì
 - Xem dữ liệu kết quả trực tiếp từ backend.
 - Xem phân bố điểm và thống kê kết quả.
 - Phân biệt trạng thái workflow và publish state.
-- Công bố kết quả cho thí sinh.
-- Xem báo cáo và xuất dữ liệu kết quả.
+- Công bố kết quả cho thí sinh, công bố hàng loạt hoặc hẹn giờ công bố.
+- Xem lại bài làm của từng kết quả và xuất file review.
+- Xem báo cáo và xuất dữ liệu kết quả (CSV/Excel, danh sách thí sinh chưa nộp).
 - Màn hình kết quả hiện rõ trạng thái đỗ/trượt đã hoàn tất.
 
 ## 3.11. Kỷ luật và chứng chỉ
@@ -148,6 +157,19 @@ Quyền truy cập thực tế được kiểm soát bởi RBAC ở backend, vì
 - Xem timeline audit event.
 - Xem summary theo nhóm sự kiện.
 - Rà soát các hành động liên quan đến auth, grading, results, proctoring và assignment.
+
+## 3.15. Cuộc thi và đăng ký dự thi
+
+- Tạo, sửa, ẩn cuộc thi hiển thị trên trang chủ (mã, kỳ, ngày thi, hạn đăng ký, link thông tin).
+- Không cho xóa cuộc thi đã có lượt đăng ký; chỉ cho ẩn.
+- Xem danh sách phiếu đăng ký, cập nhật trạng thái và ghi chú quản trị.
+- Xuất danh sách đăng ký ra Excel.
+
+## 3.16. Kết nối AI (MCP)
+
+- Quản trị viên tạo/thu hồi mã truy cập cá nhân (PAT) tại Hồ sơ → Kết nối AI (MCP); server chỉ lưu bản băm.
+- MCP server cho phép trợ lý AI import/kiểm tra câu hỏi, kiểm tra đề, chấm tự luận hàng loạt, theo dõi phòng thi trong phạm vi quyền của tài khoản.
+- Chạy cục bộ (stdio) hoặc từ xa qua HTTP với header `Authorization: Bearer <PAT>`; chế độ `full`/`no-admin`/`readonly`.
 
 ## 4. Chức năng cổng thí sinh
 
