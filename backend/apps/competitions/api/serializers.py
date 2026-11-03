@@ -38,10 +38,10 @@ class CompetitionSerializer(serializers.ModelSerializer):
         )
         read_only_fields = ("created_at", "updated_at")
 
-    def get_status(self, obj):
+    def get_status(self, obj) -> str:
         return obj.status_on()
 
-    def get_accepts_registration(self, obj):
+    def get_accepts_registration(self, obj) -> bool:
         return obj.accepts_registration_on()
 
     def validate(self, attrs):
@@ -144,7 +144,7 @@ class RegistrationSerializer(serializers.ModelSerializer):
             "created_at",
         )
 
-    def get_competitions(self, obj):
+    def get_competitions(self, obj) -> list[dict]:
         return [{"id": c.id, "code": c.code, "name": c.name, "cycle": c.cycle} for c in obj.competitions.all()]
 
 

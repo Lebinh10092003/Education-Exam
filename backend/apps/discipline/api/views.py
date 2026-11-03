@@ -1,6 +1,9 @@
 from django.http import HttpResponse
 from django.contrib.auth import get_user_model
 from django.db.models import Max, Q
+from drf_spectacular.types import OpenApiTypes
+from drf_spectacular.utils import extend_schema, inline_serializer
+from rest_framework import serializers as drf_serializers
 from rest_framework import generics, status
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
@@ -32,6 +35,14 @@ from .serializers import (
     DisciplinaryExamSummarySerializer,
     ExamDisciplinaryRecordSerializer,
     PenaltyProposalMutationSerializer,
+)
+
+
+XLSX_CONTENT_TYPE = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+XLSX_SCHEMA_RESPONSE = {(200, XLSX_CONTENT_TYPE): OpenApiTypes.BINARY}
+PROPOSAL_STATUS_RESPONSE = inline_serializer(
+    name="PenaltyProposalStatusResponse",
+    fields={"status": drf_serializers.CharField()},
 )
 
 
@@ -132,6 +143,13 @@ class CasePenaltyProposalView(APIView):
     permission_classes = [IsAuthenticated, HasAPIPermissionCode]
     permission_code = "discipline.manage"
 
+    @extend_schema(
+        request=PenaltyProposalMutationSerializer,
+        responses=inline_serializer(
+            name="PenaltyProposalResponse",
+            fields={"id": drf_serializers.IntegerField(), "status": drf_serializers.CharField()},
+        ),
+    )
     def post(self, request, case_id):
         case = generics.get_object_or_404(ViolationCase.objects.select_related("session", "session__exam", "session__candidate"), pk=case_id)
         serializer = PenaltyProposalMutationSerializer(data=request.data)
@@ -150,6 +168,7 @@ class CasePenaltyApproveView(APIView):
     permission_classes = [IsAuthenticated, HasAPIPermissionCode]
     permission_code = "discipline.manage"
 
+    @extend_schema(request=PenaltyProposalMutationSerializer, responses=PROPOSAL_STATUS_RESPONSE)
     def post(self, request, case_id):
         case = generics.get_object_or_404(
             ViolationCase.objects.select_related("penalty_proposal", "session", "session__exam", "session__candidate"),
@@ -184,6 +203,7 @@ class CasePenaltyRejectView(APIView):
     permission_classes = [IsAuthenticated, HasAPIPermissionCode]
     permission_code = "discipline.manage"
 
+    @extend_schema(request=None, responses=PROPOSAL_STATUS_RESPONSE)
     def post(self, request, case_id):
         case = generics.get_object_or_404(ViolationCase.objects.select_related("penalty_proposal"), pk=case_id)
         proposal = getattr(case, "penalty_proposal", None)
@@ -205,6 +225,7 @@ class CasePenaltyNoPenaltyView(APIView):
     permission_classes = [IsAuthenticated, HasAPIPermissionCode]
     permission_code = "discipline.manage"
 
+    @extend_schema(request=None, responses=PROPOSAL_STATUS_RESPONSE)
     def post(self, request, case_id):
         case = generics.get_object_or_404(ViolationCase.objects.select_related("penalty_proposal"), pk=case_id)
         proposal = getattr(case, "penalty_proposal", None)
@@ -224,6 +245,13 @@ class DisciplineExamBulkApplyView(APIView):
     permission_classes = [IsAuthenticated, HasAPIPermissionCode]
     permission_code = "discipline.manage"
 
+    @extend_schema(
+        request=BulkPenaltyActionSerializer,
+        responses=inline_serializer(
+            name="BulkPenaltyActionResponse",
+            fields={"processed_count": drf_serializers.IntegerField()},
+        ),
+    )
     def post(self, request, exam_id):
         exam = _get_exam_or_404(exam_id)
         serializer = BulkPenaltyActionSerializer(data=request.data)
@@ -273,6 +301,7 @@ class ExamCertificatePolicyView(APIView):
     permission_classes = [IsAuthenticated, HasAPIPermissionCode]
     permission_code = "discipline.manage"
 
+    @extend_schema(request=CertificatePolicySerializer, responses=CertificatePolicySerializer)
     def put(self, request, exam_id):
         exam = _get_exam_or_404(exam_id)
         serializer = CertificatePolicySerializer(data=request.data)
@@ -284,6 +313,7 @@ class ExamCertificatePolicyView(APIView):
         recompute_exam_certificates(exam=exam, triggered_by=request.user, request=request)
         return Response(CertificatePolicySerializer(policy).data)
 
+    @extend_schema(responses=CertificatePolicySerializer)
     def get(self, request, exam_id):
         exam = _get_exam_or_404(exam_id)
         policy = getattr(exam, "certificate_policy", None)
@@ -304,6 +334,13 @@ class ExamCertificateRecomputeView(APIView):
     permission_classes = [IsAuthenticated, HasAPIPermissionCode]
     permission_code = "discipline.manage"
 
+    @extend_schema(
+        request=None,
+        responses=inline_serializer(
+            name="CertificateRecomputeResponse",
+            fields={"award_count": drf_serializers.IntegerField()},
+        ),
+    )
     def post(self, request, exam_id):
         exam = _get_exam_or_404(exam_id)
         awards = recompute_exam_certificates(exam=exam, triggered_by=request.user, request=request)
@@ -314,6 +351,7 @@ class DisciplineExamExportView(APIView):
     permission_classes = [IsAuthenticated, HasAPIPermissionCode]
     permission_code = "discipline.view"
 
+    @extend_schema(responses=XLSX_SCHEMA_RESPONSE)
     def get(self, request, exam_id):
         exam = _get_exam_or_404(exam_id)
         records = (
@@ -324,7 +362,7 @@ class DisciplineExamExportView(APIView):
         workbook = build_disciplinary_summary_workbook(records)
         response = HttpResponse(
             serialize_workbook(workbook),
-            content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            content_type=XLSX_CONTENT_TYPE,
         )
         response["Content-Disposition"] = f'attachment; filename="eduexam-discipline-summary-exam-{exam.id}.xlsx"'
         return response
@@ -334,6 +372,7 @@ class DisciplineExamCaseExportView(APIView):
     permission_classes = [IsAuthenticated, HasAPIPermissionCode]
     permission_code = "discipline.view"
 
+    @extend_schema(responses=XLSX_SCHEMA_RESPONSE)
     def get(self, request, exam_id):
         exam = _get_exam_or_404(exam_id)
         cases = (
@@ -352,7 +391,7 @@ class DisciplineExamCaseExportView(APIView):
         workbook = build_disciplinary_case_workbook(cases)
         response = HttpResponse(
             serialize_workbook(workbook),
-            content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            content_type=XLSX_CONTENT_TYPE,
         )
         response["Content-Disposition"] = f'attachment; filename="eduexam-discipline-cases-exam-{exam.id}.xlsx"'
         return response

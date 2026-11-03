@@ -173,7 +173,7 @@ class ExamMonitoringHubItemSerializer(serializers.Serializer):
     latest_alert_at = serializers.DateTimeField(allow_null=True)
     highest_alert_severity = serializers.SerializerMethodField()
 
-    def get_highest_alert_severity(self, obj):
+    def get_highest_alert_severity(self, obj) -> str:
         if obj.critical_alert_count:
             return "critical"
         if obj.alert_count:

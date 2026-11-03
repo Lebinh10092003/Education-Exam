@@ -22,7 +22,7 @@ class ApiTokenSerializer(serializers.ModelSerializer):
         model = ApiToken
         fields = ("id", "name", "key_prefix", "created_at", "expires_at", "last_used_at", "revoked_at", "is_active")
 
-    def get_is_active(self, obj):
+    def get_is_active(self, obj) -> bool:
         from django.utils import timezone
 
         return obj.revoked_at is None and (obj.expires_at is None or obj.expires_at > timezone.now())
@@ -42,6 +42,9 @@ class ApiTokenViewSet(mixins.ListModelMixin, mixins.DestroyModelMixin, viewsets.
     pagination_class = None
 
     def get_queryset(self):
+        # drf-spectacular sinh schema voi AnonymousUser; tra ve rong de lay kieu cua path param.
+        if getattr(self, "swagger_fake_view", False):
+            return ApiToken.objects.none()
         return ApiToken.objects.filter(user=self.request.user).order_by("-created_at")
 
     def create(self, request):

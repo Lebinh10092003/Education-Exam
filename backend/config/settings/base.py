@@ -336,6 +336,7 @@ SPECTACULAR_SETTINGS = {
         "QuestionImportBatchStatusEnum": "apps.question_bank.models.QuestionImportBatch.Status",
         "QuestionImportSourceFormatEnum": "apps.question_bank.models.QuestionImportBatch.SourceFormat",
         "ExamStatusEnum": "apps.exam_authoring.models.Exam.Status",
+        "ExamModeEnum": "apps.exam_authoring.models.Exam.Mode",
         "ExamItemSourceEnum": "apps.exam_authoring.models.ExamItem.Source",
         "ExamSessionStatusEnum": "apps.exam_delivery.models.ExamSession.Status",
         "SubmissionSourceEnum": "apps.exam_delivery.models.Submission.Source",

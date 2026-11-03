@@ -68,21 +68,21 @@ class ExamDisciplinaryRecordSerializer(serializers.ModelSerializer):
             "updated_at",
         )
 
-    def get_candidate(self, obj):
+    def get_candidate(self, obj) -> dict:
         return {
             "id": obj.candidate_id,
             "email": obj.candidate.email,
             "full_name": obj.candidate.full_name,
         }
 
-    def get_exam(self, obj):
+    def get_exam(self, obj) -> dict:
         return {
             "id": obj.exam_id,
             "name": obj.exam.name,
             "subject_name": obj.exam.subject.name,
         }
 
-    def get_review_status(self, obj):
+    def get_review_status(self, obj) -> str:
         if obj.highest_approved_penalty_percent > 0:
             return "penalty_applied"
         if obj.unique_case_count == 0:
@@ -110,10 +110,10 @@ class DisciplinaryCaseSerializer(serializers.Serializer):
     evidence_count = serializers.SerializerMethodField()
     proposal = ViolationPenaltyProposalSerializer(source="penalty_proposal", allow_null=True, read_only=True)
 
-    def get_evidence_count(self, obj):
+    def get_evidence_count(self, obj) -> int:
         return obj.evidences.count()
 
-    def get_exam(self, obj):
+    def get_exam(self, obj) -> dict:
         exam = obj.session.exam
         return {
             "id": exam.id,
@@ -121,10 +121,10 @@ class DisciplinaryCaseSerializer(serializers.Serializer):
             "subject_name": exam.subject.name,
         }
 
-    def get_title(self, obj):
+    def get_title(self, obj) -> str:
         return localize_discipline_case_title(obj.title)
 
-    def get_summary(self, obj):
+    def get_summary(self, obj) -> str:
         return localize_discipline_case_summary(obj.summary)
 
 

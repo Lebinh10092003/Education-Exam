@@ -3,8 +3,10 @@ from io import BytesIO
 from django.db.models import Count, Q
 from django.http import HttpResponse
 from django.utils import timezone
+from drf_spectacular.types import OpenApiTypes
+from drf_spectacular.utils import OpenApiParameter, extend_schema, inline_serializer
 from openpyxl import Workbook
-from rest_framework import mixins, status, viewsets
+from rest_framework import mixins, serializers, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
@@ -45,6 +47,13 @@ class PublicCompetitionListView(APIView):
     permission_classes = [AllowAny]
     authentication_classes = []
 
+    @extend_schema(
+        parameters=[
+            OpenApiParameter("all", OpenApiTypes.STR, description="1/true: lay tat ca thay vi chi cuoc thi noi bat."),
+            OpenApiParameter("ended_limit", OpenApiTypes.INT, description="So cuoc thi da ket thuc toi da (mac dinh 6)."),
+        ],
+        responses=PublicCompetitionSerializer(many=True),
+    )
     def get(self, request):
         featured_only = request.query_params.get("all") not in {"1", "true"}
         today = timezone.localdate()
@@ -79,6 +88,19 @@ class PublicRegistrationCreateView(APIView):
     throttle_classes = [ScopedRateThrottle]
     throttle_scope = "competition_registration"
 
+    @extend_schema(
+        request=RegistrationCreateSerializer,
+        responses={
+            201: inline_serializer(
+                name="PublicRegistrationCreateResponse",
+                fields={
+                    "id": serializers.IntegerField(),
+                    "status": serializers.CharField(),
+                    "competitions": serializers.ListField(child=serializers.CharField()),
+                },
+            )
+        },
+    )
     def post(self, request):
         serializer = RegistrationCreateSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)

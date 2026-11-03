@@ -5,6 +5,7 @@ import secrets
 from datetime import timedelta
 
 from django.utils import timezone
+from drf_spectacular.extensions import OpenApiAuthenticationExtension
 from rest_framework import authentication, exceptions
 
 from .models import ApiToken
@@ -66,3 +67,17 @@ class ApiTokenAuthentication(authentication.BaseAuthentication):
 
     def authenticate_header(self, request):
         return self.keyword
+
+
+class ApiTokenAuthenticationScheme(OpenApiAuthenticationExtension):
+    """Khai bao PAT trong OpenAPI de Swagger hien dung kieu xac thuc."""
+
+    target_class = "apps.identity.api_tokens.ApiTokenAuthentication"
+    name = "apiTokenAuth"
+
+    def get_security_definition(self, auto_schema):
+        return {
+            "type": "http",
+            "scheme": "bearer",
+            "description": f"Ma truy cap ca nhan dang `{TOKEN_PREFIX}...` (dung cho MCP).",
+        }

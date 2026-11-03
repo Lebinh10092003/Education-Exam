@@ -1,9 +1,9 @@
 from drf_spectacular.types import OpenApiTypes
 from django.http import HttpResponse
 from django.shortcuts import get_object_or_404
-from drf_spectacular.utils import extend_schema
+from drf_spectacular.utils import extend_schema, inline_serializer
 from rest_framework import generics
-from rest_framework import mixins, status, viewsets
+from rest_framework import mixins, serializers, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.parsers import FormParser, MultiPartParser
 from rest_framework.permissions import IsAuthenticated
@@ -214,6 +214,10 @@ class CandidateSessionEvidenceMockUploadView(APIView):
             
     parser_classes = [PlainBinaryParser]
 
+    @extend_schema(
+        request={"application/octet-stream": OpenApiTypes.BINARY},
+        responses=inline_serializer(name="EvidenceUploadResponse", fields={"status": serializers.CharField()}),
+    )
     def put(self, request, session_id):
         from django.conf import settings
         from django.core.files.base import ContentFile
@@ -252,7 +256,7 @@ class CandidateSessionEvidenceMockUploadView(APIView):
 class CandidateSessionMediaPublishTokenView(APIView):
     permission_classes = [IsAuthenticated]
 
-    @extend_schema(responses={status.HTTP_200_OK: MediaProviderTokenSerializer})
+    @extend_schema(request=None, responses={status.HTTP_200_OK: MediaProviderTokenSerializer})
     def post(self, request, session_id):
         session = _get_candidate_session(session_id, request.user)
         payload = issue_candidate_publish_token(session=session, user=request.user)
@@ -281,7 +285,7 @@ class AdminSessionMediaViewTokenView(APIView):
     permission_classes = [IsAuthenticated, HasAPIPermissionCode]
     permission_code = "proctoring.view"
 
-    @extend_schema(responses={status.HTTP_200_OK: MediaProviderTokenSerializer})
+    @extend_schema(request=None, responses={status.HTTP_200_OK: MediaProviderTokenSerializer})
     def post(self, request, session_id):
         assert_admin_monitoring_access(user=request.user)
         session = get_object_or_404(
