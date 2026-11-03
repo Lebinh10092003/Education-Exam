@@ -36,6 +36,7 @@ import { Card, CardContent } from "../components/ui/card";
 import { Input } from "../components/ui/input";
 import { Label } from "../components/ui/label";
 import { COMPETITION_STATUS_STYLES } from "../lib/competitionStatus";
+import { apiRequest, type PaginatedResponse } from "../lib/http";
 import {
   daysUntil,
   fetchPublicCompetitions,
@@ -275,6 +276,7 @@ export function LandingPage() {
 
     try {
       const data = await apiRequest<PaginatedResponse<PublicResultRecord>>("/api/v1/public-results/lookup/", {
+        auth: false,
         query: queryParams,
       });
       setResults(data.results ?? []);

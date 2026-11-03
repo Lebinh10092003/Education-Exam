@@ -1,5 +1,6 @@
 import "@testing-library/jest-dom/vitest";
-import { vi } from "vitest";
+import { cleanup } from "@testing-library/react";
+import { afterEach, vi } from "vitest";
 import "../app/i18n";
 
 if (typeof window !== "undefined") {
@@ -30,3 +31,8 @@ if (typeof window !== "undefined") {
     value: ResizeObserverMock,
   });
 }
+
+// Vitest chay khong bat globals nen Testing Library khong tu cleanup; go DOM sau moi test.
+afterEach(() => {
+  cleanup();
+});

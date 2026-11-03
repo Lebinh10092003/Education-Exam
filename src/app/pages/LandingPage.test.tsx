@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import type { ContextType } from "react";
 import { MemoryRouter } from "react-router";
 import { ThemeProvider } from "next-themes";
@@ -12,6 +12,12 @@ const mockFetchCompetitions = vi.fn();
 vi.mock("../lib/competitions", async () => {
   const actual = await vi.importActual<typeof import("../lib/competitions")>("../lib/competitions");
   return { ...actual, fetchPublicCompetitions: () => mockFetchCompetitions() };
+});
+
+const mockApiRequest = vi.fn();
+vi.mock("../lib/http", async () => {
+  const actual = await vi.importActual<typeof import("../lib/http")>("../lib/http");
+  return { ...actual, apiRequest: (...args: unknown[]) => mockApiRequest(...args) };
 });
 
 type AuthContextValue = NonNullable<ContextType<typeof AuthContext>>;
@@ -88,5 +94,28 @@ describe("LandingPage", () => {
     quickLinks.forEach((link) => expect(link).toHaveAttribute("href", "/register?competition=7"));
     expect(screen.getAllByText(/Còn \d+ ngày/).length).toBeGreaterThan(0);
     expect(screen.getAllByRole("button", { name: "Tra cứu kết quả" }).length).toBeGreaterThan(0);
+  });
+
+  it("looks up published results by username without sending auth", async () => {
+    await i18n.changeLanguage("vi");
+    mockApiRequest.mockReset();
+    mockApiRequest.mockResolvedValue({
+      count: 1, next: null, previous: null,
+      results: [{
+        id: 1, candidate_name: "Nguyễn Văn A", exam_name: "Kỳ thi thử", subject_name: "Toán",
+        score: "8.00", max_score: "10.00", percentage: "80.00", passed: true, completed_date: "2026-06-01",
+      }],
+    });
+
+    const { container } = renderLandingPage();
+
+    fireEvent.change(container.querySelector("#lookup-username")!, { target: { value: "candidate01" } });
+    fireEvent.submit(container.querySelector("#lookup-username")!.closest("form")!);
+
+    expect(await screen.findByText("Nguyễn Văn A")).toBeInTheDocument();
+    expect(mockApiRequest).toHaveBeenCalledWith("/api/v1/public-results/lookup/", {
+      auth: false,
+      query: { type: "username", username: "candidate01" },
+    });
   });
 });

@@ -52,6 +52,69 @@ paths:
                 type: object
                 additionalProperties: {}
           description: ''
+  /api/v1/api-tokens/:
+    get:
+      operationId: api_v1_api_tokens_list
+      description: Ma truy cap MCP cua CHINH tai khoan dang dang nhap (khong xem/thu
+        hoi duoc ma cua nguoi khac).
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ApiToken'
+          description: ''
+    post:
+      operationId: api_v1_api_tokens_create
+      description: Ma truy cap MCP cua CHINH tai khoan dang dang nhap (khong xem/thu
+        hoi duoc ma cua nguoi khac).
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiToken'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/ApiToken'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/ApiToken'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiToken'
+          description: ''
+  /api/v1/api-tokens/{id}/:
+    delete:
+      operationId: api_v1_api_tokens_destroy
+      description: Ma truy cap MCP cua CHINH tai khoan dang dang nhap (khong xem/thu
+        hoi duoc ma cua nguoi khac).
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+        required: true
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '204':
+          description: No response body
   /api/v1/audit/events/:
     get:
       operationId: api_v1_audit_events_list
@@ -60,6 +123,12 @@ paths:
         required: false
         in: query
         description: A page number within the paginated result set.
+        schema:
+          type: integer
+      - name: page_size
+        required: false
+        in: query
+        description: Number of results to return per page.
         schema:
           type: integer
       tags:
@@ -185,6 +254,251 @@ paths:
       responses:
         '200':
           description: No response body
+  /api/v1/competition-registrations/:
+    get:
+      operationId: api_v1_competition_registrations_list
+      parameters:
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      - name: page_size
+        required: false
+        in: query
+        description: Number of results to return per page.
+        schema:
+          type: integer
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedRegistrationList'
+          description: ''
+  /api/v1/competition-registrations/{id}/:
+    get:
+      operationId: api_v1_competition_registrations_retrieve
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this competition registration.
+        required: true
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Registration'
+          description: ''
+    patch:
+      operationId: api_v1_competition_registrations_partial_update
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this competition registration.
+        required: true
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedRegistration'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedRegistration'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedRegistration'
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Registration'
+          description: ''
+  /api/v1/competition-registrations/export/:
+    get:
+      operationId: api_v1_competition_registrations_export_retrieve
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Registration'
+          description: ''
+  /api/v1/competitions/:
+    get:
+      operationId: api_v1_competitions_list
+      parameters:
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      - name: page_size
+        required: false
+        in: query
+        description: Number of results to return per page.
+        schema:
+          type: integer
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedCompetitionList'
+          description: ''
+    post:
+      operationId: api_v1_competitions_create
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Competition'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/Competition'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/Competition'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Competition'
+          description: ''
+  /api/v1/competitions/{id}/:
+    get:
+      operationId: api_v1_competitions_retrieve
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this competition.
+        required: true
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Competition'
+          description: ''
+    put:
+      operationId: api_v1_competitions_update
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this competition.
+        required: true
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Competition'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/Competition'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/Competition'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Competition'
+          description: ''
+    patch:
+      operationId: api_v1_competitions_partial_update
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this competition.
+        required: true
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedCompetition'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedCompetition'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedCompetition'
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Competition'
+          description: ''
+    delete:
+      operationId: api_v1_competitions_destroy
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this competition.
+        required: true
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '204':
+          description: No response body
   /api/v1/dashboard/overview/:
     get:
       operationId: api_v1_dashboard_overview_retrieve
@@ -198,6 +512,243 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/DashboardOverview'
+          description: ''
+  /api/v1/discipline/cases/{case_id}/approve/:
+    post:
+      operationId: api_v1_discipline_cases_approve_create
+      parameters:
+      - in: path
+        name: case_id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          description: No response body
+  /api/v1/discipline/cases/{case_id}/no-penalty/:
+    post:
+      operationId: api_v1_discipline_cases_no_penalty_create
+      parameters:
+      - in: path
+        name: case_id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          description: No response body
+  /api/v1/discipline/cases/{case_id}/proposal/:
+    post:
+      operationId: api_v1_discipline_cases_proposal_create
+      parameters:
+      - in: path
+        name: case_id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          description: No response body
+  /api/v1/discipline/cases/{case_id}/reject/:
+    post:
+      operationId: api_v1_discipline_cases_reject_create
+      parameters:
+      - in: path
+        name: case_id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          description: No response body
+  /api/v1/discipline/exams/:
+    get:
+      operationId: api_v1_discipline_exams_retrieve
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DisciplinaryExamSummary'
+          description: ''
+  /api/v1/discipline/exams/{exam_id}/bulk-apply/:
+    post:
+      operationId: api_v1_discipline_exams_bulk_apply_create
+      parameters:
+      - in: path
+        name: exam_id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          description: No response body
+  /api/v1/discipline/exams/{exam_id}/cases/:
+    get:
+      operationId: api_v1_discipline_exams_cases_list
+      parameters:
+      - in: path
+        name: exam_id
+        schema:
+          type: integer
+        required: true
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      - name: page_size
+        required: false
+        in: query
+        description: Number of results to return per page.
+        schema:
+          type: integer
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedDisciplinaryCaseList'
+          description: ''
+  /api/v1/discipline/exams/{exam_id}/cases/export/:
+    get:
+      operationId: api_v1_discipline_exams_cases_export_retrieve
+      parameters:
+      - in: path
+        name: exam_id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          description: No response body
+  /api/v1/discipline/exams/{exam_id}/certificate-policy/:
+    get:
+      operationId: api_v1_discipline_exams_certificate_policy_retrieve
+      parameters:
+      - in: path
+        name: exam_id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          description: No response body
+    put:
+      operationId: api_v1_discipline_exams_certificate_policy_update
+      parameters:
+      - in: path
+        name: exam_id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          description: No response body
+  /api/v1/discipline/exams/{exam_id}/certificate-recompute/:
+    post:
+      operationId: api_v1_discipline_exams_certificate_recompute_create
+      parameters:
+      - in: path
+        name: exam_id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          description: No response body
+  /api/v1/discipline/exams/{exam_id}/export/:
+    get:
+      operationId: api_v1_discipline_exams_export_retrieve
+      parameters:
+      - in: path
+        name: exam_id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          description: No response body
+  /api/v1/discipline/exams/{exam_id}/records/:
+    get:
+      operationId: api_v1_discipline_exams_records_list
+      parameters:
+      - in: path
+        name: exam_id
+        schema:
+          type: integer
+        required: true
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      - name: page_size
+        required: false
+        in: query
+        description: Number of results to return per page.
+        schema:
+          type: integer
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedExamDisciplinaryRecordList'
           description: ''
   /api/v1/exam-sessions/{id}/:
     get:
@@ -330,6 +881,12 @@ paths:
         required: false
         in: query
         description: A page number within the paginated result set.
+        schema:
+          type: integer
+      - name: page_size
+        required: false
+        in: query
+        description: Number of results to return per page.
         schema:
           type: integer
       tags:
@@ -552,6 +1109,53 @@ paths:
               schema:
                 $ref: '#/components/schemas/ExamRead'
           description: ''
+  /api/v1/exams/{id}/preview/:
+    get:
+      operationId: api_v1_exams_preview_retrieve
+      description: |-
+        Xem truoc de nhu thi sinh lam bai (kem dap an/barem de nguoi ra de soat).
+        Chi danh cho quyen exams.view - KHONG dung cho phia thi sinh.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this exam.
+        required: true
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExamRead'
+          description: ''
+  /api/v1/exams/{id}/quality-check/:
+    get:
+      operationId: api_v1_exams_quality_check_retrieve
+      description: 'Kiem tra de: cau hoi loi, luat ngau nhien thieu cau, lich thi,
+        phan cong thi sinh...'
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this exam.
+        required: true
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExamRead'
+          description: ''
   /api/v1/exams/{id}/start-session/:
     post:
       operationId: api_v1_exams_start_session_create
@@ -610,6 +1214,12 @@ paths:
         required: false
         in: query
         description: A page number within the paginated result set.
+        schema:
+          type: integer
+      - name: page_size
+        required: false
+        in: query
+        description: Number of results to return per page.
         schema:
           type: integer
       tags:
@@ -676,6 +1286,144 @@ paths:
               schema:
                 $ref: '#/components/schemas/ManualGradingTask'
           description: ''
+  /api/v1/grading/tasks/approve-suggestions/:
+    post:
+      operationId: api_v1_grading_tasks_approve_suggestions_create
+      description: 'Giao vien duyet goi y thanh diem chinh thuc. Body: {"task_ids":
+        [...], "include_flagged": false}.'
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ManualGradingTask'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/ManualGradingTask'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/ManualGradingTask'
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ManualGradingTask'
+          description: ''
+  /api/v1/grading/tasks/bulk-grade/:
+    post:
+      operationId: api_v1_grading_tasks_bulk_grade_create
+      description: 'Body: {"grades": [{"task_id": 1, "score_awarded": 2.5, "feedback":
+        "..."}]} (toi da 200 bai).'
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ManualGradingTask'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/ManualGradingTask'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/ManualGradingTask'
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ManualGradingTask'
+          description: ''
+  /api/v1/grading/tasks/essay-batch/:
+    get:
+      operationId: api_v1_grading_tasks_essay_batch_retrieve
+      description: 'Lo bai tu luan an danh cua 1 cau cho AI cham goi y: ?exam=&question=&limit=&include_suggested=.'
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ManualGradingTask'
+          description: ''
+  /api/v1/grading/tasks/grade-blank/:
+    post:
+      operationId: api_v1_grading_tasks_grade_blank_create
+      description: 'Cho 0 diem moi bai tu luan bo trong chua cham cua 1 de. Body:
+        {"exam_id": 1, "feedback": "..."}'
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ManualGradingTask'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/ManualGradingTask'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/ManualGradingTask'
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ManualGradingTask'
+          description: ''
+  /api/v1/grading/tasks/progress/:
+    get:
+      operationId: api_v1_grading_tasks_progress_retrieve
+      description: 'Tien do cham theo tung cau tu luan: ?exam=<id>.'
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ManualGradingTask'
+          description: ''
+  /api/v1/grading/tasks/suggest/:
+    post:
+      operationId: api_v1_grading_tasks_suggest_create
+      description: 'Body: {"source": "claude", "suggestions": [{"task_id", "score",
+        "feedback", "rationale", "flags"}]}.'
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ManualGradingTask'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/ManualGradingTask'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/ManualGradingTask'
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ManualGradingTask'
+          description: ''
   /api/v1/groups/:
     get:
       operationId: api_v1_groups_list
@@ -684,6 +1432,12 @@ paths:
         required: false
         in: query
         description: A page number within the paginated result set.
+        schema:
+          type: integer
+      - name: page_size
+        required: false
+        in: query
+        description: Number of results to return per page.
         schema:
           type: integer
       tags:
@@ -875,6 +1629,22 @@ paths:
               schema:
                 $ref: '#/components/schemas/CandidateGroup'
           description: ''
+    delete:
+      operationId: api_v1_groups_memberships_destroy
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this candidate group.
+        required: true
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '204':
+          description: No response body
   /api/v1/groups/{id}/memberships/import/:
     post:
       operationId: api_v1_groups_memberships_import_create
@@ -928,6 +1698,12 @@ paths:
         required: false
         in: query
         description: A page number within the paginated result set.
+        schema:
+          type: integer
+      - name: page_size
+        required: false
+        in: query
+        description: Number of results to return per page.
         schema:
           type: integer
       tags:
@@ -1102,6 +1878,12 @@ paths:
         description: A page number within the paginated result set.
         schema:
           type: integer
+      - name: page_size
+        required: false
+        in: query
+        description: Number of results to return per page.
+        schema:
+          type: integer
       tags:
       - api
       security:
@@ -1121,6 +1903,12 @@ paths:
         required: false
         in: query
         description: A page number within the paginated result set.
+        schema:
+          type: integer
+      - name: page_size
+        required: false
+        in: query
+        description: Number of results to return per page.
         schema:
           type: integer
       tags:
@@ -1144,6 +1932,12 @@ paths:
         description: A page number within the paginated result set.
         schema:
           type: integer
+      - name: page_size
+        required: false
+        in: query
+        description: Number of results to return per page.
+        schema:
+          type: integer
       tags:
       - api
       security:
@@ -1163,6 +1957,12 @@ paths:
         required: false
         in: query
         description: A page number within the paginated result set.
+        schema:
+          type: integer
+      - name: page_size
+        required: false
+        in: query
+        description: Number of results to return per page.
         schema:
           type: integer
       tags:
@@ -1278,6 +2078,12 @@ paths:
         description: A page number within the paginated result set.
         schema:
           type: integer
+      - name: page_size
+        required: false
+        in: query
+        description: Number of results to return per page.
+        schema:
+          type: integer
       tags:
       - api
       security:
@@ -1334,6 +2140,12 @@ paths:
         required: false
         in: query
         description: A page number within the paginated result set.
+        schema:
+          type: integer
+      - name: page_size
+        required: false
+        in: query
+        description: Number of results to return per page.
         schema:
           type: integer
       tags:
@@ -1510,6 +2322,12 @@ paths:
         description: A page number within the paginated result set.
         schema:
           type: integer
+      - name: page_size
+        required: false
+        in: query
+        description: Number of results to return per page.
+        schema:
+          type: integer
       tags:
       - api
       security:
@@ -1620,6 +2438,12 @@ paths:
         description: A page number within the paginated result set.
         schema:
           type: integer
+      - name: page_size
+        required: false
+        in: query
+        description: Number of results to return per page.
+        schema:
+          type: integer
       tags:
       - api
       security:
@@ -1724,6 +2548,86 @@ paths:
               schema:
                 $ref: '#/components/schemas/ProctorEvidence'
           description: ''
+  /api/v1/proctoring/sessions/{session_id}/evidence/confirm/:
+    post:
+      operationId: api_v1_proctoring_sessions_evidence_confirm_create
+      parameters:
+      - in: path
+        name: session_id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EvidenceConfirm'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/EvidenceConfirm'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/EvidenceConfirm'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProctorEvidence'
+          description: ''
+  /api/v1/proctoring/sessions/{session_id}/evidence/mock-upload/:
+    put:
+      operationId: api_v1_proctoring_sessions_evidence_mock_upload_update
+      parameters:
+      - in: path
+        name: session_id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          description: No response body
+  /api/v1/proctoring/sessions/{session_id}/evidence/presigned-url/:
+    post:
+      operationId: api_v1_proctoring_sessions_evidence_presigned_url_create
+      parameters:
+      - in: path
+        name: session_id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EvidencePresignedUrlRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/EvidencePresignedUrlRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/EvidencePresignedUrlRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EvidencePresignedUrlResponse'
+          description: ''
   /api/v1/proctoring/sessions/{session_id}/heartbeats/:
     post:
       operationId: api_v1_proctoring_sessions_heartbeats_create
@@ -1750,7 +2654,7 @@ paths:
       security:
       - jwtAuth: []
       responses:
-        '201':
+        '200':
           content:
             application/json:
               schema:
@@ -1828,6 +2732,21 @@ paths:
               schema:
                 $ref: '#/components/schemas/MediaProviderToken'
           description: ''
+    delete:
+      operationId: api_v1_proctoring_sessions_media_view_token_destroy
+      parameters:
+      - in: path
+        name: session_id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '204':
+          description: No response body
   /api/v1/profile/:
     get:
       operationId: api_v1_profile_retrieve
@@ -1912,6 +2831,57 @@ paths:
       responses:
         '200':
           description: No response body
+  /api/v1/public-results/lookup/:
+    get:
+      operationId: api_v1_public_results_lookup_list
+      parameters:
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      - name: page_size
+        required: false
+        in: query
+        description: Number of results to return per page.
+        schema:
+          type: integer
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedPublicResultList'
+          description: ''
+  /api/v1/public/competition-registrations/:
+    post:
+      operationId: api_v1_public_competition_registrations_create
+      description: Phieu dang ky du thi (truoc day chi gia lap, khong luu).
+      tags:
+      - api
+      security:
+      - {}
+      responses:
+        '200':
+          description: No response body
+  /api/v1/public/competitions/:
+    get:
+      operationId: api_v1_public_competitions_retrieve
+      description: Bang 'Cac cuoc thi noi bat' tren trang chu va danh sach chon khi
+        dang ky.
+      tags:
+      - api
+      security:
+      - {}
+      responses:
+        '200':
+          description: No response body
   /api/v1/question-imports/:
     get:
       operationId: api_v1_question_imports_list
@@ -1920,6 +2890,12 @@ paths:
         required: false
         in: query
         description: A page number within the paginated result set.
+        schema:
+          type: integer
+      - name: page_size
+        required: false
+        in: query
+        description: Number of results to return per page.
         schema:
           type: integer
       tags:
@@ -1989,6 +2965,12 @@ paths:
         description: A page number within the paginated result set.
         schema:
           type: integer
+      - name: page_size
+        required: false
+        in: query
+        description: Number of results to return per page.
+        schema:
+          type: integer
       tags:
       - api
       security:
@@ -2029,6 +3011,12 @@ paths:
         required: false
         in: query
         description: A page number within the paginated result set.
+        schema:
+          type: integer
+      - name: page_size
+        required: false
+        in: query
+        description: Number of results to return per page.
         schema:
           type: integer
       tags:
@@ -2175,6 +3163,12 @@ paths:
         description: A page number within the paginated result set.
         schema:
           type: integer
+      - name: page_size
+        required: false
+        in: query
+        description: Number of results to return per page.
+        schema:
+          type: integer
       tags:
       - api
       security:
@@ -2207,6 +3201,39 @@ paths:
               schema:
                 $ref: '#/components/schemas/Result'
           description: ''
+  /api/v1/results/{id}/lock/:
+    post:
+      operationId: api_v1_results_lock_create
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this result.
+        required: true
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Result'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/Result'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/Result'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Result'
+          description: ''
   /api/v1/results/{id}/publish/:
     post:
       operationId: api_v1_results_publish_create
@@ -2217,6 +3244,262 @@ paths:
           type: integer
         description: A unique integer value identifying this result.
         required: true
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Result'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/Result'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/Result'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Result'
+          description: ''
+  /api/v1/results/{id}/review/:
+    get:
+      operationId: api_v1_results_review_retrieve
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this result.
+        required: true
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Result'
+          description: ''
+  /api/v1/results/{id}/review-export/:
+    get:
+      operationId: api_v1_results_review_export_retrieve
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this result.
+        required: true
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Result'
+          description: ''
+  /api/v1/results/{id}/schedule-publication/:
+    post:
+      operationId: api_v1_results_schedule_publication_create
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this result.
+        required: true
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Result'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/Result'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/Result'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Result'
+          description: ''
+  /api/v1/results/{id}/unlock/:
+    post:
+      operationId: api_v1_results_unlock_create
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this result.
+        required: true
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Result'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/Result'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/Result'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Result'
+          description: ''
+  /api/v1/results/bulk-publish/:
+    post:
+      operationId: api_v1_results_bulk_publish_create
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Result'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/Result'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/Result'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Result'
+          description: ''
+  /api/v1/results/candidates/:
+    get:
+      operationId: api_v1_results_candidates_retrieve
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Result'
+          description: ''
+  /api/v1/results/exam-roster-export/:
+    get:
+      operationId: api_v1_results_exam_roster_export_retrieve
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Result'
+          description: ''
+  /api/v1/results/exam-unsubmitted-export/:
+    get:
+      operationId: api_v1_results_exam_unsubmitted_export_retrieve
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Result'
+          description: ''
+  /api/v1/results/export-csv/:
+    get:
+      operationId: api_v1_results_export_csv_retrieve
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Result'
+          description: ''
+  /api/v1/results/export-xlsx/:
+    get:
+      operationId: api_v1_results_export_xlsx_retrieve
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Result'
+          description: ''
+  /api/v1/results/publish-exam/:
+    post:
+      operationId: api_v1_results_publish_exam_create
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Result'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/Result'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/Result'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Result'
+          description: ''
+  /api/v1/results/run-scheduled-publications/:
+    post:
+      operationId: api_v1_results_run_scheduled_publications_create
       tags:
       - api
       requestBody:
@@ -2262,6 +3545,12 @@ paths:
         required: false
         in: query
         description: A page number within the paginated result set.
+        schema:
+          type: integer
+      - name: page_size
+        required: false
+        in: query
+        description: Number of results to return per page.
         schema:
           type: integer
       tags:
@@ -2410,6 +3699,12 @@ paths:
         description: A page number within the paginated result set.
         schema:
           type: integer
+      - name: page_size
+        required: false
+        in: query
+        description: Number of results to return per page.
+        schema:
+          type: integer
       tags:
       - api
       security:
@@ -2554,6 +3849,12 @@ paths:
         required: false
         in: query
         description: A page number within the paginated result set.
+        schema:
+          type: integer
+      - name: page_size
+        required: false
+        in: query
+        description: Number of results to return per page.
         schema:
           type: integer
       - name: search
@@ -2708,6 +4009,12 @@ paths:
         description: A page number within the paginated result set.
         schema:
           type: integer
+      - name: page_size
+        required: false
+        in: query
+        description: Number of results to return per page.
+        schema:
+          type: integer
       tags:
       - api
       security:
@@ -2734,7 +4041,6 @@ paths:
           multipart/form-data:
             schema:
               $ref: '#/components/schemas/User'
-        required: true
       security:
       - jwtAuth: []
       responses:
@@ -2787,7 +4093,6 @@ paths:
           multipart/form-data:
             schema:
               $ref: '#/components/schemas/User'
-        required: true
       security:
       - jwtAuth: []
       responses:
@@ -2867,7 +4172,6 @@ paths:
           multipart/form-data:
             schema:
               $ref: '#/components/schemas/User'
-        required: true
       security:
       - jwtAuth: []
       responses:
@@ -2900,7 +4204,6 @@ paths:
           multipart/form-data:
             schema:
               $ref: '#/components/schemas/User'
-        required: true
       security:
       - jwtAuth: []
       responses:
@@ -2910,8 +4213,68 @@ paths:
               schema:
                 $ref: '#/components/schemas/User'
           description: ''
+  /api/v1/users/import-csv/:
+    post:
+      operationId: api_v1_users_import_csv_create
+      tags:
+      - api
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/UserImportRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/UserImportRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserImportSummary'
+          description: ''
 components:
   schemas:
+    ApiToken:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        name:
+          type: string
+          maxLength: 120
+        key_prefix:
+          type: string
+          maxLength: 24
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+        expires_at:
+          type: string
+          format: date-time
+          nullable: true
+        last_used_at:
+          type: string
+          format: date-time
+          nullable: true
+        revoked_at:
+          type: string
+          format: date-time
+          nullable: true
+        is_active:
+          type: string
+          readOnly: true
+      required:
+      - created_at
+      - id
+      - is_active
+      - key_prefix
+      - name
     AuditActor:
       type: object
       properties:
@@ -3072,12 +4435,16 @@ components:
         enable_proctoring:
           type: boolean
           readOnly: true
+        lifecycle_phase:
+          type: string
+          readOnly: true
       required:
       - active_session_id
       - attempts_remaining
       - attempts_used
       - enable_proctoring
       - id
+      - lifecycle_phase
       - name
       - question_count
       - schedule
@@ -3095,11 +4462,16 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/Result'
+        pending_results:
+          type: array
+          items:
+            $ref: '#/components/schemas/CandidatePendingResult'
         recent_materials:
           type: array
           items:
             $ref: '#/components/schemas/Material'
       required:
+      - pending_results
       - recent_materials
       - recent_results
       - stats
@@ -3113,6 +4485,8 @@ components:
           type: integer
         published_result_count:
           type: integer
+        pending_result_count:
+          type: integer
         average_percentage:
           type: string
           format: decimal
@@ -3123,6 +4497,7 @@ components:
       - active_material_count
       - assigned_exam_count
       - average_percentage
+      - pending_result_count
       - published_result_count
       - upcoming_exam_count
     CandidateExamSchedule:
@@ -3168,6 +4543,16 @@ components:
         expires_at:
           type: string
           format: date-time
+        submission_deadline:
+          type: string
+          format: date-time
+          readOnly: true
+        submission_grace_seconds:
+          type: integer
+          readOnly: true
+        is_late:
+          type: boolean
+          readOnly: true
         submitted_at:
           type: string
           format: date-time
@@ -3177,6 +4562,9 @@ components:
           readOnly: true
         enable_proctoring:
           type: boolean
+          readOnly: true
+        lifecycle_phase:
+          type: string
           readOnly: true
         remaining_seconds:
           type: integer
@@ -3213,12 +4601,16 @@ components:
       - exam_name
       - expires_at
       - id
+      - is_late
+      - lifecycle_phase
       - marked_count
       - questions
       - remaining_seconds
       - show_results_immediately
       - started_at
       - subject
+      - submission_deadline
+      - submission_grace_seconds
       - total_questions
     CandidateExamSubject:
       type: object
@@ -3270,6 +4662,39 @@ components:
       - member_count
       - name
       - updated_at
+    CandidatePendingResult:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        workflow_status:
+          $ref: '#/components/schemas/ResultWorkflowStatusEnum'
+        publish_state:
+          $ref: '#/components/schemas/ResultPublishStateEnum'
+        submitted_at:
+          type: string
+          format: date-time
+          readOnly: true
+        status_label:
+          type: string
+          readOnly: true
+        exam:
+          type: object
+          properties:
+            id:
+              type: integer
+            name:
+              type: string
+            subject_name:
+              type: string
+          readOnly: true
+      required:
+      - exam
+      - id
+      - status_label
+      - submitted_at
+      - workflow_status
     CandidateSummary:
       type: object
       properties:
@@ -3358,6 +4783,80 @@ components:
           default: ''
       required:
       - client_type
+    Competition:
+      type: object
+      description: 'Quan tri: day du truong + trang thai tinh theo ngay + so luot
+        dang ky.'
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        name:
+          type: string
+          maxLength: 255
+        code:
+          type: string
+          description: Mã viết tắt, vd. IMO, SCO IEO.
+          maxLength: 32
+        description:
+          type: string
+        cycle:
+          type: string
+          description: Chu kỳ / mùa thi, vd. 3 hoặc 2026-2027.
+          maxLength: 64
+        exam_date:
+          type: string
+          format: date
+        registration_deadline:
+          type: string
+          format: date
+          nullable: true
+        registration_open:
+          type: boolean
+          description: Cho phép chọn cuộc thi này khi đăng ký.
+        is_featured:
+          type: boolean
+          description: Hiển thị trong bảng 'Các cuộc thi nổi bật' trên trang chủ.
+        is_active:
+          type: boolean
+          description: Tắt để ẩn hoàn toàn khỏi trang công khai.
+        sort_order:
+          type: integer
+          maximum: 9223372036854775807
+          minimum: 0
+          format: int64
+        info_url:
+          type: string
+          format: uri
+          maxLength: 200
+        status:
+          type: string
+          readOnly: true
+        accepts_registration:
+          type: string
+          readOnly: true
+        registration_count:
+          type: integer
+          readOnly: true
+          default: 0
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - accepts_registration
+      - code
+      - created_at
+      - exam_date
+      - id
+      - name
+      - registration_count
+      - status
+      - updated_at
     DashboardActivityPoint:
       type: object
       properties:
@@ -3459,6 +4958,89 @@ components:
         * `easy` - Easy
         * `medium` - Medium
         * `hard` - Hard
+    DisciplinaryCase:
+      type: object
+      properties:
+        id:
+          type: integer
+        session_id:
+          type: integer
+        candidate:
+          allOf:
+          - $ref: '#/components/schemas/ResultUserSummary'
+          readOnly: true
+        exam:
+          type: string
+          readOnly: true
+        severity:
+          type: string
+        status:
+          type: string
+        title:
+          type: string
+          readOnly: true
+        summary:
+          type: string
+          readOnly: true
+        created_at:
+          type: string
+          format: date-time
+        evidence_count:
+          type: string
+          readOnly: true
+        proposal:
+          allOf:
+          - $ref: '#/components/schemas/ViolationPenaltyProposal'
+          readOnly: true
+          nullable: true
+      required:
+      - candidate
+      - created_at
+      - evidence_count
+      - exam
+      - id
+      - proposal
+      - session_id
+      - severity
+      - status
+      - summary
+      - title
+    DisciplinaryExamSummary:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        subject_name:
+          type: string
+        unique_violating_candidates:
+          type: integer
+        total_cases:
+          type: integer
+        approved_records:
+          type: integer
+        pending_review_count:
+          type: integer
+        result_sync_status:
+          type: string
+        certificate_status:
+          type: string
+        last_updated:
+          type: string
+          format: date-time
+          nullable: true
+      required:
+      - approved_records
+      - certificate_status
+      - id
+      - last_updated
+      - name
+      - pending_review_count
+      - result_sync_status
+      - subject_name
+      - total_cases
+      - unique_violating_candidates
     EduExamTokenObtainPair:
       type: object
       properties:
@@ -3473,6 +5055,52 @@ components:
           writeOnly: true
       required:
       - password
+    EvidenceConfirm:
+      type: object
+      properties:
+        event_id:
+          type: integer
+          nullable: true
+        evidence_type:
+          $ref: '#/components/schemas/ProctorEvidenceTypeEnum'
+        object_key:
+          type: string
+          maxLength: 512
+        metadata: {}
+      required:
+      - evidence_type
+      - object_key
+    EvidencePresignedUrlRequest:
+      type: object
+      properties:
+        evidence_type:
+          $ref: '#/components/schemas/ProctorEvidenceTypeEnum'
+        file_name:
+          type: string
+          maxLength: 255
+        content_type:
+          type: string
+          maxLength: 128
+      required:
+      - content_type
+      - evidence_type
+      - file_name
+    EvidencePresignedUrlResponse:
+      type: object
+      properties:
+        upload_url:
+          type: string
+        object_key:
+          type: string
+        content_type:
+          type: string
+        upload_method:
+          $ref: '#/components/schemas/UploadMethodEnum'
+      required:
+      - content_type
+      - object_key
+      - upload_method
+      - upload_url
     EvidencePreview:
       type: object
       properties:
@@ -3547,6 +5175,78 @@ components:
       - in_progress_sessions
       - submitted_sessions
       - total_sessions
+    ExamDisciplinaryRecord:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        exam:
+          type: string
+          readOnly: true
+        candidate:
+          type: string
+          readOnly: true
+        selected_session:
+          type: integer
+          nullable: true
+        unique_case_count:
+          type: integer
+          maximum: 9223372036854775807
+          minimum: 0
+          format: int64
+        open_case_count:
+          type: integer
+          maximum: 9223372036854775807
+          minimum: 0
+          format: int64
+        approved_case_count:
+          type: integer
+          maximum: 9223372036854775807
+          minimum: 0
+          format: int64
+        original_total_score:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,6}(?:\.\d{0,2})?$
+        original_percentage:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,6}(?:\.\d{0,2})?$
+        applied_penalty_percent:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,3}(?:\.\d{0,2})?$
+          readOnly: true
+        final_total_score:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,6}(?:\.\d{0,2})?$
+        final_percentage:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,6}(?:\.\d{0,2})?$
+        certificate_level_snapshot:
+          type: string
+          maxLength: 32
+        review_status:
+          type: string
+          readOnly: true
+        published_score_synced_at:
+          type: string
+          format: date-time
+          nullable: true
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - applied_penalty_percent
+      - candidate
+      - exam
+      - id
+      - review_status
+      - updated_at
     ExamItem:
       type: object
       properties:
@@ -3696,6 +5396,22 @@ components:
       - in_progress
       - not_started
       - total_candidates
+    ExamQuestionOption:
+      type: object
+      properties:
+        key:
+          type: string
+          maxLength: 8
+        text:
+          type: string
+        sort_order:
+          type: integer
+          maximum: 9223372036854775807
+          minimum: 0
+          format: int64
+      required:
+      - key
+      - text
     ExamQuestionRevisionSummary:
       type: object
       properties:
@@ -3711,9 +5427,15 @@ components:
           type: string
         difficulty:
           type: string
+        options:
+          type: array
+          items:
+            $ref: '#/components/schemas/ExamQuestionOption'
+          readOnly: true
       required:
       - difficulty
       - id
+      - options
       - question_id
       - question_text
       - question_type
@@ -3784,6 +5506,9 @@ components:
           type: string
         status:
           $ref: '#/components/schemas/ExamStatusEnum'
+        lifecycle_phase:
+          type: string
+          readOnly: true
         duration_minutes:
           type: integer
           maximum: 9223372036854775807
@@ -3835,6 +5560,7 @@ components:
       - current_version
       - delivery_summary
       - id
+      - lifecycle_phase
       - name
       - schedule_window
       - subject
@@ -4033,6 +5759,9 @@ components:
           type: array
           items:
             type: integer
+        bonus_minutes:
+          type: integer
+          minimum: 0
     ForgotPassword:
       type: object
       properties:
@@ -4142,6 +5871,10 @@ components:
           allOf:
           - $ref: '#/components/schemas/ManualGrade'
           readOnly: true
+        suggestion:
+          type: object
+          additionalProperties: {}
+          readOnly: true
       required:
       - answer_text
       - candidate
@@ -4149,6 +5882,7 @@ components:
       - id
       - manual_grade
       - question_text
+      - suggestion
     ManualGradingTaskStatusEnum:
       enum:
       - pending
@@ -4258,6 +5992,10 @@ components:
         last_publish_at:
           type: string
           nullable: true
+        live_request_enabled:
+          type: boolean
+        live_slot_active:
+          type: boolean
       required:
       - last_publish_at
       - screen_capture_status
@@ -4267,23 +6005,25 @@ components:
       properties:
         provider:
           type: string
+          default: ''
         server_url:
           type: string
+          default: ''
         room_name:
           type: string
+          default: ''
         participant_name:
           type: string
+          default: ''
         access_token:
           type: string
+          default: ''
         expires_at:
           type: string
-      required:
-      - access_token
-      - expires_at
-      - participant_name
-      - provider
-      - room_name
-      - server_url
+          default: ''
+        vps_overloaded:
+          type: boolean
+          default: false
     ModeEnum:
       enum:
       - exam
@@ -4496,6 +6236,75 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/CandidateGroup'
+    PaginatedCompetitionList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/Competition'
+    PaginatedDisciplinaryCaseList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/DisciplinaryCase'
+    PaginatedExamDisciplinaryRecordList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/ExamDisciplinaryRecord'
     PaginatedExamMonitoringHubListResponseList:
       type: object
       required:
@@ -4657,6 +6466,29 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/PracticeSessionHistory'
+    PaginatedPublicResultList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/PublicResult'
     PaginatedQuestionImportBatchList:
       type: object
       required:
@@ -4726,6 +6558,29 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/QuestionTag'
+    PaginatedRegistrationList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/Registration'
     PaginatedResultList:
       type: object
       required:
@@ -4891,6 +6746,70 @@ components:
           type: string
           format: date-time
           readOnly: true
+    PatchedCompetition:
+      type: object
+      description: 'Quan tri: day du truong + trang thai tinh theo ngay + so luot
+        dang ky.'
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        name:
+          type: string
+          maxLength: 255
+        code:
+          type: string
+          description: Mã viết tắt, vd. IMO, SCO IEO.
+          maxLength: 32
+        description:
+          type: string
+        cycle:
+          type: string
+          description: Chu kỳ / mùa thi, vd. 3 hoặc 2026-2027.
+          maxLength: 64
+        exam_date:
+          type: string
+          format: date
+        registration_deadline:
+          type: string
+          format: date
+          nullable: true
+        registration_open:
+          type: boolean
+          description: Cho phép chọn cuộc thi này khi đăng ký.
+        is_featured:
+          type: boolean
+          description: Hiển thị trong bảng 'Các cuộc thi nổi bật' trên trang chủ.
+        is_active:
+          type: boolean
+          description: Tắt để ẩn hoàn toàn khỏi trang công khai.
+        sort_order:
+          type: integer
+          maximum: 9223372036854775807
+          minimum: 0
+          format: int64
+        info_url:
+          type: string
+          format: uri
+          maxLength: 200
+        status:
+          type: string
+          readOnly: true
+        accepts_registration:
+          type: string
+          readOnly: true
+        registration_count:
+          type: integer
+          readOnly: true
+          default: 0
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
     PatchedExamWrite:
       type: object
       properties:
@@ -4944,6 +6863,9 @@ components:
           type: array
           items:
             type: integer
+        bonus_minutes:
+          type: integer
+          minimum: 0
     PatchedMaterial:
       type: object
       properties:
@@ -5035,6 +6957,65 @@ components:
           type: string
         sample_answer:
           type: string
+    PatchedRegistration:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        full_name:
+          type: string
+          maxLength: 255
+        date_of_birth:
+          type: string
+          format: date
+        grade:
+          type: string
+          maxLength: 32
+        school:
+          type: string
+          maxLength: 255
+        class_name:
+          type: string
+          maxLength: 64
+        cccd:
+          type: string
+          maxLength: 32
+        address:
+          type: string
+          maxLength: 255
+        ward:
+          type: string
+          maxLength: 255
+        city:
+          type: string
+          maxLength: 255
+        email:
+          type: string
+          format: email
+          maxLength: 254
+        guardian_phone:
+          type: string
+          maxLength: 32
+        competitions:
+          type: string
+          readOnly: true
+        status:
+          $ref: '#/components/schemas/RegistrationStatusEnum'
+        admin_note:
+          type: string
+        handled_by_name:
+          type: string
+          readOnly: true
+          default: ''
+        handled_at:
+          type: string
+          format: date-time
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
     PatchedRole:
       type: object
       properties:
@@ -5132,8 +7113,6 @@ components:
           type: string
         email:
           type: string
-          format: email
-          maxLength: 254
         full_name:
           type: string
           maxLength: 255
@@ -5148,6 +7127,23 @@ components:
           writeOnly: true
         phone_number:
           type: string
+        date_of_birth:
+          type: string
+          format: date
+          nullable: true
+        student_class:
+          type: string
+        ward:
+          type: string
+        national_exam_subject:
+          type: string
+        exam_block:
+          type: string
+        candidate_number:
+          type: string
+        visible_password:
+          type: string
+          readOnly: true
         last_login:
           type: string
           format: date-time
@@ -5816,6 +7812,50 @@ components:
         phone_number:
           type: string
           maxLength: 32
+    PublicResult:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        candidate_name:
+          type: string
+          readOnly: true
+        exam_name:
+          type: string
+          readOnly: true
+        subject_name:
+          type: string
+          readOnly: true
+        score:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,6}(?:\.\d{0,2})?$
+          readOnly: true
+        max_score:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,6}(?:\.\d{0,2})?$
+          readOnly: true
+        percentage:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,6}(?:\.\d{0,2})?$
+        passed:
+          type: boolean
+          nullable: true
+        completed_date:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - candidate_name
+      - completed_date
+      - exam_name
+      - id
+      - max_score
+      - score
+      - subject_name
     QuestionAnswerKey:
       type: object
       properties:
@@ -5877,6 +7917,12 @@ components:
         file:
           type: string
           format: uri
+        dry_run:
+          type: boolean
+          default: false
+        skip_duplicates:
+          type: boolean
+          default: false
       required:
       - file
       - source_format
@@ -5915,10 +7961,12 @@ components:
       enum:
       - csv
       - json
+      - xlsx
       type: string
       description: |-
         * `csv` - CSV
         * `json` - JSON
+        * `xlsx` - XLSX
     QuestionOption:
       type: object
       properties:
@@ -6108,6 +8156,88 @@ components:
       required:
       - components
       - status
+    Registration:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        full_name:
+          type: string
+          maxLength: 255
+        date_of_birth:
+          type: string
+          format: date
+        grade:
+          type: string
+          maxLength: 32
+        school:
+          type: string
+          maxLength: 255
+        class_name:
+          type: string
+          maxLength: 64
+        cccd:
+          type: string
+          maxLength: 32
+        address:
+          type: string
+          maxLength: 255
+        ward:
+          type: string
+          maxLength: 255
+        city:
+          type: string
+          maxLength: 255
+        email:
+          type: string
+          format: email
+          maxLength: 254
+        guardian_phone:
+          type: string
+          maxLength: 32
+        competitions:
+          type: string
+          readOnly: true
+        status:
+          $ref: '#/components/schemas/RegistrationStatusEnum'
+        admin_note:
+          type: string
+        handled_by_name:
+          type: string
+          readOnly: true
+          default: ''
+        handled_at:
+          type: string
+          format: date-time
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - competitions
+      - created_at
+      - date_of_birth
+      - email
+      - full_name
+      - grade
+      - guardian_phone
+      - handled_by_name
+      - id
+      - school
+    RegistrationStatusEnum:
+      enum:
+      - new
+      - contacted
+      - confirmed
+      - rejected
+      type: string
+      description: |-
+        * `new` - Mới
+        * `contacted` - Đã liên hệ
+        * `confirmed` - Đã xác nhận
+        * `rejected` - Từ chối
     ResetPassword:
       type: object
       properties:
@@ -6147,6 +8277,11 @@ components:
           format: decimal
           pattern: ^-?\d{0,6}(?:\.\d{0,2})?$
           readOnly: true
+        original_score:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,6}(?:\.\d{0,2})?$
+          readOnly: true
         total_marks:
           type: string
           format: decimal
@@ -6156,6 +8291,19 @@ components:
           type: string
           format: decimal
           pattern: ^-?\d{0,6}(?:\.\d{0,2})?$
+        original_percentage:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,6}(?:\.\d{0,2})?$
+          readOnly: true
+        penalty_percent_applied:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,3}(?:\.\d{0,2})?$
+          readOnly: true
+        certificate_level:
+          type: string
+          readOnly: true
         result_status:
           type: string
           readOnly: true
@@ -6169,15 +8317,38 @@ components:
         time_taken_minutes:
           type: integer
           readOnly: true
+        is_late:
+          type: boolean
+          readOnly: true
         published_at:
           type: string
           format: date-time
           nullable: true
+        locked_at:
+          type: string
+          format: date-time
+          nullable: true
+        locked_by:
+          allOf:
+          - $ref: '#/components/schemas/ResultUserSummary'
+          readOnly: true
+        scheduled_publish_at:
+          type: string
+          format: date-time
+          nullable: true
+        publication_note:
+          type: string
       required:
       - candidate
+      - certificate_level
       - completed_date
       - exam
       - id
+      - is_late
+      - locked_by
+      - original_percentage
+      - original_score
+      - penalty_percent_applied
       - result_status
       - score
       - time_taken_minutes
@@ -6199,10 +8370,16 @@ components:
     ResultPublishStateEnum:
       enum:
       - draft
+      - reviewing
+      - locked
+      - scheduled
       - published
       type: string
       description: |-
         * `draft` - Draft
+        * `reviewing` - Reviewing
+        * `locked` - Locked
+        * `scheduled` - Scheduled
         * `published` - Published
     ResultUserSummary:
       type: object
@@ -6338,16 +8515,13 @@ components:
     SessionHeartbeat:
       type: object
       properties:
-        id:
+        session_id:
           type: integer
-          readOnly: true
         connection_status:
           $ref: '#/components/schemas/SessionHeartbeatConnectionStatusEnum'
         latency_ms:
           type: integer
-          maximum: 9223372036854775807
           minimum: 0
-          format: int64
           nullable: true
         payload: {}
         recorded_at:
@@ -6355,7 +8529,9 @@ components:
           format: date-time
       required:
       - connection_status
-      - id
+      - payload
+      - recorded_at
+      - session_id
     SessionHeartbeatConnectionStatusEnum:
       enum:
       - stable
@@ -6498,6 +8674,14 @@ components:
       required:
       - access
       - refresh
+    UploadMethodEnum:
+      enum:
+      - s3
+      - backend
+      type: string
+      description: |-
+        * `s3` - s3
+        * `backend` - backend
     User:
       type: object
       properties:
@@ -6508,8 +8692,6 @@ components:
           type: string
         email:
           type: string
-          format: email
-          maxLength: 254
         full_name:
           type: string
           maxLength: 255
@@ -6524,6 +8706,23 @@ components:
           writeOnly: true
         phone_number:
           type: string
+        date_of_birth:
+          type: string
+          format: date
+          nullable: true
+        student_class:
+          type: string
+        ward:
+          type: string
+        national_exam_subject:
+          type: string
+        exam_block:
+          type: string
+        candidate_number:
+          type: string
+        visible_password:
+          type: string
+          readOnly: true
         last_login:
           type: string
           format: date-time
@@ -6550,11 +8749,53 @@ components:
             $ref: '#/components/schemas/Role'
           readOnly: true
       required:
-      - email
       - id
       - last_login
       - roles
       - school
+      - visible_password
+    UserImportError:
+      type: object
+      properties:
+        row_number:
+          type: integer
+        identifier:
+          type: string
+        message:
+          type: string
+      required:
+      - identifier
+      - message
+      - row_number
+    UserImportRequest:
+      type: object
+      properties:
+        file:
+          type: string
+          format: uri
+      required:
+      - file
+    UserImportSummary:
+      type: object
+      properties:
+        total_rows:
+          type: integer
+        created_users:
+          type: integer
+        updated_users:
+          type: integer
+        failed_rows:
+          type: integer
+        errors:
+          type: array
+          items:
+            $ref: '#/components/schemas/UserImportError'
+      required:
+      - created_users
+      - errors
+      - failed_rows
+      - total_rows
+      - updated_users
     UserStatusEnum:
       enum:
       - active
@@ -6637,6 +8878,47 @@ components:
         * `open` - Open
         * `resolved` - Resolved
         * `dismissed` - Dismissed
+    ViolationPenaltyProposal:
+      type: object
+      properties:
+        proposed_penalty_percent:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,3}(?:\.\d{0,2})?$
+        status:
+          $ref: '#/components/schemas/ViolationPenaltyProposalStatusEnum'
+        notes:
+          type: string
+        proposed_by:
+          allOf:
+          - $ref: '#/components/schemas/ResultUserSummary'
+          readOnly: true
+        proposed_at:
+          type: string
+          format: date-time
+        approved_by:
+          allOf:
+          - $ref: '#/components/schemas/ResultUserSummary'
+          readOnly: true
+        approved_at:
+          type: string
+          format: date-time
+          nullable: true
+      required:
+      - approved_by
+      - proposed_by
+    ViolationPenaltyProposalStatusEnum:
+      enum:
+      - draft
+      - approved
+      - rejected
+      - no_penalty
+      type: string
+      description: |-
+        * `draft` - Draft
+        * `approved` - Approved
+        * `rejected` - Rejected
+        * `no_penalty` - No Penalty
     ViolationReview:
       type: object
       properties:
