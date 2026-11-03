@@ -599,7 +599,9 @@ export function ExamInstructions() {
                 <span>{t("examInstructions.checklistLabel")}</span>
                 <span className="font-medium text-slate-900">
                   {t("examInstructions.checklistConfirmed", {
-                    count: Object.values(checklist).filter(Boolean).length,
+                    // Cac muc tu xac nhan + buoc kiem tra he thong tu dong.
+                    count: Object.values(checklist).filter(Boolean).length + (autoCheckState.status === "pass" ? 1 : 0),
+                    total: Object.keys(checklist).length + 1,
                   })}
                 </span>
               </div>

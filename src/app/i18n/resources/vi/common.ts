@@ -122,7 +122,7 @@ const common = {
     window: "Khung thời gian",
     openNow: "Đang mở",
     checklistLabel: "Checklist",
-    checklistConfirmed: "{{count}}/4 đã xác nhận",
+    checklistConfirmed: "{{count}}/{{total}} đã xác nhận",
     launchReadyHint: "Hoàn tất checklist để bật nút vào bài thi cuối cùng.",
     launchUnavailableHint:
       "Bài thi này hiện chưa thể khởi chạy. Hãy xem lại thông tin ở đây và quay lại khi khung thời gian mở.",

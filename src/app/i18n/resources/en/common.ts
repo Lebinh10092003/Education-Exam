@@ -122,7 +122,7 @@ const common = {
     window: "Window",
     openNow: "Open now",
     checklistLabel: "Checklist",
-    checklistConfirmed: "{{count}}/4 confirmed",
+    checklistConfirmed: "{{count}}/{{total}} confirmed",
     launchReadyHint: "Complete the checklist to enable the final launch button.",
     launchUnavailableHint:
       "This exam cannot be launched yet. Review the details here and return when the window opens.",

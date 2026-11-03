@@ -8,6 +8,8 @@ export interface CandidateAssignedExam {
   max_attempts: number;
   question_count: number;
   enable_proctoring: boolean;
+  // Pha vong doi do backend tinh (open/scheduled/paused/closed/results); backend dung no de chan bat dau thi.
+  lifecycle_phase?: string;
   attempts_used: number;
   attempts_remaining: number;
   active_session_id: number | null;
@@ -28,6 +30,7 @@ export type CandidateExamAvailability =
   | "upcoming"
   | "resume"
   | "closed"
+  | "paused"
   | "locked";
 
 const isVietnameseLocale = (locale: string) => locale.toLowerCase().startsWith("vi");
@@ -44,6 +47,7 @@ const getCandidateExamCopy = (locale: string) =>
           available: "Khả dụng",
           upcoming: "Sắp diễn ra",
           closed: "Đã đóng",
+          paused: "Tạm dừng",
           locked: "Đã dùng hết lượt",
         },
         actions: {
@@ -63,6 +67,7 @@ const getCandidateExamCopy = (locale: string) =>
           available: "Available",
           upcoming: "Upcoming",
           closed: "Closed",
+          paused: "Paused",
           locked: "Attempts Used",
         },
         actions: {
@@ -126,6 +131,15 @@ export const getExamAvailabilityState = (
   if (exam.attempts_remaining <= 0) {
     return "locked";
   }
+  if (exam.lifecycle_phase === "closed" || exam.lifecycle_phase === "results") {
+    return "closed";
+  }
+  if (exam.lifecycle_phase === "paused") {
+    return "paused";
+  }
+  if (exam.lifecycle_phase === "scheduled") {
+    return "upcoming";
+  }
   if (exam.schedule.closes_at && new Date(exam.schedule.closes_at) < now) {
     return "closed";
   }
@@ -163,6 +177,8 @@ export const getExamAvailabilityLabelForState = (
       return copy.availability.upcoming;
     case "closed":
       return copy.availability.closed;
+    case "paused":
+      return copy.availability.paused;
     case "locked":
       return copy.availability.locked;
     default:
@@ -181,6 +197,8 @@ export const getExamAvailabilityTone = (exam: CandidateAssignedExam, now?: Date)
       return "border-blue-200 bg-blue-50 text-blue-800";
     case "closed":
       return "border-slate-200 bg-slate-100 text-slate-700";
+    case "paused":
+      return "border-orange-200 bg-orange-50 text-orange-800";
     case "locked":
       return "border-rose-200 bg-rose-50 text-rose-700";
     default:
@@ -203,7 +221,7 @@ export const getExamPrimaryAction = (
     };
   }
 
-  if (availability === "available" || availability === "upcoming" || availability === "closed") {
+  if (availability === "available" || availability === "upcoming" || availability === "closed" || availability === "paused") {
     return {
       href: `/candidate/exams/${exam.id}/instructions`,
       label: availability === "available" ? copy.actions.startExam : copy.actions.viewDetails,

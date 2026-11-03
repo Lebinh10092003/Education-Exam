@@ -115,6 +115,7 @@ export function MyExams() {
               <SelectItem value="upcoming">{getExamAvailabilityLabelForState("upcoming", locale)}</SelectItem>
               <SelectItem value="resume">{getExamAvailabilityLabelForState("resume", locale)}</SelectItem>
               <SelectItem value="closed">{getExamAvailabilityLabelForState("closed", locale)}</SelectItem>
+              <SelectItem value="paused">{getExamAvailabilityLabelForState("paused", locale)}</SelectItem>
               <SelectItem value="locked">{getExamAvailabilityLabelForState("locked", locale)}</SelectItem>
             </SelectContent>
           </Select>
