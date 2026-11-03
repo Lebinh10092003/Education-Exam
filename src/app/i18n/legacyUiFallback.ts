@@ -888,6 +888,7 @@ const translateDynamicText = (locale: LegacyLocale, value: string): string => {
     locale === "vi"
       ? [
           [/^(\d+) monitoring alerts$/, (count) => `${count} cảnh báo giám sát`],
+          [/^([\d.,]+) assigned candidates across the current result set\.$/, (count) => `${count} thí sinh được giao trong danh sách hiện tại.`],
           [/^(\d+) recent exams loaded$/, (count) => `${count} kỳ thi gần đây`],
           [/^Updated (.+)$/, (date) => `Cập nhật ${date}`],
           [/^(\d+) questions$/, (count) => `${count} câu hỏi`],
@@ -957,6 +958,7 @@ const translateDynamicText = (locale: LegacyLocale, value: string): string => {
           [/^(\d+) bản ghi hoạt động$/, (count) => `${count} active records`],
           [/^(\d+) đang diễn ra$/, (count) => `${count} in progress`],
           [/^(\d+) đã nộp$/, (count) => `${count} submitted`],
+          [/^([\d.,]+) thí sinh được giao trong danh sách hiện tại\.$/, (count) => `${count} assigned candidates across the current result set.`],
           [/^(\d+) tổng$/, (count) => `${count} total`],
           [/^(\d+) nghiêm trọng$/, (count) => `${count} critical`],
           [/^(\d+) câu hỏi$/, (count) => `${count} question(s)`],

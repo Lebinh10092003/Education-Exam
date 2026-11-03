@@ -86,4 +86,13 @@ describe("translateLegacyUiText", () => {
       translateLegacyUiText("en", "Quyền truy cập được kiểm soát bởi ghi danh và trạng thái lớp học."),
     ).toBe("Access is controlled by enrollment and the class status.");
   });
+
+  it("translates the monitoring hub candidate summary in both directions", () => {
+    expect(translateLegacyUiText("vi", "1,234 assigned candidates across the current result set.")).toBe(
+      "1,234 thí sinh được giao trong danh sách hiện tại.",
+    );
+    expect(translateLegacyUiText("en", "4 thí sinh được giao trong danh sách hiện tại.")).toBe(
+      "4 assigned candidates across the current result set.",
+    );
+  });
 });

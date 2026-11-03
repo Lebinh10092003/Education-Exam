@@ -446,27 +446,27 @@ export function ExamInstructions() {
 
             <div className="rounded-2xl border border-slate-200 bg-slate-50 p-5 space-y-4">
               <div className="flex items-center justify-between">
-                <h3 className="font-semibold text-slate-900">{t("examInstructions.systemCheckTitle", { defaultValue: "Automated System Check" })}</h3>
+                <h3 className="font-semibold text-slate-900">{t("examInstructions.systemCheck.title")}</h3>
                 {autoCheckState.status === "idle" && (
                   <Button size="sm" onClick={runSystemCheck}>
-                    {t("examInstructions.runCheck", { defaultValue: "Run Check" })}
+                    {t("examInstructions.systemCheck.run")}
                   </Button>
                 )}
                 {autoCheckState.status === "running" && (
                   <span className="flex items-center gap-1.5 text-sm text-blue-600 font-medium">
                     <Loader2 className="h-4 w-4 animate-spin" />
-                    {t("examInstructions.checking", { defaultValue: "Checking..." })}
+                    {t("examInstructions.systemCheck.checking")}
                   </span>
                 )}
                 {autoCheckState.status === "pass" && (
                   <span className="flex items-center gap-1.5 text-sm text-emerald-600 font-medium">
                     <CheckCircle2 className="h-4 w-4" />
-                    {t("examInstructions.checkPass", { defaultValue: "System Ready" })}
+                    {t("examInstructions.systemCheck.pass")}
                   </span>
                 )}
                 {autoCheckState.status === "fail" && (
                   <Button size="sm" variant="destructive" onClick={runSystemCheck}>
-                    {t("examInstructions.retryCheck", { defaultValue: "Retry Check" })}
+                    {t("examInstructions.systemCheck.retry")}
                   </Button>
                 )}
               </div>
@@ -479,8 +479,8 @@ export function ExamInstructions() {
                     autoCheckState.indexedDb === "pass" ? "text-emerald-500" : autoCheckState.indexedDb === "fail" ? "text-red-500" : "text-slate-400"
                   }`} />
                   <div className="min-w-0 flex-1">
-                    <p className="text-xs font-semibold text-slate-900">IndexedDB Storage</p>
-                    <p className="text-[10px] text-slate-500 truncate">{autoCheckState.indexedDb === "pass" ? "Ready (>250MB)" : autoCheckState.indexedDb === "fail" ? "Storage Full" : "Pending"}</p>
+                    <p className="text-xs font-semibold text-slate-900">{t("examInstructions.systemCheck.storage")}</p>
+                    <p className="text-[10px] text-slate-500 truncate">{t(`examInstructions.systemCheck.${autoCheckState.indexedDb === "pass" ? "storageReady" : autoCheckState.indexedDb === "fail" ? "storageFull" : "pending"}`)}</p>
                   </div>
                 </div>
 
@@ -491,8 +491,8 @@ export function ExamInstructions() {
                     autoCheckState.worker === "pass" ? "text-emerald-500" : autoCheckState.worker === "fail" ? "text-red-500" : "text-slate-400"
                   }`} />
                   <div className="min-w-0 flex-1">
-                    <p className="text-xs font-semibold text-slate-900">Web Worker</p>
-                    <p className="text-[10px] text-slate-500 truncate">{autoCheckState.worker === "pass" ? "Supported" : autoCheckState.worker === "fail" ? "Unsupported" : "Pending"}</p>
+                    <p className="text-xs font-semibold text-slate-900">{t("examInstructions.systemCheck.worker")}</p>
+                    <p className="text-[10px] text-slate-500 truncate">{t(`examInstructions.systemCheck.${autoCheckState.worker === "pass" ? "supported" : autoCheckState.worker === "fail" ? "unsupported" : "pending"}`)}</p>
                   </div>
                 </div>
 
@@ -503,8 +503,8 @@ export function ExamInstructions() {
                     autoCheckState.network === "pass" ? "text-emerald-500" : autoCheckState.network === "fail" ? "text-red-500" : "text-slate-400"
                   }`} />
                   <div className="min-w-0 flex-1">
-                    <p className="text-xs font-semibold text-slate-900">Network Connection</p>
-                    <p className="text-[10px] text-slate-500 truncate">{autoCheckState.network === "pass" ? "Stable" : autoCheckState.network === "fail" ? "High Latency" : "Pending"}</p>
+                    <p className="text-xs font-semibold text-slate-900">{t("examInstructions.systemCheck.network")}</p>
+                    <p className="text-[10px] text-slate-500 truncate">{t(`examInstructions.systemCheck.${autoCheckState.network === "pass" ? "stable" : autoCheckState.network === "fail" ? "highLatency" : "pending"}`)}</p>
                   </div>
                 </div>
 
@@ -517,8 +517,8 @@ export function ExamInstructions() {
                         autoCheckState.camera === "pass" ? "text-emerald-500" : autoCheckState.camera === "fail" ? "text-red-500" : "text-slate-400"
                       }`} />
                       <div className="min-w-0 flex-1">
-                        <p className="text-xs font-semibold text-slate-900">Webcam Access</p>
-                        <p className="text-[10px] text-slate-500 truncate">{autoCheckState.camera === "pass" ? "Granted" : autoCheckState.camera === "fail" ? "Denied" : "Pending"}</p>
+                        <p className="text-xs font-semibold text-slate-900">{t("examInstructions.systemCheck.camera")}</p>
+                        <p className="text-[10px] text-slate-500 truncate">{t(`examInstructions.systemCheck.${autoCheckState.camera === "pass" ? "granted" : autoCheckState.camera === "fail" ? "denied" : "pending"}`)}</p>
                       </div>
                     </div>
 
@@ -529,8 +529,8 @@ export function ExamInstructions() {
                         autoCheckState.screen === "pass" ? "text-emerald-500" : autoCheckState.screen === "fail" ? "text-red-500" : "text-slate-400"
                       }`} />
                       <div className="min-w-0 flex-1">
-                        <p className="text-xs font-semibold text-slate-900">Screen Share</p>
-                        <p className="text-[10px] text-slate-500 truncate">{autoCheckState.screen === "pass" ? "Granted" : autoCheckState.screen === "fail" ? "Denied" : "Pending"}</p>
+                        <p className="text-xs font-semibold text-slate-900">{t("examInstructions.systemCheck.screen")}</p>
+                        <p className="text-[10px] text-slate-500 truncate">{t(`examInstructions.systemCheck.${autoCheckState.screen === "pass" ? "granted" : autoCheckState.screen === "fail" ? "denied" : "pending"}`)}</p>
                       </div>
                     </div>
                   </>

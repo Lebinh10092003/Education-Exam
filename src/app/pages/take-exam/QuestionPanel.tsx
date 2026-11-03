@@ -44,8 +44,8 @@ export function QuestionPanel({
                 <h2 className="text-xl font-semibold text-gray-900">
                   {t("examSession.questionHeading", { number: index + 1 })}
                 </h2>
-                <Badge variant="outline">{question.difficulty}</Badge>
-                <Badge variant="outline">{question.question_type.replace(/_/g, " ")}</Badge>
+                <Badge variant="outline">{t(`examSession.difficulty.${question.difficulty}`, { defaultValue: question.difficulty })}</Badge>
+                <Badge variant="outline">{t(`examSession.questionType.${question.question_type}`, { defaultValue: question.question_type.replace(/_/g, " ") })}</Badge>
               </div>
               <p className="text-xs text-gray-500">{t("examSession.points", { points: question.points })}</p>
             </div>

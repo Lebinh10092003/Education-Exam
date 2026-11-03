@@ -146,11 +146,11 @@ export function QuestionNavigator({
           {isSaving ? <p className="text-xs text-blue-600 pt-2">{t("examSession.savingAnswer")}</p> : null}
 
           <div className="mt-4 pt-4 border-t border-gray-200">
-            <p className="text-xs font-semibold text-slate-500 mb-2">⌨️ CS Shortcuts (Alt+):</p>
+            <p className="text-xs font-semibold text-slate-500 mb-2">⌨️ {t("examSession.shortcuts.title")}</p>
             <div className="grid grid-cols-2 gap-1 text-[11px] text-slate-500">
-              <div><kbd className="px-1 bg-slate-100 border rounded">Alt</kbd>+<kbd className="px-1 bg-slate-100 border rounded">←</kbd> Prev</div>
-              <div><kbd className="px-1 bg-slate-100 border rounded">Alt</kbd>+<kbd className="px-1 bg-slate-100 border rounded">→</kbd> Next</div>
-              <div><kbd className="px-1 bg-slate-100 border rounded">Alt</kbd>+<kbd className="px-1 bg-slate-100 border rounded">F</kbd> Flag</div>
+              <div><kbd className="px-1 bg-slate-100 border rounded">Alt</kbd>+<kbd className="px-1 bg-slate-100 border rounded">←</kbd> {t("examSession.shortcuts.prev")}</div>
+              <div><kbd className="px-1 bg-slate-100 border rounded">Alt</kbd>+<kbd className="px-1 bg-slate-100 border rounded">→</kbd> {t("examSession.shortcuts.next")}</div>
+              <div><kbd className="px-1 bg-slate-100 border rounded">Alt</kbd>+<kbd className="px-1 bg-slate-100 border rounded">F</kbd> {t("examSession.shortcuts.flag")}</div>
             </div>
           </div>
         </div>
