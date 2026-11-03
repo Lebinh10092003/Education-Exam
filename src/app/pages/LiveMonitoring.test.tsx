@@ -375,6 +375,6 @@ describe("LiveMonitoring", () => {
       value: "unstable",
       label: "Unstable",
     });
-    expect(CANDIDATE_CONNECTION_FILTER_OPTIONS.some((option) => option.value === "intermittent")).toBe(false);
+    expect(CANDIDATE_CONNECTION_FILTER_OPTIONS.some((option) => (option.value as string) === "intermittent")).toBe(false);
   });
 });

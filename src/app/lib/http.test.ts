@@ -41,7 +41,7 @@ describe("apiRequest locale propagation", () => {
       ),
     );
 
-    await expect(apiRequest("/api/v1/missing/", { auth: false })).rejects.toMatchObject<ApiError>({
+    await expect(apiRequest("/api/v1/missing/", { auth: false })).rejects.toMatchObject({
       message: "Page not found (404)",
       status: 404,
     });
@@ -55,7 +55,7 @@ describe("apiRequest locale propagation", () => {
       }),
     );
 
-    await expect(apiRequest("/api/v1/practice/sessions/1/", { auth: false })).rejects.toMatchObject<ApiError>({
+    await expect(apiRequest("/api/v1/practice/sessions/1/", { auth: false })).rejects.toMatchObject({
       message: "Phiên luyện tập này đã hết hạn.",
       status: 400,
     });

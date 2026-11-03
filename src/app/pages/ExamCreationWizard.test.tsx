@@ -42,7 +42,7 @@ const subject = {
 const examRecord = {
   id: 1,
   name: "Algebra Midterm",
-  mode: "exam" as const,
+  mode: "exam" as "exam" | "class",
   subject,
   description: "Quarterly algebra exam",
   status: "draft" as const,

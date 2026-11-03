@@ -251,13 +251,13 @@ export function DisciplinaryExamSheet() {
 
   const renderPolicyConfigRow = (
     label: string,
-    key: keyof CertificatePolicyRecord,
+    key: Exclude<keyof CertificatePolicyRecord, "mode">,
     primaryLabel: string,
     primaryKey: "threshold" | "ratio",
     secondaryLabel?: string,
     secondaryKey?: "minimum_percentage",
   ) => {
-    const config = policyDraft[key] as Record<string, string | number>;
+    const config = policyDraft[key];
     return (
       <div className="grid gap-3 rounded-xl border border-gray-200 p-4 md:grid-cols-3">
         <div>

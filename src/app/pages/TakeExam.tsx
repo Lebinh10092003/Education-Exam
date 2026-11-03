@@ -157,7 +157,7 @@ export function TakeExam() {
 
   const enqueueSessionMutation = async <T,>(task: () => Promise<T>) => {
     const previous = requestQueueRef.current;
-    let releaseCurrent = () => undefined;
+    let releaseCurrent: () => void = () => undefined;
     requestQueueRef.current = new Promise<void>((resolve) => {
       releaseCurrent = resolve;
     });

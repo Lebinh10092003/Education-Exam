@@ -40,7 +40,7 @@ export function PracticeSession() {
 
   const enqueueMutation = async <T,>(task: () => Promise<T>) => {
     const previous = requestQueueRef.current;
-    let release = () => undefined;
+    let release: () => void = () => undefined;
     requestQueueRef.current = new Promise<void>((resolve) => {
       release = resolve;
     });

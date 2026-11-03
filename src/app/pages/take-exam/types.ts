@@ -94,4 +94,4 @@ export type NavigatorConnectionInfo = {
   rtt?: number;
 };
 
-export type PreviewVideoRef = RefObject<HTMLVideoElement | null>;
+export type PreviewVideoRef = RefObject<HTMLVideoElement>;

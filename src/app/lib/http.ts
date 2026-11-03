@@ -14,7 +14,7 @@ type QueryValue = string | number | boolean | null | undefined;
 
 interface ApiRequestOptions {
   method?: string;
-  body?: BodyInit | FormData | Record<string, unknown> | null;
+  body?: BodyInit | FormData | object | null;
   headers?: HeadersInit;
   auth?: boolean;
   retryOnAuth?: boolean;
