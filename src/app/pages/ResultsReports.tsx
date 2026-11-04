@@ -509,7 +509,7 @@ export function ResultsReports() {
           </div>
 
           <div className="hidden overflow-x-auto md:block">
-            <table className="w-full">
+            <table className="w-full min-w-[1320px]">
               <thead>
                 <tr className="border-b border-gray-200">
                   <th className="text-left py-3 px-4 text-sm font-semibold text-gray-700">Candidate</th>
@@ -530,16 +530,16 @@ export function ResultsReports() {
                   const percentage = Number(result.percentage);
                   return (
                     <tr key={result.id} className="border-b border-gray-100 hover:bg-gray-50">
-                      <td className="py-4 px-4">
-                        <p className="font-medium text-gray-900">{result.candidate.full_name}</p>
+                      <td className="py-4 px-4 min-w-[190px]">
+                        <p className="font-semibold text-gray-900 leading-snug">{result.candidate.full_name}</p>
                         <p className="text-xs text-gray-500">{result.candidate.email}</p>
                       </td>
-                      <td className="py-4 px-4">
-                        <p className="text-sm text-gray-700">{result.exam.name}</p>
+                      <td className="py-4 px-4 min-w-[200px] max-w-[280px]">
+                        <p className="text-sm leading-snug text-gray-700">{result.exam.name}</p>
                         <p className="text-xs text-gray-500">{result.exam.subject_name}</p>
                       </td>
-                      <td className="py-4 px-4 text-sm text-gray-900">
-                        <div>{result.score}/{result.total_marks}</div>
+                      <td className="py-4 px-4 whitespace-nowrap text-sm text-gray-900">
+                        <div className="font-semibold">{result.score}/{result.total_marks}</div>
                         <div className="text-xs text-gray-500">Orig. {result.original_score}</div>
                       </td>
                       <td className="py-4 px-4 text-sm text-gray-600">
@@ -565,8 +565,8 @@ export function ResultsReports() {
                       <td className="py-4 px-4">
                         <StatusBadge status={result.publish_state} />
                       </td>
-                      <td className="py-4 px-4 text-sm text-gray-600">{formatDate(result.completed_date)}</td>
-                      <td className="py-4 px-4 text-sm text-gray-600">{formatDuration(result.time_taken_minutes)}</td>
+                      <td className="py-4 px-4 whitespace-nowrap text-sm text-gray-600">{formatDate(result.completed_date)}</td>
+                      <td className="py-4 px-4 whitespace-nowrap text-sm text-gray-600">{formatDuration(result.time_taken_minutes)}</td>
                       <td className="py-4 px-4">
                         <div className="flex gap-2">
                           <Button size="sm" variant="ghost" onClick={() => setSelectedResult(result)}>

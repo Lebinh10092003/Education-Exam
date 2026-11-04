@@ -225,26 +225,21 @@ export function AdminLayout() {
     const isActive = getLeafActiveState(item);
     const label = t(item.labelKey, { ns: "navigation" });
     const paddingClass = compact
-      ? "justify-center px-3 py-3"
+      ? "justify-center px-3 py-2.5"
       : nested
-        ? "px-4 py-2"
-        : mobile
-          ? "px-4 py-3"
-          : "px-6 py-3";
+        ? "px-3 py-2 text-[13px]"
+        : "px-3 py-2.5";
 
     return (
       <Link
         key={`${mobile ? "mobile" : "desktop"}:${item.labelKey}:${item.path}`}
         to={item.path}
-        title={compact ? label : undefined}
-        className={`flex items-center gap-3 rounded-lg transition-colors ${
-          isActive
-            ? "bg-blue-50 text-blue-600 dark:bg-blue-500/16 dark:text-blue-100 dark:ring-1 dark:ring-blue-400/25"
-            : "text-gray-700 hover:bg-gray-50 dark:text-slate-300 dark:hover:bg-[var(--shell-elevated)] dark:hover:text-slate-50"
-        } ${paddingClass}`}
+        title={compact || label.length > 22 ? label : undefined}
+        data-active={isActive ? "true" : "false"}
+        className={`app-sidebar-link ${nested ? "app-sidebar-link-nested" : ""} flex items-center gap-3 rounded-md text-sm transition-all ${paddingClass}`}
       >
-        <item.icon className="h-5 w-5 flex-shrink-0" />
-        {!compact ? <span className="font-medium">{label}</span> : null}
+        <item.icon className={`${nested ? "h-4 w-4" : "h-[18px] w-[18px]"} flex-shrink-0`} />
+        {!compact ? <span className="min-w-0 truncate font-medium">{label}</span> : null}
       </Link>
     );
   };
@@ -269,17 +264,14 @@ export function AdminLayout() {
           type="button"
           aria-expanded={isExpanded}
           onClick={() => toggleGroup(entry.labelKey, mobile)}
-          className={`flex w-full items-center gap-3 rounded-lg text-left transition-colors ${
-            mobile ? "px-4 py-3" : sidebarCollapsed ? "justify-center px-3 py-3" : "px-6 py-3"
-          } ${
-            isActive || isExpanded
-              ? "bg-blue-50 text-blue-600 dark:bg-blue-500/16 dark:text-blue-100 dark:ring-1 dark:ring-blue-400/25"
-              : "text-gray-700 hover:bg-gray-50 dark:text-slate-300 dark:hover:bg-[var(--shell-elevated)] dark:hover:text-slate-50"
+          data-open={isActive || isExpanded ? "true" : "false"}
+          className={`app-sidebar-link app-sidebar-group flex w-full items-center gap-3 rounded-md text-left text-sm transition-all ${
+            !mobile && sidebarCollapsed ? "justify-center px-3 py-2.5" : "px-3 py-2.5"
           }`}
           title={!mobile && sidebarCollapsed ? label : undefined}
         >
-          <entry.icon className="h-5 w-5 flex-shrink-0" />
-          {!sidebarCollapsed || mobile ? <span className="font-medium">{label}</span> : null}
+          <entry.icon className="h-[18px] w-[18px] flex-shrink-0" />
+          {!sidebarCollapsed || mobile ? <span className="min-w-0 truncate font-medium">{label}</span> : null}
           {!sidebarCollapsed || mobile ? (
             <ChevronDown className={`ml-auto h-4 w-4 transition-transform ${isExpanded ? "rotate-180" : ""}`} />
           ) : null}
@@ -288,8 +280,8 @@ export function AdminLayout() {
           <div
             className={
               mobile
-                ? "ml-4 mt-1 space-y-1 border-l border-gray-200 pl-3 dark:border-white/[0.08]"
-                : "ml-9 mt-1 space-y-1 border-l border-gray-200 pl-3 dark:border-white/[0.08]"
+                ? "ml-5 mt-1 space-y-0.5 border-l border-white/10 pl-2"
+                : "ml-5 mt-1 space-y-0.5 border-l border-white/10 pl-2"
             }
           >
             {entry.children.map((child) =>
@@ -306,7 +298,7 @@ export function AdminLayout() {
   };
 
   return (
-    <div className="flex min-h-screen bg-gray-50 text-gray-900 dark:bg-[var(--shell-background)] dark:text-slate-100">
+    <div data-app-shell className="flex min-h-screen bg-[var(--shell-background)] text-slate-900 dark:text-slate-100">
       {mobileSidebarOpen ? (
         <button
           type="button"
@@ -318,17 +310,17 @@ export function AdminLayout() {
 
       <aside
         data-legacy-i18n-ignore="true"
-        className={`fixed inset-y-0 left-0 z-50 flex w-72 max-w-[85vw] flex-col border-r border-gray-200 bg-white transition-transform duration-300 dark:border-white/[0.08] dark:bg-[var(--shell-panel)] lg:hidden ${
+        className={`app-sidebar fixed inset-y-0 left-0 z-50 flex w-72 max-w-[85vw] flex-col border-r border-white/10 shadow-2xl transition-transform duration-300 lg:hidden ${
           mobileSidebarOpen ? "translate-x-0" : "-translate-x-full"
         }`}
       >
-        <div className="flex h-16 items-center justify-between border-b border-gray-200 px-4 dark:border-white/[0.08]">
+        <div className="flex h-16 items-center justify-between border-b border-white/10 px-4">
           <Link to="/dashboard" className="flex min-w-0 items-center">
-            <BrandLogo size="sm" subtitle="EduExam" />
+            <BrandLogo size="sm" subtitle="EduExam" onDark />
           </Link>
           <button
             type="button"
-            className="rounded-lg p-2 text-gray-700 transition-colors hover:bg-gray-100 dark:text-slate-300 dark:hover:bg-[var(--shell-elevated)]"
+            className="rounded-lg p-2 text-slate-300 transition-colors hover:bg-white/10 hover:text-white"
             onClick={() => setMobileSidebarOpen(false)}
           >
             <X className="h-5 w-5" />
@@ -343,13 +335,13 @@ export function AdminLayout() {
       <aside
         data-legacy-i18n-ignore="true"
         className={`${
-          sidebarCollapsed ? "w-20" : "w-64"
-        } hidden border-r border-gray-200 bg-white transition-all duration-300 dark:border-white/[0.08] dark:bg-[var(--shell-panel)] lg:flex lg:flex-col`}
+          sidebarCollapsed ? "w-20" : "w-[17rem]"
+        } app-sidebar sticky top-0 hidden h-screen shrink-0 border-r border-white/10 transition-all duration-300 lg:flex lg:flex-col`}
       >
-        <div className="flex h-16 items-center justify-between border-b border-gray-200 px-6 dark:border-white/[0.08]">
+        <div className="flex h-16 items-center justify-between border-b border-white/10 px-5">
           {!sidebarCollapsed ? (
             <Link to="/dashboard" className="flex min-w-0 items-center">
-              <BrandLogo size="sm" subtitle="EduExam" />
+              <BrandLogo size="sm" subtitle="EduExam" onDark />
             </Link>
           ) : (
             <Link to="/dashboard" className="mx-auto">
@@ -365,15 +357,15 @@ export function AdminLayout() {
         <button
           type="button"
           onClick={() => setSidebarCollapsed((previous) => !previous)}
-          className="border-t border-gray-200 p-4 transition-colors hover:bg-gray-50 dark:border-white/[0.08] dark:hover:bg-[var(--shell-elevated)]"
+          className="border-t border-white/10 p-4 text-slate-300 transition-colors hover:bg-white/5 hover:text-white"
         >
-          <Menu className="mx-auto h-5 w-5 text-gray-700 dark:text-slate-300" />
+          <Menu className="mx-auto h-5 w-5" />
         </button>
       </aside>
 
-      <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
+      <div className="flex h-screen min-w-0 flex-1 flex-col overflow-hidden">
         <header
-          className="border-b border-gray-200 bg-white px-4 py-3 dark:border-white/[0.08] dark:bg-[var(--shell-panel)] sm:px-6"
+          className="relative z-10 border-b border-slate-200/80 bg-white/90 px-4 py-3 shadow-[0_4px_16px_-12px_rgba(15,23,42,0.18)] backdrop-blur dark:border-white/[0.08] dark:bg-[var(--shell-panel)] sm:px-6"
           data-legacy-i18n-ignore="true"
         >
           <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
@@ -389,7 +381,7 @@ export function AdminLayout() {
                 <div className="hidden items-center gap-2 text-sm sm:flex">
                   <span className="text-gray-500 dark:text-slate-400">{t("common:app.name")}</span>
                   <span className="text-gray-300 dark:text-slate-600">/</span>
-                  <span className="font-medium text-gray-900 dark:text-slate-100">{currentLabel}</span>
+                  <span className="rounded-md bg-blue-50 px-2 py-0.5 font-semibold text-blue-700 dark:bg-blue-500/15 dark:text-blue-200">{currentLabel}</span>
                 </div>
                 <div className="sm:hidden">
                   <p className="text-xs uppercase tracking-wide text-gray-500 dark:text-slate-400">{t("navigation:currentPage")}</p>
@@ -402,7 +394,7 @@ export function AdminLayout() {
                   <input
                     type="text"
                     placeholder={t("navigation:searchPlaceholder")}
-                    className="w-full rounded-lg border border-gray-300 bg-white py-2 pl-10 pr-4 text-gray-900 focus:border-transparent focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-white/[0.08] dark:bg-[var(--shell-surface)] dark:text-slate-100 dark:placeholder:text-slate-500"
+                    className="w-full rounded-md border border-slate-200 bg-slate-50 py-2 pl-10 pr-4 text-slate-900 transition focus:border-blue-300 focus:bg-white focus:outline-none focus:ring-4 focus:ring-blue-500/15 dark:border-white/[0.08] dark:bg-[var(--shell-surface)] dark:text-slate-100 dark:placeholder:text-slate-500"
                   />
                 </div>
               </div>
@@ -421,8 +413,8 @@ export function AdminLayout() {
 
               <DropdownMenu>
                 <DropdownMenuTrigger className="flex min-w-0 items-center gap-3 rounded-lg border border-transparent px-2 py-2 transition-colors hover:bg-gray-50 dark:border-white/[0.06] dark:bg-[var(--shell-surface)] dark:hover:bg-[var(--shell-elevated)] sm:px-3">
-                  <Avatar className="h-8 w-8">
-                    <AvatarFallback>{initials}</AvatarFallback>
+                  <Avatar className="h-9 w-9 ring-2 ring-blue-100 dark:ring-blue-500/20">
+                    <AvatarFallback className="brand-gradient font-semibold text-white">{initials}</AvatarFallback>
                   </Avatar>
                   <div className="hidden min-w-0 text-left sm:block">
                     <div className="truncate text-sm font-medium text-gray-900 dark:text-slate-100">{displayName}</div>
@@ -455,13 +447,13 @@ export function AdminLayout() {
               <input
                 type="text"
                 placeholder={t("navigation:searchPlaceholder")}
-                className="w-full rounded-lg border border-gray-300 bg-white py-2 pl-10 pr-4 text-gray-900 focus:border-transparent focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-white/[0.08] dark:bg-[var(--shell-surface)] dark:text-slate-100 dark:placeholder:text-slate-500"
+                className="w-full rounded-md border border-slate-200 bg-slate-50 py-2 pl-10 pr-4 text-slate-900 transition focus:border-blue-300 focus:bg-white focus:outline-none focus:ring-4 focus:ring-blue-500/15 dark:border-white/[0.08] dark:bg-[var(--shell-surface)] dark:text-slate-100 dark:placeholder:text-slate-500"
               />
             </div>
           </div>
         </header>
 
-        <main className="flex-1 overflow-y-auto p-4 dark:bg-[var(--shell-background)] sm:p-6">
+        <main className="flex-1 overflow-y-auto p-4 dark:bg-[var(--shell-background)] sm:p-6 lg:p-8">
           <Suspense fallback={<RouteContentLoader />}>
             <Outlet />
           </Suspense>

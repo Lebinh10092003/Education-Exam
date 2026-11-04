@@ -402,7 +402,7 @@ export function ExamManagement() {
           </div>
 
           <div className="hidden overflow-x-auto md:block">
-            <table className="w-full min-w-[1240px]">
+            <table className="w-full min-w-[1320px]">
               <thead>
                 <tr className="border-b border-gray-200">
                   <th className="text-left py-3 px-4 text-sm font-semibold text-gray-700">Exam Name</th>
@@ -413,7 +413,7 @@ export function ExamManagement() {
                   <th className="text-left py-3 px-4 text-sm font-semibold text-gray-700">Composition</th>
                   <th className="text-left py-3 px-4 text-sm font-semibold text-gray-700">Gán nhóm</th>
                   <th className="text-left py-3 px-4 text-sm font-semibold text-gray-700">Progress</th>
-                  <th className="text-left py-3 px-4 text-sm font-semibold text-gray-700">Actions</th>
+                  <th className="sticky right-0 z-[1] text-left py-3 px-4 text-sm font-semibold text-gray-700 shadow-[-8px_0_12px_-10px_rgba(15,23,42,0.25)]">Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -438,8 +438,8 @@ export function ExamManagement() {
 
                     return (
                       <tr key={exam.id} className="border-b border-gray-100 hover:bg-gray-50">
-                        <td className="py-4 px-4">
-                          <p className="font-medium text-gray-900">{exam.name}</p>
+                        <td className="py-4 px-4 min-w-[220px] max-w-[300px]">
+                          <p className="font-semibold text-gray-900 leading-snug">{exam.name}</p>
                           <p className="text-xs text-gray-500 mt-1">
                             {`Updated ${formatSchedule(exam.updated_at)}`}
                           </p>
@@ -457,12 +457,12 @@ export function ExamManagement() {
                         </td>
                         <td className="py-4 px-4">
                           {exam.mode === "exam" ? (
-                            <div className="text-sm">
+                            <div className="text-sm whitespace-nowrap">
                               <p className="text-gray-900">
                                 {formatSchedule(exam.schedule_window?.opens_at ?? null)}
                               </p>
                               <p className="text-gray-500">
-                                to {formatSchedule(exam.schedule_window?.closes_at ?? null, false)}
+                                → {formatSchedule(exam.schedule_window?.closes_at ?? null, false)}
                               </p>
                             </div>
                           ) : (
@@ -474,20 +474,20 @@ export function ExamManagement() {
                         </td>
                         <td className="py-4 px-4">
                           {exam.mode === "exam" ? (
-                            <div className="text-sm text-gray-700">
+                            <div className="text-sm text-gray-700 whitespace-nowrap">
                               <p>{`${exam.current_version?.item_count ?? 0} questions`}</p>
                               <p className="text-gray-500">
                                 {`${exam.duration_minutes} min • v${exam.current_version?.version_number ?? 1}`}
                               </p>
                             </div>
                           ) : (
-                            <div className="text-sm text-gray-700">
+                            <div className="text-sm text-gray-700 min-w-[170px]">
                               <p>Practice & materials access</p>
                               <p className="text-gray-500">No fixed paper is delivered</p>
                             </div>
                           )}
                         </td>
-                        <td className="py-4 px-4">
+                        <td className="py-4 px-4 min-w-[180px]">
                           {exam.assignment_summary.assigned_groups.length > 0 ? (
                             <div className="flex flex-wrap gap-1">
                               {exam.assignment_summary.assigned_groups.slice(0, 2).map((group) => (
@@ -505,15 +505,15 @@ export function ExamManagement() {
                             <span className="text-sm text-gray-500">Not assigned</span>
                           )}
                         </td>
-                        <td className="py-4 px-4">
+                        <td className="py-4 px-4 min-w-[170px]">
                           {exam.mode === "class" ? (
                             <span className="text-sm text-emerald-700">Learning access only</span>
                           ) : totalCandidates > 0 ? (
                             <div className="space-y-2">
                               <div className="flex items-center gap-2">
-                                <div className="flex-1 bg-gray-200 rounded-full h-2 min-w-[80px]">
+                                <div className="flex-1 bg-slate-100 rounded-full h-2 min-w-[80px] overflow-hidden">
                                   <div
-                                    className="bg-green-600 h-2 rounded-full"
+                                    className="brand-gradient h-2 rounded-full"
                                     style={{ width: `${progressPercent}%` }}
                                   />
                                 </div>
@@ -529,7 +529,7 @@ export function ExamManagement() {
                             <span className="text-sm text-gray-500">No candidates assigned</span>
                           )}
                         </td>
-                        <td className="py-4 px-4">
+                        <td className="sticky right-0 bg-white py-4 px-4 shadow-[-8px_0_12px_-10px_rgba(15,23,42,0.25)] dark:bg-[var(--shell-surface)]">
                           <div className="flex gap-1">
                             <Link to={`/exams/${exam.id}`}>
                               <Button

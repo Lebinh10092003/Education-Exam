@@ -8,13 +8,15 @@ type BrandLogoProps = {
   size?: "sm" | "md" | "lg";
   className?: string;
   subtitleClassName?: string;
+  /** Dat tren nen toi (vd. sidebar navy): logo nam tren nen trang, nhan phu mau sang. */
+  onDark?: boolean;
 };
 
 // Logo goc 159x60 (ty le ~2.65:1): luon dat chieu cao, de chieu rong tu dong theo ty le.
 const FULL_HEIGHT = { sm: "h-7", md: "h-9 sm:h-10", lg: "h-12" } as const;
 const MARK_SIZE = { sm: "h-8 w-8", md: "h-9 w-9", lg: "h-11 w-11" } as const;
 
-export function BrandLogo({ variant = "full", subtitle, size = "md", className, subtitleClassName }: BrandLogoProps) {
+export function BrandLogo({ variant = "full", subtitle, size = "md", className, subtitleClassName, onDark = false }: BrandLogoProps) {
   if (variant === "mark") {
     return (
       <img
@@ -28,7 +30,7 @@ export function BrandLogo({ variant = "full", subtitle, size = "md", className, 
   return (
     <span className={cn("flex min-w-0 items-center gap-3", className)}>
       {/* Logo mau navy: tren nen toi can nen trang de khong bi chim. */}
-      <span className="shrink-0 rounded-lg dark:bg-white dark:px-2 dark:py-1">
+      <span className={cn("shrink-0 rounded-lg dark:bg-white dark:px-2 dark:py-1", onDark && "bg-white px-2 py-1 shadow-sm")}>
         <img
           src="/fermat-logo.png"
           alt="FermatTech"
@@ -41,6 +43,7 @@ export function BrandLogo({ variant = "full", subtitle, size = "md", className, 
         <span
           className={cn(
             "shrink-0 whitespace-nowrap border-l border-slate-200 pl-3 text-[11px] font-semibold uppercase leading-tight tracking-[0.14em] text-slate-500 dark:border-slate-700 dark:text-slate-400",
+            onDark && "border-white/20 text-sky-200",
             subtitleClassName,
           )}
         >

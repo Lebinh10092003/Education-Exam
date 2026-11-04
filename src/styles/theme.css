@@ -2,44 +2,52 @@
 
 :root {
   --font-size: 16px;
+  /* Mau thuong hieu FermatTech: xanh duong chu dao + cyan lam diem nhan (dong bo voi logo/trang chu). */
+  --brand-600: #2563eb;
+  --brand-700: #1d4ed8;
+  --brand-50: #eff4ff;
+  --brand-accent: #06b6d4;
+  --brand-gradient: linear-gradient(135deg, #2563eb 0%, #0ea5e9 55%, #06b6d4 100%);
+  --brand-navy: #0b1a3a;
+  --brand-navy-2: #10244f;
   --background: #ffffff;
-  --foreground: oklch(0.145 0 0);
+  --foreground: #0f172a;
   --card: #ffffff;
-  --card-foreground: oklch(0.145 0 0);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  --primary: #030213;
-  --primary-foreground: oklch(1 0 0);
-  --secondary: oklch(0.95 0.0058 264.53);
-  --secondary-foreground: #030213;
-  --muted: #ececf0;
-  --muted-foreground: #717182;
-  --accent: #e9ebef;
-  --accent-foreground: #030213;
-  --destructive: #d4183d;
+  --card-foreground: #0f172a;
+  --popover: #ffffff;
+  --popover-foreground: #0f172a;
+  --primary: #2563eb;
+  --primary-foreground: #ffffff;
+  --secondary: #eef2ff;
+  --secondary-foreground: #1e3a8a;
+  --muted: #f1f5f9;
+  --muted-foreground: #64748b;
+  --accent: #eff4ff;
+  --accent-foreground: #1d4ed8;
+  --destructive: #dc2626;
   --destructive-foreground: #ffffff;
-  --border: rgba(0, 0, 0, 0.1);
+  --border: #e2e8f0;
   --input: transparent;
-  --input-background: #f3f3f5;
-  --switch-background: #cbced4;
+  --input-background: #f8fafc;
+  --switch-background: #cbd5e1;
   --font-weight-medium: 500;
   --font-weight-normal: 400;
-  --ring: oklch(0.708 0 0);
-  --chart-1: oklch(0.646 0.222 41.116);
-  --chart-2: oklch(0.6 0.118 184.704);
-  --chart-3: oklch(0.398 0.07 227.392);
-  --chart-4: oklch(0.828 0.189 84.429);
-  --chart-5: oklch(0.769 0.188 70.08);
-  --radius: 0.625rem;
-  --sidebar: oklch(0.985 0 0);
-  --sidebar-foreground: oklch(0.145 0 0);
-  --sidebar-primary: #030213;
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.97 0 0);
-  --sidebar-accent-foreground: oklch(0.205 0 0);
-  --sidebar-border: oklch(0.922 0 0);
-  --sidebar-ring: oklch(0.708 0 0);
-  --shell-background: #f8fafc;
+  --ring: #3b82f6;
+  --chart-1: #2563eb;
+  --chart-2: #06b6d4;
+  --chart-3: #10b981;
+  --chart-4: #f59e0b;
+  --chart-5: #8b5cf6;
+  --radius: 0.375rem;
+  --sidebar: #0b1a3a;
+  --sidebar-foreground: #cbd5e1;
+  --sidebar-primary: #2563eb;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: rgba(255, 255, 255, 0.06);
+  --sidebar-accent-foreground: #ffffff;
+  --sidebar-border: rgba(255, 255, 255, 0.08);
+  --sidebar-ring: #3b82f6;
+  --shell-background: #f4f7fc;
   --shell-panel: #ffffff;
   --shell-surface: #ffffff;
   --shell-elevated: #f8fafc;
@@ -148,7 +156,10 @@
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
-  --radius-xl: calc(var(--radius) + 4px);
+  /* Bo goc vua phai: thu nho ca thang 2xl/3xl ma nhieu trang dang dung truc tiep. */
+  --radius-xl: calc(var(--radius) + 2px);
+  --radius-2xl: calc(var(--radius) + 4px);
+  --radius-3xl: calc(var(--radius) + 6px);
   --color-sidebar: var(--sidebar);
   --color-sidebar-foreground: var(--sidebar-foreground);
   --color-sidebar-primary: var(--sidebar-primary);
@@ -452,3 +463,91 @@
   border: 1px solid rgba(255, 255, 255, 0.05) !important;
 }
 
+/* ============================================================================
+ * Giao dien quan tri/thi sinh: bang du lieu, diem nhan thuong hieu.
+ * Dat ngoai @layer de ap dung dong bo cho ca bang <table> viet tay o cac trang cu.
+ * ========================================================================== */
+[data-app-shell] table thead th {
+  white-space: nowrap;
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+:root:not(.dark) [data-app-shell] table thead th {
+  background-color: #f8fafc;
+  color: #64748b;
+}
+
+:root:not(.dark) [data-app-shell] table thead tr {
+  border-bottom-color: #e2e8f0;
+}
+
+:root:not(.dark) [data-app-shell] table tbody tr {
+  transition: background-color 0.15s ease;
+}
+
+:root:not(.dark) [data-app-shell] table tbody tr:hover {
+  background-color: #f5f8ff;
+}
+
+.dark [data-app-shell] table thead th {
+  background-color: var(--legacy-surface-2);
+  color: var(--legacy-text-muted);
+}
+
+/* Thanh nhan mau thuong hieu (gradient xanh -> cyan). */
+.brand-gradient {
+  background-image: var(--brand-gradient);
+}
+
+.brand-gradient-text {
+  background-image: var(--brand-gradient);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+/* Sidebar admin: nen navy dam, muc dang chon dung gradient thuong hieu. */
+.app-sidebar {
+  background: linear-gradient(180deg, var(--brand-navy) 0%, var(--brand-navy-2) 100%);
+  color: #cbd5e1;
+}
+
+.dark .app-sidebar {
+  background: var(--shell-panel);
+}
+
+.app-sidebar-link {
+  color: #cbd5e1;
+}
+
+.app-sidebar-link:hover {
+  background-color: rgba(255, 255, 255, 0.07);
+  color: #ffffff;
+}
+
+.app-sidebar-link[data-active="true"] {
+  background-image: var(--brand-gradient);
+  color: #ffffff;
+  box-shadow: 0 8px 20px -8px rgba(14, 165, 233, 0.65);
+}
+
+.app-sidebar-group[data-open="true"] {
+  background-color: rgba(255, 255, 255, 0.06);
+  color: #ffffff;
+}
+
+.app-sidebar-link-nested[data-active="true"] {
+  background-image: none;
+  background-color: rgba(56, 189, 248, 0.16);
+  color: #ffffff;
+  box-shadow: inset 3px 0 0 #38bdf8;
+}
+
+/* Thanh cuon mong, toi mau trong sidebar navy. */
+.app-sidebar nav {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.18) transparent;
+}

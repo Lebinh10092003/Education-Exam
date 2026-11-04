@@ -325,14 +325,14 @@ export function CandidateDashboard() {
                     <div className="mt-4 grid grid-cols-1 gap-3 text-sm text-gray-600 md:grid-cols-3">
                       <div className="flex items-center gap-2">
                         <Clock3 className="h-4 w-4" />
-                        <span>{exam.duration_minutes} minutes</span>
+                        <span>{`${exam.duration_minutes} minutes`}</span>
                       </div>
                       <div className="flex items-center gap-2">
                         <CalendarDays className="h-4 w-4" />
                         <span>{formatDateTime(exam.schedule.opens_at)}</span>
                       </div>
                       <div className="text-sm">
-                        Attempts {exam.attempts_used}/{exam.max_attempts}
+                        {`Attempts ${exam.attempts_used}/${exam.max_attempts}`}
                       </div>
                     </div>
                   </div>

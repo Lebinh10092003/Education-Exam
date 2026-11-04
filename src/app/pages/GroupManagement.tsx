@@ -217,21 +217,24 @@ export function GroupManagement() {
           groups.map((group) => (
             <Card key={group.id} className="transition-shadow hover:shadow-lg">
               <CardHeader>
-                <div className="flex items-start justify-between gap-3">
+                <div className="flex min-w-0 items-start justify-between gap-3">
                   <div className="flex min-w-0 items-center gap-3">
                     <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-blue-100">
                       <Users className="h-6 w-6 text-blue-600" />
                     </div>
                     <div className="min-w-0">
-                      <CardTitle className="truncate text-lg">{group.name}</CardTitle>
-                      <p className="mt-1 text-sm text-gray-500">
-                        Tạo ngày {formatDate(group.created_at)}
-                      </p>
+                      <CardTitle className="line-clamp-2 text-lg leading-snug" title={group.name}>{group.name}</CardTitle>
+                      <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1">
+                        <Badge
+                          variant="outline"
+                          className={group.is_active ? "border-emerald-200 bg-emerald-50 text-emerald-700" : "border-slate-200 bg-slate-100 text-slate-600"}
+                        >
+                          {group.is_active ? "Đang hoạt động" : "Tạm dừng"}
+                        </Badge>
+                        <span className="text-xs text-gray-500">Tạo ngày {formatDate(group.created_at)}</span>
+                      </div>
                     </div>
                   </div>
-                  <Badge variant={group.is_active ? "outline" : "secondary"}>
-                    {group.is_active ? "Đang hoạt động" : "Tạm dừng"}
-                  </Badge>
                 </div>
               </CardHeader>
               <CardContent>

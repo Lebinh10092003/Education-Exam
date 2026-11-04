@@ -603,12 +603,12 @@ export function QuestionBank() {
                 ) : (
                   questions.map((question) => (
                     <tr key={question.id} className="border-b border-gray-100 hover:bg-gray-50">
-                      <td className="py-4 px-4">
-                        <p className="font-medium text-gray-900 max-w-md">
+                      <td className="py-4 px-4 min-w-[300px]">
+                        <p className="font-medium text-gray-900 max-w-md leading-snug">
                           <MathText text={question.current_revision.question_text} />
                         </p>
                         <p className="text-xs text-gray-500 mt-1">
-                          Updated {formatDateTime(question.updated_at)}
+                          {`Updated ${formatDateTime(question.updated_at)}`}
                         </p>
                       </td>
                       <td className="py-4 px-4">
@@ -619,7 +619,7 @@ export function QuestionBank() {
                           {difficultyLabels[question.difficulty]}
                         </Badge>
                       </td>
-                      <td className="py-4 px-4 text-sm text-gray-700">
+                      <td className="py-4 px-4 whitespace-nowrap text-sm text-gray-700">
                         {questionTypeLabels[question.question_type]}
                       </td>
                       <td className="py-4 px-4">

@@ -652,7 +652,7 @@ export function UserManagement() {
           </div>
 
           <div className="hidden overflow-x-auto md:block">
-            <table className="w-full min-w-[960px]">
+            <table className="w-full min-w-[1120px]">
               <thead>
                 <tr className="border-b border-gray-200">
                   <th className="text-left py-3 px-4 w-12">
@@ -704,9 +704,9 @@ export function UserManagement() {
                           onCheckedChange={() => toggleUserSelection(user.id)}
                         />
                       </td>
-                      <td className="py-3 px-4">
+                      <td className="py-3 px-4 min-w-[190px]">
                         <div>
-                          <p className="font-medium text-gray-900">{user.full_name}</p>
+                          <p className="font-semibold text-gray-900 leading-snug">{user.full_name}</p>
                           {user.phone_number && (
                             <p className="text-xs text-gray-500 mt-1">{user.phone_number}</p>
                           )}
@@ -726,13 +726,13 @@ export function UserManagement() {
                           )}
                         </div>
                       </td>
-                      <td className="py-3 px-4 text-sm text-gray-600">
+                      <td className="py-3 px-4 min-w-[220px] max-w-[300px] text-sm leading-snug text-gray-600">
                         {user.school ? `${user.school.name} (${user.school.code})` : "Unassigned"}
                       </td>
                       <td className="py-3 px-4">
                         <StatusBadge status={user.status} />
                       </td>
-                      <td className="py-3 px-4 text-sm text-gray-600">
+                      <td className="py-3 px-4 whitespace-nowrap text-sm text-gray-600">
                         {formatLastLogin(user.last_login)}
                       </td>
                       <td className="py-3 px-4">

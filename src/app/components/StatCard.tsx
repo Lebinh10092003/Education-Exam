@@ -25,12 +25,14 @@ export function StatCard({
   iconColor = "text-blue-600 dark:text-blue-300",
 }: StatCardProps) {
   return (
-    <Card className="shadow-sm dark:shadow-[0_18px_38px_rgba(2,6,23,0.22)]">
+    <Card className="relative overflow-hidden shadow-sm transition-shadow hover:shadow-md dark:shadow-[0_18px_38px_rgba(2,6,23,0.22)]">
+      {/* Vach mau thuong hieu tren dau the. */}
+      <span aria-hidden="true" className="brand-gradient absolute inset-x-0 top-0 h-1" />
       <CardContent className="p-6">
-        <div className="flex items-center justify-between">
-          <div className="flex-1">
-            <p className="mb-1 text-sm text-muted-foreground">{title}</p>
-            <p className="text-2xl font-bold text-foreground">{value}</p>
+        <div className="flex items-center justify-between gap-4">
+          <div className="min-w-0 flex-1">
+            <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-muted-foreground">{title}</p>
+            <p className="text-3xl font-bold tracking-tight text-slate-900 dark:text-foreground">{value}</p>
             {trend ? (
               <p
                 className={`mt-2 text-sm ${
@@ -50,7 +52,7 @@ export function StatCard({
               </p>
             ) : null}
           </div>
-          <div className={`${iconBgColor} ${iconColor} rounded-2xl border border-white/5 p-4`}>
+          <div className={`${iconBgColor} ${iconColor} shrink-0 rounded-lg p-3.5`}>
             <Icon className="h-6 w-6" />
           </div>
         </div>

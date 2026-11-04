@@ -151,10 +151,10 @@ export function CandidateLayout() {
         key={item.path}
         to={item.path}
         className={cn(
-          "flex items-center gap-3 rounded-2xl px-3 py-3 text-sm font-medium transition-colors",
+          "flex items-center gap-3 rounded-md px-3 py-2.5 text-sm font-medium transition-all",
           active
-            ? "bg-blue-600 text-white shadow-sm dark:bg-blue-500/16 dark:text-blue-100 dark:ring-1 dark:ring-blue-400/25 dark:shadow-none"
-            : "text-slate-700 hover:bg-slate-100 hover:text-slate-950 dark:text-slate-300 dark:hover:bg-[var(--shell-elevated)] dark:hover:text-slate-50",
+            ? "brand-gradient text-white shadow-[0_8px_20px_-10px_rgba(37,99,235,0.7)] dark:bg-none dark:bg-blue-500/16 dark:text-blue-100 dark:ring-1 dark:ring-blue-400/25 dark:shadow-none"
+            : "text-slate-600 hover:bg-blue-50 hover:text-blue-700 dark:text-slate-300 dark:hover:bg-[var(--shell-elevated)] dark:hover:text-slate-50",
           options.compact ? "px-4" : "",
         )}
       >
@@ -173,7 +173,7 @@ export function CandidateLayout() {
   };
 
   return (
-    <div className="flex min-h-screen bg-[linear-gradient(180deg,#eff6ff_0%,#f8fafc_14%,#f8fafc_100%)] text-slate-900 dark:bg-[linear-gradient(180deg,#0f1115_0%,#131923_18%,#0f1115_100%)] dark:text-slate-100">
+    <div data-app-shell className="flex min-h-screen bg-[linear-gradient(180deg,#eaf1ff_0%,#f4f7fc_16%,#f4f7fc_100%)] text-slate-900 dark:bg-[linear-gradient(180deg,#0f1115_0%,#131923_18%,#0f1115_100%)] dark:text-slate-100">
       {mobileSidebarOpen ? (
         <button
           type="button"
@@ -205,7 +205,7 @@ export function CandidateLayout() {
 
         <div className="flex-1 overflow-y-auto px-4 py-5">
           {schoolName ? (
-            <Badge variant="outline" className="mb-5 rounded-full border-blue-200 bg-blue-50 text-blue-700 dark:border-blue-400/30 dark:bg-blue-500/12 dark:text-blue-200">
+            <Badge variant="outline" className="mb-5 max-w-full whitespace-normal rounded-md border-blue-200 bg-blue-50 text-left leading-snug text-blue-700 dark:border-blue-400/30 dark:bg-blue-500/12 dark:text-blue-200">
               {schoolName}
             </Badge>
           ) : null}
@@ -224,14 +224,15 @@ export function CandidateLayout() {
 
       <aside
         data-legacy-i18n-ignore="true"
-        className="hidden w-72 shrink-0 border-r border-slate-200 bg-white dark:border-white/[0.08] dark:bg-[var(--shell-panel)] lg:flex lg:flex-col"
+        className="sticky top-0 hidden h-screen w-72 shrink-0 border-r border-slate-200 bg-white dark:border-white/[0.08] dark:bg-[var(--shell-panel)] lg:flex lg:flex-col"
       >
-        <div className="border-b border-slate-200 px-6 py-5 dark:border-white/[0.08]">
+        <div className="relative border-b border-slate-200 px-6 py-5 dark:border-white/[0.08]">
+          <span aria-hidden="true" className="brand-gradient absolute inset-x-0 top-0 h-1" />
           <Link to="/candidate" className="flex min-w-0 items-center">
             <BrandLogo subtitle={t("candidate.portal", { ns: "navigation" })} />
           </Link>
           {schoolName ? (
-            <Badge variant="outline" className="mt-4 rounded-full border-blue-200 bg-blue-50 text-blue-700 dark:border-blue-400/30 dark:bg-blue-500/12 dark:text-blue-200">
+            <Badge variant="outline" className="mt-4 max-w-full whitespace-normal rounded-md border-blue-200 bg-blue-50 text-left leading-snug text-blue-700 dark:border-blue-400/30 dark:bg-blue-500/12 dark:text-blue-200">
               {schoolName}
             </Badge>
           ) : null}
@@ -276,16 +277,16 @@ export function CandidateLayout() {
               {!isActive("/candidate/notifications") && (unreadCount.data?.unread_count ?? 0) > 0 ? (
                 <Link
                   to="/candidate/notifications"
-                  className="inline-flex items-center gap-2 rounded-full border border-red-200 bg-red-50 px-3 py-2 text-sm font-medium text-red-700 dark:border-red-500/30 dark:bg-red-500/12 dark:text-red-200"
+                  className="inline-flex items-center gap-2 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm font-medium text-red-700 dark:border-red-500/30 dark:bg-red-500/12 dark:text-red-200"
                 >
                   <Bell className="h-4 w-4" />
                   {unreadCount.data?.unread_count}
                 </Link>
               ) : null}
               <DropdownMenu>
-                <DropdownMenuTrigger className="flex min-w-0 items-center gap-3 rounded-full border border-slate-200 bg-white px-2 py-1.5 transition-colors hover:bg-slate-50 dark:border-white/[0.08] dark:bg-[var(--shell-surface)] dark:hover:bg-[var(--shell-elevated)] sm:px-3">
-                  <Avatar className="h-9 w-9">
-                    <AvatarFallback>{initials}</AvatarFallback>
+                <DropdownMenuTrigger className="flex min-w-0 items-center gap-3 rounded-md border border-slate-200 bg-white px-2 py-1.5 transition-colors hover:bg-slate-50 dark:border-white/[0.08] dark:bg-[var(--shell-surface)] dark:hover:bg-[var(--shell-elevated)] sm:px-3">
+                  <Avatar className="h-9 w-9 ring-2 ring-blue-100 dark:ring-blue-500/20">
+                    <AvatarFallback className="brand-gradient font-semibold text-white">{initials}</AvatarFallback>
                   </Avatar>
                   <div className="hidden min-w-0 text-left sm:block">
                     <p className="truncate text-sm font-medium text-slate-900 dark:text-slate-100">{displayName}</p>
