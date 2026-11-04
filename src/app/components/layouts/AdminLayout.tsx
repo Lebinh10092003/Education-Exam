@@ -368,8 +368,8 @@ export function AdminLayout() {
           className="relative z-10 border-b border-slate-200/80 bg-white/90 px-4 py-3 shadow-[0_4px_16px_-12px_rgba(15,23,42,0.18)] backdrop-blur dark:border-white/[0.08] dark:bg-[var(--shell-panel)] sm:px-6"
           data-legacy-i18n-ignore="true"
         >
-          <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-            <div className="flex min-w-0 items-start gap-3 sm:items-center lg:flex-1">
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex min-w-0 flex-1 items-center gap-3">
               <button
                 type="button"
                 className="rounded-lg p-2 text-gray-700 transition-colors hover:bg-gray-100 lg:hidden"
@@ -400,7 +400,7 @@ export function AdminLayout() {
               </div>
             </div>
 
-            <div className="flex items-center justify-between gap-3 sm:justify-end">
+            <div className="flex shrink-0 items-center gap-2 sm:gap-3">
               <LanguageSwitcher />
               <Link to="/notifications" className="relative rounded-lg p-2 transition-colors hover:bg-gray-100 dark:hover:bg-[var(--shell-elevated)]">
                 <Bell className="h-5 w-5 text-gray-700 dark:text-slate-300" />
@@ -438,17 +438,6 @@ export function AdminLayout() {
                   <DropdownMenuItem onClick={logout}>{t("common:actions.logout")}</DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
-            </div>
-          </div>
-
-          <div className="mt-3 md:hidden">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400 dark:text-slate-500" />
-              <input
-                type="text"
-                placeholder={t("navigation:searchPlaceholder")}
-                className="w-full rounded-md border border-slate-200 bg-slate-50 py-2 pl-10 pr-4 text-slate-900 transition focus:border-blue-300 focus:bg-white focus:outline-none focus:ring-4 focus:ring-blue-500/15 dark:border-white/[0.08] dark:bg-[var(--shell-surface)] dark:text-slate-100 dark:placeholder:text-slate-500"
-              />
             </div>
           </div>
         </header>

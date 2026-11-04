@@ -277,6 +277,30 @@
     color: var(--legacy-red-text) !important;
   }
 
+  .dark :is(.bg-emerald-50, .bg-emerald-100) {
+    background-color: var(--legacy-green-surface) !important;
+  }
+  .dark :is(.border-emerald-100, .border-emerald-200, .border-emerald-300) {
+    border-color: var(--legacy-green-border) !important;
+  }
+  .dark :is(.text-emerald-800, .text-emerald-700, .text-emerald-600) {
+    color: var(--legacy-green-text) !important;
+  }
+  .dark :is(.bg-sky-50, .bg-sky-100, .bg-cyan-50, .bg-cyan-100) {
+    background-color: var(--legacy-blue-surface) !important;
+  }
+  .dark :is(.text-sky-700, .text-sky-800, .text-cyan-700, .text-cyan-800) {
+    color: var(--legacy-blue-text) !important;
+  }
+  .dark :is(.bg-orange-50, .bg-yellow-50, .bg-yellow-100) {
+    background-color: var(--legacy-amber-surface) !important;
+  }
+  .dark :is(.border-orange-200, .border-yellow-200) {
+    border-color: var(--legacy-amber-border) !important;
+  }
+  .dark :is(.text-orange-700, .text-orange-800, .text-yellow-700, .text-yellow-800) {
+    color: var(--legacy-amber-text) !important;
+  }
   .dark .bg-purple-100 {
     background-color: var(--legacy-purple-surface) !important;
   }

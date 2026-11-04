@@ -27,6 +27,7 @@ import {
 import { Textarea } from "../components/ui/textarea";
 import { ImportTemplateActions } from "../components/imports/ImportTemplateActions";
 import { MathText } from "../components/MathText";
+import { RangeSummary } from "../components/RangeSummary";
 import { apiRequest, type PaginatedResponse } from "../lib/http";
 import { questionImportTemplate } from "../lib/importTemplates";
 import { useAsyncList } from "../hooks/useAsyncList";
@@ -664,9 +665,7 @@ export function QuestionBank() {
           </div>
 
           <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <p className="text-sm text-gray-600">
-              Showing <strong>{rangeStart}-{rangeEnd}</strong> of <strong>{totalCount}</strong> questions
-            </p>
+            <RangeSummary start={rangeStart} end={rangeEnd} total={totalCount} unit="questions" />
             <div className="flex gap-2">
               <Button
                 variant="outline"

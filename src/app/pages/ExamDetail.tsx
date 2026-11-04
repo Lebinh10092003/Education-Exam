@@ -504,8 +504,8 @@ export function ExamDetail() {
         </div>
       ) : null}
 
-      <div className="mb-6 grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-4">
-        <Card>
+      <div className="mb-6 grid grid-cols-2 gap-3 sm:gap-6 xl:grid-cols-4">
+        <Card className="border-l-4 border-l-blue-500">
           <CardHeader className="pb-3">
             <CardTitle className="flex items-center gap-2 text-base">
               <Users className="h-4 w-4 text-blue-600" />
@@ -519,7 +519,7 @@ export function ExamDetail() {
             </p>
           </CardContent>
         </Card>
-        <Card>
+        <Card className="border-l-4 border-l-emerald-500">
           <CardHeader className="pb-3">
             <CardTitle className="flex items-center gap-2 text-base">
               <FileText className="h-4 w-4 text-green-600" />
@@ -533,7 +533,7 @@ export function ExamDetail() {
             </p>
           </CardContent>
         </Card>
-        <Card>
+        <Card className="border-l-4 border-l-amber-500">
           <CardHeader className="pb-3">
             <CardTitle className="flex items-center gap-2 text-base">
               <Play className="h-4 w-4 text-amber-600" />
@@ -547,7 +547,7 @@ export function ExamDetail() {
             </p>
           </CardContent>
         </Card>
-        <Card>
+        <Card className="border-l-4 border-l-slate-400">
           <CardHeader className="pb-3">
             <CardTitle className="flex items-center gap-2 text-base">
               <Clock className="h-4 w-4 text-gray-600" />
@@ -572,7 +572,8 @@ export function ExamDetail() {
         </Card>
       </div>
 
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
+      {/* Tab giam sat can toan bo chieu rong; an cot thao tac nhanh khi dang o tab nay. */}
+      <div className={`grid grid-cols-1 gap-6 ${activeTab === "monitoring" ? "" : "lg:grid-cols-[minmax(0,1fr)_320px]"}`}>
         <Card>
           <CardContent className="p-6">
             <Tabs value={activeTab} onValueChange={(value) => updateTab(value as ExamTab)} className="space-y-6">
@@ -970,7 +971,7 @@ export function ExamDetail() {
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className={activeTab === "monitoring" ? "hidden" : undefined}>
           <CardHeader>
             <CardTitle className="text-base">Quick Actions</CardTitle>
           </CardHeader>

@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Link } from "react-router";
 import { notify } from "../lib/notify";
 import {
@@ -20,6 +21,7 @@ import { StatusBadge } from "../components/StatusBadge";
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
+import { RangeSummary } from "../components/RangeSummary";
 import {
   Select,
   SelectContent,
@@ -42,6 +44,7 @@ import { useMutationState } from "../hooks/useMutationState";
 import { buildApiUrl } from "../lib/env";
 import { getStoredTokens } from "../lib/storage";
 import { formatCertificateLevel } from "./disciplineShared";
+import { translateLegacyUiText } from "../i18n/legacyUiFallback";
 
 interface ExamOption {
   id: number;
@@ -172,6 +175,8 @@ const exportExamRosterFile = async (examFilter: string) => {
 
 
 export function ResultsReports() {
+  const { i18n } = useTranslation();
+  const chartLocale = i18n.resolvedLanguage ?? i18n.language ?? "vi";
   const [searchQuery, setSearchQuery] = useState("");
   const [examFilter, setExamFilter] = useState("all");
   const [page, setPage] = useState(1);
@@ -201,11 +206,12 @@ export function ResultsReports() {
 
   const passFailData = useMemo(
     () => [
-      { name: "Pass", value: summary.data?.pass_count ?? 0, color: "#10b981" },
-      { name: "Fail", value: summary.data?.fail_count ?? 0, color: "#ef4444" },
-      { name: "Pending", value: summary.data?.pending_count ?? 0, color: "#f59e0b" },
+      // Nhan bieu do nam trong SVG nen bridge khong dich duoc; dich san theo ngon ngu hien tai.
+      { name: translateLegacyUiText(chartLocale, "Pass"), value: summary.data?.pass_count ?? 0, color: "#10b981" },
+      { name: translateLegacyUiText(chartLocale, "Fail"), value: summary.data?.fail_count ?? 0, color: "#ef4444" },
+      { name: translateLegacyUiText(chartLocale, "Pending"), value: summary.data?.pending_count ?? 0, color: "#f59e0b" },
     ],
-    [summary.data],
+    [chartLocale, summary.data],
   );
 
   const publishResult = async (result: ResultRecord) => {
@@ -602,9 +608,7 @@ export function ResultsReports() {
           </div>
 
           <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <p className="text-sm text-gray-600">
-              Showing <strong>{startRow}</strong>-<strong>{endRow}</strong> of <strong>{totalResults}</strong> results
-            </p>
+            <RangeSummary start={startRow} end={endRow} total={totalResults} unit="results" />
             <div className="flex gap-2">
               <Button variant="outline" size="sm" disabled={page === 1} onClick={() => setPage((current) => current - 1)}>
                 Previous

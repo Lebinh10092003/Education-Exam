@@ -30,6 +30,7 @@ import { useAsyncList } from "../hooks/useAsyncList";
 import { useDebouncedValue } from "../hooks/useDebouncedValue";
 import { useMutationState } from "../hooks/useMutationState";
 import { cn } from "../components/ui/utils";
+import { RangeSummary } from "../components/RangeSummary";
 import {
   DEFAULT_SUBJECT_COLOR,
   generateSubjectCode,
@@ -447,9 +448,7 @@ export function SubjectManagement() {
           </div>
 
           <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <p className="text-sm text-gray-600">
-              Showing <strong>{rangeStart}-{rangeEnd}</strong> of <strong>{totalCount}</strong> subjects
-            </p>
+            <RangeSummary start={rangeStart} end={rangeEnd} total={totalCount} unit="subjects" />
             <div className="flex gap-2">
               <Button
                 variant="outline"

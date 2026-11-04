@@ -27,6 +27,7 @@ import {
   SelectValue,
 } from "../components/ui/select";
 import { Tabs, TabsList, TabsTrigger } from "../components/ui/tabs";
+import { RangeSummary } from "../components/RangeSummary";
 import { useAsyncList } from "../hooks/useAsyncList";
 import { useDebouncedValue } from "../hooks/useDebouncedValue";
 import { useMutationState } from "../hooks/useMutationState";
@@ -414,9 +415,7 @@ export function NotificationCenter() {
           </div>
 
           <div className="flex flex-col gap-3 border-t border-gray-200 pt-4 sm:flex-row sm:items-center sm:justify-between">
-            <p className="text-sm text-gray-600">
-              Showing <strong>{rangeStart}</strong>-<strong>{rangeEnd}</strong> of <strong>{notificationsList.data?.count ?? 0}</strong> notification(s)
-            </p>
+            <RangeSummary start={rangeStart} end={rangeEnd} total={notificationsList.data?.count ?? 0} unit="notification(s)" />
             <div className="flex gap-2">
               <Button
                 variant="outline"

@@ -30,7 +30,7 @@ export function BrandLogo({ variant = "full", subtitle, size = "md", className, 
   return (
     <span className={cn("flex min-w-0 items-center gap-3", className)}>
       {/* Logo mau navy: tren nen toi can nen trang de khong bi chim. */}
-      <span className={cn("shrink-0 rounded-lg dark:bg-white dark:px-2 dark:py-1", onDark && "bg-white px-2 py-1 shadow-sm")}>
+      <span className={cn("shrink-0 rounded-lg dark:bg-white dark:px-2 dark:py-1", onDark && "bg-[#ffffff] px-2 py-1 shadow-sm")}>
         <img
           src="/fermat-logo.png"
           alt="FermatTech"

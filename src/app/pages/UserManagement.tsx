@@ -27,6 +27,7 @@ import {
 } from "../components/ui/select";
 import { Badge } from "../components/ui/badge";
 import { ImportTemplateActions } from "../components/imports/ImportTemplateActions";
+import { RangeSummary } from "../components/RangeSummary";
 import { apiRequest, type PaginatedResponse } from "../lib/http";
 import { userImportTemplate } from "../lib/importTemplates";
 import { useAsyncList } from "../hooks/useAsyncList";
@@ -773,9 +774,7 @@ export function UserManagement() {
           </div>
 
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <p className="text-sm text-gray-600">
-              Showing <strong>{rangeStart}-{rangeEnd}</strong> of <strong>{totalCount}</strong> users
-            </p>
+            <RangeSummary start={rangeStart} end={rangeEnd} total={totalCount} unit="users" />
             <div className="flex gap-2">
               <Button
                 variant="outline"

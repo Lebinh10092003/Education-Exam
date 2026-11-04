@@ -17,6 +17,7 @@ import { Badge } from "../components/ui/badge";
 import { Button } from "../components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
 import { Input } from "../components/ui/input";
+import { RangeSummary } from "../components/RangeSummary";
 import {
   Select,
   SelectContent,
@@ -206,7 +207,7 @@ export function AuditCenter() {
         </div>
       ) : null}
 
-      <div className="mb-6 grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-4">
+      <div className="mb-6 grid grid-cols-2 gap-3 sm:gap-6 xl:grid-cols-4">
         <Card>
           <CardHeader className="pb-3">
             <CardTitle className="flex items-center gap-2 text-base">
@@ -414,9 +415,7 @@ export function AuditCenter() {
           </div>
 
           <div className="flex flex-col gap-3 border-t border-gray-200 pt-4 sm:flex-row sm:items-center sm:justify-between">
-            <p className="text-sm text-gray-600">
-              Showing <strong>{rangeStart}</strong>-<strong>{rangeEnd}</strong> of <strong>{events.data?.count ?? 0}</strong> event(s)
-            </p>
+            <RangeSummary start={rangeStart} end={rangeEnd} total={events.data?.count ?? 0} unit="event(s)" />
             <div className="flex gap-2">
               <Button
                 variant="outline"

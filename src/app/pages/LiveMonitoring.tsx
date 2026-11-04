@@ -1097,7 +1097,7 @@ export function LiveMonitoring({ examId: examIdProp, embedded = false }: LiveMon
         </TabsList>
 
         <TabsContent value="overview" className="space-y-6">
-          <div className="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-4">
+          <div className="grid grid-cols-2 gap-3 sm:gap-6 xl:grid-cols-4">
             <Card><CardContent className="p-6"><div className="flex items-center justify-between"><div><p className="mb-1 text-sm text-slate-600">Total Candidates</p><p className="text-3xl font-bold text-slate-900">{data?.total_candidates ?? 0}</p></div><div className="rounded-2xl bg-blue-100 p-4 text-blue-600"><Users className="h-6 w-6" /></div></div></CardContent></Card>
             <Card><CardContent className="p-6"><div className="flex items-center justify-between"><div><p className="mb-1 text-sm text-slate-600">In Progress</p><p className="text-3xl font-bold text-blue-600">{data?.in_progress ?? 0}</p></div><div className="rounded-2xl bg-blue-100 p-4 text-blue-600"><Clock className="h-6 w-6" /></div></div></CardContent></Card>
             <Card><CardContent className="p-6"><div className="flex items-center justify-between"><div><p className="mb-1 text-sm text-slate-600">Completed</p><p className="text-3xl font-bold text-green-600">{data?.completed ?? 0}</p></div><div className="rounded-2xl bg-green-100 p-4 text-green-600"><CheckCircle2 className="h-6 w-6" /></div></div></CardContent></Card>

@@ -9,6 +9,7 @@ import { Badge } from "../components/ui/badge";
 import { Button } from "../components/ui/button";
 import { Card, CardContent } from "../components/ui/card";
 import { Input } from "../components/ui/input";
+import { RangeSummary } from "../components/RangeSummary";
 import {
   Select,
   SelectContent,
@@ -602,9 +603,7 @@ export function ExamManagement() {
           </div>
 
           <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <p className="text-sm text-gray-600">
-              Showing <strong>{rangeStart}-{rangeEnd}</strong> of <strong>{totalCount}</strong> records
-            </p>
+            <RangeSummary start={rangeStart} end={rangeEnd} total={totalCount} unit="records" />
             <div className="flex gap-2">
               <Button
                 variant="outline"

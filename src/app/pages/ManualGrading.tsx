@@ -24,6 +24,7 @@ import {
   SelectValue,
 } from "../components/ui/select";
 import { Textarea } from "../components/ui/textarea";
+import { RangeSummary } from "../components/RangeSummary";
 import { apiRequest, type PaginatedResponse } from "../lib/http";
 import { notify } from "../lib/notify";
 import { useAsyncList } from "../hooks/useAsyncList";
@@ -486,10 +487,7 @@ export function ManualGrading() {
           </div>
 
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <p className="text-sm text-gray-600">
-              Showing <strong>{rangeStart}</strong>-<strong>{rangeEnd}</strong> of{" "}
-              <strong>{totalCount}</strong> grading task(s)
-            </p>
+            <RangeSummary start={rangeStart} end={rangeEnd} total={totalCount} unit="grading task(s)" />
             <div className="flex gap-2">
               <Button
                 variant="outline"

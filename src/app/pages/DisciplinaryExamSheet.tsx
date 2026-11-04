@@ -259,11 +259,13 @@ export function DisciplinaryExamSheet() {
   ) => {
     const config = policyDraft[key];
     return (
-      <div className="grid gap-3 rounded-xl border border-gray-200 p-4 md:grid-cols-3">
+      // Khung chinh sach nam o cot hep: tieu de o tren, o nhap ben duoi (khong ep 3 cot).
+      <div className="space-y-3 rounded-lg border border-gray-200 p-4">
         <div>
-          <p className="font-medium text-gray-900">{label}</p>
+          <p className="font-semibold text-gray-900">{label}</p>
           <p className="text-xs text-gray-500">{t("discipline.sheet.bandDescription")}</p>
         </div>
+        <div className={`grid gap-3 ${secondaryLabel && secondaryKey ? "grid-cols-2" : "grid-cols-1"}`}>
         <div>
           <label className="mb-1 block text-xs uppercase tracking-wide text-gray-500">{primaryLabel}</label>
           <Input
@@ -279,9 +281,8 @@ export function DisciplinaryExamSheet() {
             }
           />
         </div>
-        <div>
-          {secondaryLabel && secondaryKey ? (
-            <>
+        {secondaryLabel && secondaryKey ? (
+          <div>
               <label className="mb-1 block text-xs uppercase tracking-wide text-gray-500">{secondaryLabel}</label>
               <Input
                 value={getPolicyValue(config, secondaryKey, 0)}
@@ -295,12 +296,8 @@ export function DisciplinaryExamSheet() {
                   }))
                 }
               />
-            </>
-          ) : (
-            <div className="rounded-lg border border-dashed border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-500">
-              {t("discipline.sheet.noSecondaryValue")}
-            </div>
-          )}
+          </div>
+        ) : null}
         </div>
       </div>
     );
@@ -342,7 +339,7 @@ export function DisciplinaryExamSheet() {
         </div>
       ) : null}
 
-      <div className="mb-6 grid gap-6 xl:grid-cols-[minmax(0,1.5fr)_420px]">
+      <div className="mb-6 grid items-start gap-6 xl:grid-cols-[minmax(0,1.5fr)_420px]">
         <Card>
           <CardHeader>
             <CardTitle>{t("discipline.sheet.bulkTitle")}</CardTitle>
